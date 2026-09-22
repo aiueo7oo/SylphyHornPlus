@@ -132,6 +132,12 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "pinned")]
 		public bool Pinned;
 
+		[DataMember(Name = "windowPinned", EmitDefaultValue = false)]
+		public bool? WindowPinned;
+
+		[DataMember(Name = "appPinned", EmitDefaultValue = false)]
+		public bool? AppPinned;
+
 		[DataMember(Name = "movable")]
 		public bool Movable;
 	}
@@ -146,7 +152,7 @@ namespace SylphyHorn.Commands
 			using (var hash = SHA256.Create())
 			using (var process = Process.GetCurrentProcess())
 			{
-				var key = company + "\n" + product + "\n" + identity.User.Value + "\n" + process.SessionId;
+				var key = company + "\r\n" + product + "\r\n" + identity.User.Value + "\r\n" + process.SessionId;
 				return "SylphyHorn.Cli.v1." + BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(key))).Replace("-", "");
 			}
 		}

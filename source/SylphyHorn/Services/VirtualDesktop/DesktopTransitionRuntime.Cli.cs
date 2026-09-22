@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
 using SylphyHorn.Commands;
+using SylphyHorn.Properties;
 using SylphyHorn.Services.AppPlacement;
 using WindowsDesktop;
 
@@ -28,8 +29,54 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (command.Operation == "desktop list")
 					return CliResponse.Ok(command.Operation, new CliData { Desktops = this.State.Order.Select(this.CliDesktopInfo).ToArray() });
 				if (command.Operation == "window list") return CliResponse.Ok(command.Operation, this.ListCliWindows(cancellation));
+				if (command.Operation == "desktop create")
+				{
+					if (command.Name != null && !ProductInfo.IsNameSupportBuild)
+						throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
+					this.EnsureCliAvailable(cancellation);
+					submitted = true;
+					var created = this._operations.Create();
+					if (command.Name != null) this._operations.SetName(created, command.Name);
+					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(created)
+						&& (command.Name == null || this.CliDesktopInfo(created).Name == command.Name), cancellation);
+					return CliResponse.Ok(command.Operation, new CliData { Changed = true, Desktop = this.CliDesktopInfo(created) });
+				}
 
-				var target = this.ResolveCliTarget(command);
+				var target = command.Operation == "window pin" || command.Operation == "window unpin"
+					? Guid.Empty : this.ResolveCliTarget(command);
+				if (command.Operation == "desktop rename")
+				{
+					if (!ProductInfo.IsNameSupportBuild) throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
+					var changed = this.CliDesktopInfo(target).Name != command.Name;
+					if (changed)
+					{
+						this.EnsureCliAvailable(cancellation);
+						submitted = true;
+						this._operations.SetName(target, command.Name);
+						await this.ConfirmCliDesktopAsync(() => this.CliDesktopInfo(target).Name == command.Name, cancellation);
+					}
+					return CliResponse.Ok(command.Operation, new CliData { Changed = changed, Desktop = this.CliDesktopInfo(target) });
+				}
+				if (command.Operation == "desktop reorder")
+				{
+					if (!ProductInfo.IsReorderingSupportBuild)
+						throw new CliFailure("unsupported", "Desktop reordering is unavailable on this Windows build.");
+					var count = this.State.Order.Count;
+					if (command.Number > count) throw new CliFailure("desktop_not_found", "The destination position does not exist.");
+					var original = this.CliDesktopInfo(target).Number;
+					for (var number = original; number != command.Number;)
+					{
+						this.EnsureCliAvailable(cancellation);
+						if (this.State.Order.Count != count) throw new CliFailure("state_changed", "The desktop order changed during reordering.");
+						var next = number + (command.Number > number ? 1 : -1);
+						submitted = true;
+						if (next > number) this._operations.MoveRight(target);
+						else this._operations.MoveLeft(target);
+						await this.ConfirmCliDesktopAsync(() => this.CliDesktopInfo(target).Number == next, cancellation);
+						number = next;
+					}
+					return CliResponse.Ok(command.Operation, new CliData { Changed = original != command.Number, Desktop = this.CliDesktopInfo(target) });
+				}
 				if (command.Operation == "desktop switch")
 				{
 					var changed = this.State.CurrentDesktopId != target;
@@ -44,12 +91,57 @@ namespace SylphyHorn.Services.DesktopTransitions
 				}
 
 				var key = Guid.Parse(command.WindowId);
-				if (!this._cliWindows.TryGetValue(key, out var entry) || entry.ExpiresAt < DateTime.UtcNow)
-					throw new CliFailure("window_not_found", "The window ID is unknown or expired. Run window list again.");
+				var entry = this.ResolveCliWindow(key);
 				var windows = new PlacementWindows();
 				var inspection = windows.Inspect(entry.Identity.Window);
 				if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity))
 					throw new CliFailure("window_changed", "The window identity changed. Run window list again.");
+				if (command.Operation == "window pin" || command.Operation == "window unpin")
+				{
+					var pin = command.Operation == "window pin";
+					var appId = command.Scope == "app" ? ApplicationHelper.GetAppId(entry.Identity.Window) : null;
+					if (command.Scope == "app" && string.IsNullOrEmpty(appId))
+						throw new CliFailure("app_id_unavailable", "The window's application ID is unavailable.");
+					var current = command.Scope == "app" ? VirtualDesktop.IsPinnedApplication(appId) : VirtualDesktop.IsPinnedWindow(entry.Identity.Window);
+					var changed = current != pin;
+					if (changed)
+					{
+						this.EnsureCliAvailable(cancellation);
+						inspection = windows.Inspect(entry.Identity.Window);
+						if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity)
+							|| (command.Scope == "app" && ApplicationHelper.GetAppId(entry.Identity.Window) != appId))
+							throw new CliFailure("window_changed", "The window identity changed. Run window list again.");
+						submitted = true;
+						if (command.Scope == "app")
+						{
+							if (pin) VirtualDesktop.PinApplication(appId);
+							else VirtualDesktop.UnpinApplication(appId);
+						}
+						else if (pin) VirtualDesktop.PinWindow(entry.Identity.Window);
+						else VirtualDesktop.UnpinWindow(entry.Identity.Window);
+						while (true)
+						{
+							this.EnsureCliAvailable(cancellation);
+							if (command.Scope == "window")
+							{
+								inspection = windows.Inspect(entry.Identity.Window);
+								if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity))
+									throw new CliFailure("result_unconfirmed", "The window changed before its pin state could be confirmed.");
+							}
+							current = command.Scope == "app" ? VirtualDesktop.IsPinnedApplication(appId) : VirtualDesktop.IsPinnedWindow(entry.Identity.Window);
+							if (current == pin) break;
+							await Task.Delay(100, cancellation);
+						}
+					}
+					var result = new CliData { Changed = changed };
+					inspection = windows.Inspect(entry.Identity.Window);
+					if (inspection.Status == PlacementInspectionStatus.Ready && entry.Identity.SameInstance(inspection.Identity))
+					{
+						try { result.Window = this.CliWindowInfo(key, entry.Identity, windows.Locate(entry.Identity.Window)); }
+						catch { /* The pin state was confirmed; optional window details may no longer be available. */ }
+					}
+					return CliResponse.Ok(command.Operation, result);
+				}
 				var location = windows.Locate(entry.Identity.Window);
 				if (location == null) throw new CliFailure("state_unavailable", "The window location could not be read.", true);
 				if (location.Pinned) throw new CliFailure("window_pinned", "A pinned window cannot be assigned to one desktop.");
@@ -143,6 +235,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 			} while (true);
 		}
 
+		private async Task ConfirmCliDesktopAsync(Func<bool> confirmed, CancellationToken cancellation)
+		{
+			while (true)
+			{
+				await this.RefreshCliStateAsync(cancellation);
+				if (confirmed()) return;
+				await Task.Delay(100, cancellation);
+			}
+		}
+
 		private Guid ResolveCliTarget(CliCommand command)
 		{
 			var order = this.State.Order.ToArray();
@@ -167,6 +269,13 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (resolution.Status == PlacementResolutionStatus.StateUnavailable) throw new CliFailure("state_unavailable", "Desktop names could not be resolved.", true);
 			}
 			throw new CliFailure("desktop_not_found", "The specified desktop does not exist.");
+		}
+
+		private CliWindowEntry ResolveCliWindow(Guid key)
+		{
+			if (!this._cliWindows.TryGetValue(key, out var entry) || entry.ExpiresAt < DateTime.UtcNow)
+				throw new CliFailure("window_not_found", "The window ID is unknown or expired. Run window list again.");
+			return entry;
 		}
 
 		private CliDesktop CliDesktopInfo(Guid id)
@@ -223,6 +332,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 			var title = new StringBuilder(1024);
 			CliGetWindowText(identity.Window, title, title.Capacity);
 			var process = identity.AppProcess ?? identity.Owner;
+			var appId = ApplicationHelper.GetAppId(identity.Window);
+			// The Shell may report a pinned view when the application is pinned.
+			var windowPinned = VirtualDesktop.IsPinnedWindow(identity.Window);
+			var appPinned = string.IsNullOrEmpty(appId) ? (bool?)null : VirtualDesktop.IsPinnedApplication(appId);
+			var pinned = windowPinned || appPinned == true || (location != null && location.Pinned);
 			return new CliWindow
 			{
 				Id = key.ToString(),
@@ -230,10 +344,12 @@ namespace SylphyHorn.Services.DesktopTransitions
 				ProcessId = process.Id,
 				ProcessName = Path.GetFileNameWithoutExtension(process.Path),
 				ExecutablePath = process.Path,
-				AppId = identity.App.Kind == PlacementAppKind.PackageAppId ? identity.App.Value : null,
-				DesktopId = location != null && !location.Pinned ? location.Desktop.ToString() : null,
-				Pinned = location != null && location.Pinned,
-				Movable = location != null && !location.Pinned
+				AppId = appId,
+				DesktopId = location != null && !pinned ? location.Desktop.ToString() : null,
+				Pinned = pinned,
+				WindowPinned = windowPinned,
+				AppPinned = appPinned,
+				Movable = location != null && !pinned
 			};
 		}
 

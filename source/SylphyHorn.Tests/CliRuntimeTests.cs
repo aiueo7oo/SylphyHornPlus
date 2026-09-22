@@ -74,6 +74,77 @@ namespace SylphyHorn.Tests
 			Assert.Empty(harness.Operations.DesktopOperationIds);
 		}
 
+		[Fact]
+		public async Task CreateReturnsConfirmedDesktop()
+		{
+			var harness = await Create();
+			harness.Operations.Creating = () => C;
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", ""), Entry(B, 1, "work", ""), Entry(C, 2, "new", "")));
+			var response = await harness.Runtime.ExecuteCliAsync(CliCommand.Parse(new[] { "desktop", "create", "--name", "new" }), CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.True(response.Data.Changed);
+			Assert.Equal(C.ToString(), response.Data.Desktop.Id);
+			Assert.Equal(3, response.Data.Desktop.Number);
+			Assert.Equal(new[] { "new" }, harness.Operations.NameValues);
+		}
+
+		[Fact]
+		public async Task RenameWaitsForConfirmedName()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "renamed", ""), Entry(B, 1, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "rename", "--id", A.ToString(), "--name", "renamed" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal("renamed", response.Data.Desktop.Name);
+			Assert.Equal(new[] { "renamed" }, harness.Operations.NameValues);
+		}
+
+		[Fact]
+		public async Task EmptyNameCanBeConfirmed()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "", ""), Entry(B, 1, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "rename", "--id", A.ToString(), "--name", "" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal(string.Empty, response.Data.Desktop.Name);
+			Assert.Equal(new[] { string.Empty }, harness.Operations.NameValues);
+		}
+
+		[Fact]
+		public async Task ReorderWaitsForConfirmedPosition()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(B, 0, "work", ""), Entry(A, 1, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "reorder", "--id", A.ToString(), "--number", "2" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal(2, response.Data.Desktop.Number);
+			Assert.Equal(new[] { "MoveRight" }, harness.Operations.DesktopOperationNames);
+		}
+
+		[Fact]
+		public async Task UnconfirmedCreateCannotBeBlindlyRetried()
+		{
+			var harness = await Create();
+			var response = await harness.Runtime.ExecuteCliAsync(CliCommand.Parse(new[] { "desktop", "create" }), CancellationToken.None);
+			Assert.Equal("result_unconfirmed", response.Error.Code);
+			Assert.False(response.Error.Retryable);
+			Assert.Equal(1, harness.Operations.CreateCalls);
+		}
+
+		[Fact]
+		public async Task UnconfirmedReorderStopsBeforeAnotherMove()
+		{
+			var harness = await Create();
+			var command = CliCommand.Parse(new[] { "desktop", "reorder", "--id", A.ToString(), "--number", "2" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.Equal("result_unconfirmed", response.Error.Code);
+			Assert.False(response.Error.Retryable);
+			Assert.Equal(new[] { "MoveRight" }, harness.Operations.DesktopOperationNames);
+		}
+
 		private static async Task<Harness> Create()
 		{
 			var batch = Batch(1, 1, A, Entry(A, 0, "work", ""), Entry(B, 1, "work", ""));

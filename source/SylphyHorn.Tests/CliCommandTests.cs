@@ -61,5 +61,31 @@ namespace SylphyHorn.Tests
 			Assert.Equal(desktop, command.TargetValue);
 			Assert.False(command.Follow);
 		}
+
+		[Fact]
+		public void DesktopMutationsRequireExplicitIdentifiersAndValues()
+		{
+			var id = Guid.NewGuid().ToString();
+			Assert.Equal("work", CliCommand.Parse(new[] { "desktop", "create", "--name", "work" }).Name);
+			var rename = CliCommand.Parse(new[] { "desktop", "rename", "--id", id, "--name", "new work" });
+			Assert.Equal(id, rename.TargetValue);
+			Assert.Equal("new work", rename.Name);
+			var clearName = CliCommand.Parse(new[] { "desktop", "rename", "--id", id, "--name", string.Empty });
+			Assert.Equal(string.Empty, clearName.Name);
+			var reorder = CliCommand.Parse(new[] { "desktop", "reorder", "--id", id, "--number", "2" });
+			Assert.Equal(2, reorder.Number);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "rename", "--name", "work" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "reorder", "--id", id, "--number", "0" }));
+		}
+
+		[Fact]
+		public void PinScopeMustBeExplicit()
+		{
+			var id = Guid.NewGuid().ToString();
+			Assert.Equal("window", CliCommand.Parse(new[] { "window", "pin", "--id", id, "--scope", "window" }).Scope);
+			Assert.Equal("app", CliCommand.Parse(new[] { "window", "unpin", "--id", id, "--scope", "app" }).Scope);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "pin", "--id", id }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "unpin", "--id", id, "--scope", "all" }));
+		}
 	}
 }

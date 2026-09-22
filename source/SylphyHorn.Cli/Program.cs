@@ -18,8 +18,13 @@ namespace SylphyHorn.Cli
 			{
 				Console.WriteLine("sylphyhorn-cli desktop list");
 				Console.WriteLine("sylphyhorn-cli desktop switch (--number N | --name NAME | --id ID | --next | --previous) [--wrap]");
+				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME]");
+				Console.WriteLine("sylphyhorn-cli desktop rename --id ID --name NAME");
+				Console.WriteLine("sylphyhorn-cli desktop reorder --id ID --number N");
 				Console.WriteLine("sylphyhorn-cli window list");
 				Console.WriteLine("sylphyhorn-cli window move --id ID (--desktop-number N | --desktop-name NAME | --desktop-id ID) [--follow]");
+				Console.WriteLine("sylphyhorn-cli window pin --id ID --scope (window | app)");
+				Console.WriteLine("sylphyhorn-cli window unpin --id ID --scope (window | app)");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
 				return 0;
 			}

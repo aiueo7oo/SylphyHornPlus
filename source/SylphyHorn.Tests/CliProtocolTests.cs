@@ -21,6 +21,17 @@ namespace SylphyHorn.Tests
 			Assert.DoesNotContain("\"ok\"", json);
 		}
 
+		[Fact]
+		public void WindowPinScopesRemainDistinctInJson()
+		{
+			var window = new CliWindow { Pinned = true, WindowPinned = false, AppPinned = true };
+			var bytes = CliProtocol.Serialize(CliResponse.Ok("window list", new CliData { Windows = new[] { window } }));
+			var response = CliProtocol.Deserialize<CliResponse>(bytes);
+			Assert.False(response.Data.Windows[0].WindowPinned);
+			Assert.True(response.Data.Windows[0].AppPinned);
+			Assert.True(response.Data.Windows[0].Pinned);
+		}
+
 		[Theory]
 		[InlineData("invalid_arguments", 2)]
 		[InlineData("host_unavailable", 3)]
