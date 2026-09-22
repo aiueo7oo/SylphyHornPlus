@@ -600,4 +600,253 @@
   <data name="TaskTray_TooltipText_DesktopCount" xml:space="preserve">
     <value>デスクトップ {0}/{1}</value>
   </data>
+  <data name="Placement_Title" xml:space="preserve">
+    <value>アプリの自動配置</value>
+  </data>
+  <data name="Placement_Enable" xml:space="preserve">
+    <value>アプリの新しいウィンドウを自動配置する</value>
+  </data>
+  <data name="Placement_Restart" xml:space="preserve">
+    <value>監視を再開</value>
+  </data>
+  <data name="Placement_DeleteLabel" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="Placement_Delete" xml:space="preserve">
+    <value>ルールを削除</value>
+  </data>
+  <data name="Placement_Cancel" xml:space="preserve">
+    <value>キャンセル(_C)</value>
+  </data>
+  <data name="Placement_ExeFilter" xml:space="preserve">
+    <value>実行ファイル (*.exe)</value>
+  </data>
+  <data name="Placement_PathUnavailable" xml:space="preserve">
+    <value>実行ファイルパスは確認できません。</value>
+  </data>
+  <data name="Placement_InvalidNumber" xml:space="preserve">
+    <value>1以上の整数を入力してください。</value>
+  </data>
+  <data name="Placement_InvalidName" xml:space="preserve">
+    <value>デスクトップ名を入力してください。空白も含めて完全一致で照合します。</value>
+  </data>
+  <data name="Placement_Duplicate" xml:space="preserve">
+    <value>同じアプリの有効なルールが既にあります。キャンセルしてそのルールを編集するか、どちらかのルールを無効にしてください。</value>
+  </data>
+  <data name="Placement_SaveFailed" xml:space="preserve">
+    <value>変更はメモリ上に反映されましたが、ファイルに保存できませんでした。設定の保存先を確認してから再度保存してください。</value>
+  </data>
+  <data name="Placement_ConfigurationChanged" xml:space="preserve">
+    <value>別の操作で設定が変更されたため、未保存の編集を閉じました。現在のルールを確認してから編集し直してください。</value>
+  </data>
+  <data name="Placement_Loading" xml:space="preserve">
+    <value>アプリの候補を取得中です。編集のキャンセルはできます。</value>
+  </data>
+  <data name="Placement_QueryFailed" xml:space="preserve">
+    <value>候補を取得できませんでした。再取得するか、開いているウィンドウ・実行ファイルの指定をお試しください。</value>
+  </data>
+  <data name="Placement_IdentityUnavailable" xml:space="preserve">
+    <value>所属アプリを確認できないため登録できません。別の選択方法をお試しください。</value>
+  </data>
+  <data name="Placement_LauncherOnly" xml:space="preserve">
+    <value>照合に使う実行ファイルを確認できません。実際の実行ファイルか、開いているウィンドウから選んでください。</value>
+  </data>
+  <data name="Placement_RetrySave" xml:space="preserve">
+    <value>再度保存する</value>
+  </data>
+  <data name="Placement_AddFromApp" xml:space="preserve">
+    <value>アプリ一覧から追加…</value>
+  </data>
+  <data name="Placement_AddManual" xml:space="preserve">
+    <value>行を追加</value>
+  </data>
+  <data name="Placement_AppColumn" xml:space="preserve">
+    <value>アプリ</value>
+  </data>
+  <data name="Placement_Browse" xml:space="preserve">
+    <value>実行ファイルを参照…</value>
+  </data>
+  <data name="Placement_Choose" xml:space="preserve">
+    <value>選択</value>
+  </data>
+  <data name="Placement_ChooseApp" xml:space="preserve">
+    <value>アプリを選択</value>
+  </data>
+  <data name="Placement_EnterPath" xml:space="preserve">
+    <value>実行ファイルのパスを入力するか、アプリを選択してください。</value>
+  </data>
+  <data name="Placement_InputHint" xml:space="preserve">
+    <value>Enter または入力欄を離れると保存。Esc でその行を元に戻します。</value>
+  </data>
+  <data name="Placement_Installed" xml:space="preserve">
+    <value>インストール済み</value>
+  </data>
+  <data name="Placement_InvalidPath" xml:space="preserve">
+    <value>実行ファイルを確認できません。パスを確認してください。</value>
+  </data>
+  <data name="Placement_LauncherWarning" xml:space="preserve">
+    <value>このパスを登録します。ショートカットの参照先が、アプリ本体ではなくランチャーの場合があります。</value>
+  </data>
+  <data name="Placement_NameColumn" xml:space="preserve">
+    <value>デスクトップ名</value>
+  </data>
+  <data name="Placement_NameMatchHint" xml:space="preserve">
+    <value>同じ名前が複数ある場合は、番号が最も小さいデスクトップに配置します。</value>
+  </data>
+  <data name="Placement_NameList" xml:space="preserve">
+    <value>デスクトップ名で配置</value>
+  </data>
+  <data name="Placement_NoCandidates" xml:space="preserve">
+    <value>該当するアプリがありません。</value>
+  </data>
+  <data name="Placement_NumberColumn" xml:space="preserve">
+    <value>デスクトップ番号</value>
+  </data>
+  <data name="Placement_NumberList" xml:space="preserve">
+    <value>デスクトップ番号で配置</value>
+  </data>
+  <data name="Placement_PathColumn" xml:space="preserve">
+    <value>実行ファイルのパス</value>
+  </data>
+  <data name="Placement_RuleEnabled" xml:space="preserve">
+    <value>この登録を有効にする</value>
+  </data>
+  <data name="Placement_Search" xml:space="preserve">
+    <value>検索</value>
+  </data>
+  <data name="Placement_UnknownApplication" xml:space="preserve">
+    <value>アプリ（名前を取得できません）</value>
+  </data>
+  <data name="Placement_Windows" xml:space="preserve">
+    <value>起動中のアプリ</value>
+  </data>
+  <data name="Placement_EnabledColumn" xml:space="preserve">
+    <value>有効</value>
+  </data>
+  <data name="Placement_OpenApply" xml:space="preserve">
+    <value>開いているウィンドウに適用…</value>
+  </data>
+  <data name="Placement_ApplyTitle" xml:space="preserve">
+    <value>開いているウィンドウに配置ルールを適用</value>
+  </data>
+  <data name="Placement_ApplyIntro" xml:space="preserve">
+    <value>移動するウィンドウにチェックを入れてください。有効な登録に一致するウィンドウを表示します。表示中のデスクトップは切り替えません。</value>
+  </data>
+  <data name="Placement_WindowColumn" xml:space="preserve">
+    <value>ウィンドウ／アプリ</value>
+  </data>
+  <data name="Placement_SourceColumn" xml:space="preserve">
+    <value>確認時の位置</value>
+  </data>
+  <data name="Placement_TargetColumn" xml:space="preserve">
+    <value>移動先</value>
+  </data>
+  <data name="Placement_ResultColumn" xml:space="preserve">
+    <value>状態／結果</value>
+  </data>
+  <data name="Placement_RefreshWindows" xml:space="preserve">
+    <value>一覧を更新</value>
+  </data>
+  <data name="Placement_StopApply" xml:space="preserve">
+    <value>中止</value>
+  </data>
+  <data name="Placement_CloseApply" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="Placement_ApplySelection" xml:space="preserve">
+    <value>選択した {0} 件を移動</value>
+  </data>
+  <data name="Placement_DesktopNumber" xml:space="preserve">
+    <value>デスクトップ {0}</value>
+  </data>
+  <data name="Placement_DesktopUnknown" xml:space="preserve">
+    <value>取得できません</value>
+  </data>
+  <data name="Placement_ReadyToApply" xml:space="preserve">
+    <value>移動できます</value>
+  </data>
+  <data name="Placement_Applying" xml:space="preserve">
+    <value>処理中…</value>
+  </data>
+  <data name="Placement_ApplyDisabled" xml:space="preserve">
+    <value>設定画面で自動配置を有効にすると利用できます。</value>
+  </data>
+  <data name="Placement_ApplyNoRules" xml:space="preserve">
+    <value>有効な配置ルールを登録してください。</value>
+  </data>
+  <data name="Placement_ApplyPreparing" xml:space="preserve">
+    <value>ウィンドウ監視を準備しています。準備が終わったら一覧を更新してください。</value>
+  </data>
+  <data name="Placement_ApplyPaused" xml:space="preserve">
+    <value>監視が停止しています。設定画面から監視を再開してください。</value>
+  </data>
+  <data name="Placement_ApplyStopping" xml:space="preserve">
+    <value>中止を待っています。開始済みの移動は完了する場合があります。</value>
+  </data>
+  <data name="Placement_ApplySuspended" xml:space="preserve">
+    <value>設定の取り込み中または終了処理中は利用できません。</value>
+  </data>
+  <data name="Placement_ApplyChanged" xml:space="preserve">
+    <value>デスクトップの状態が変わりました。一覧を更新して確認してください。</value>
+  </data>
+  <data name="Placement_ApplyEmpty" xml:space="preserve">
+    <value>有効な配置ルールに一致するウィンドウはありません。</value>
+  </data>
+  <data name="Placement_ApplyReview" xml:space="preserve">
+    <value>移動先を確認し、移動するウィンドウを選択してください。時間が経った場合は一覧を更新してください。</value>
+  </data>
+  <data name="Placement_ApplyCancelled" xml:space="preserve">
+    <value>一覧の取得を中止しました。再取得するには一覧を更新してください。</value>
+  </data>
+  <data name="Placement_ApplyQueryFailed" xml:space="preserve">
+    <value>一覧を取得できませんでした。ウィンドウの移動は行っていません。一覧を更新して再試行してください。</value>
+  </data>
+  <data name="Placement_ApplyRunning" xml:space="preserve">
+    <value>選択したウィンドウを移動しています。閉じると残りの処理を中止しますが、開始済みの移動は完了する場合があります。</value>
+  </data>
+  <data name="Placement_ApplyFinished" xml:space="preserve">
+    <value>処理が終了しました。各行の結果を確認してください。続けて移動する場合は一覧を更新してください。</value>
+  </data>
+  <data name="Placement_ApplyFailed" xml:space="preserve">
+    <value>結果を確認できませんでした。一覧の期限切れや状態の変更が考えられます。一覧を更新し、現在位置を確認してください。</value>
+  </data>
+  <data name="Placement_OutcomeMoved" xml:space="preserve">
+    <value>移動しました</value>
+  </data>
+  <data name="Placement_OutcomeAlreadyPlaced" xml:space="preserve">
+    <value>配置済み</value>
+  </data>
+  <data name="Placement_OutcomeNoRule" xml:space="preserve">
+    <value>一致する登録がありません</value>
+  </data>
+  <data name="Placement_OutcomeExcluded" xml:space="preserve">
+    <value>対象外（ピン留めなど）</value>
+  </data>
+  <data name="Placement_OutcomeChanged" xml:space="preserve">
+    <value>状態変更のため見送り</value>
+  </data>
+  <data name="Placement_OutcomeCancelled" xml:space="preserve">
+    <value>中止しました</value>
+  </data>
+  <data name="Placement_OutcomeTimedOut" xml:space="preserve">
+    <value>時間切れ</value>
+  </data>
+  <data name="Placement_OutcomeUnavailable" xml:space="preserve">
+    <value>ウィンドウを確認できません</value>
+  </data>
+  <data name="Placement_OutcomeDestinationUnavailable" xml:space="preserve">
+    <value>移動先を確認できません</value>
+  </data>
+  <data name="Placement_OutcomeMoveFailed" xml:space="preserve">
+    <value>移動失敗・現在位置を要確認</value>
+  </data>
+  <data name="Placement_OutcomeUnconfirmed" xml:space="preserve">
+    <value>結果未確認</value>
+  </data>
+  <data name="Placement_OutcomeMonitorPaused" xml:space="preserve">
+    <value>監視停止中</value>
+  </data>
+  <data name="Placement_ApplyNotSelected" xml:space="preserve">
+    <value>未選択</value>
+  </data>
 </root>

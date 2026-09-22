@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,26 +26,30 @@ namespace SylphyHorn.Tests
 			=> new VirtualDesktopStableEntry(id, index, name, VirtualDesktopReadStatus.Success, wallpaper, VirtualDesktopReadStatus.Success);
 		internal static VirtualDesktopStableEntry WallpaperUnsupported(Guid id, int index, string name)
 			=> new VirtualDesktopStableEntry(id, index, name, VirtualDesktopReadStatus.Success, null, VirtualDesktopReadStatus.Unsupported);
-
 	}
 	internal sealed class NonSerializableValue { public Action Callback => () => { }; }
 
 	internal sealed class Harness
 	{
-		private Harness(FakeProvider provider, FakeSettings settings, FakeOwner owner, FakeOperations operations)
+		private Harness(
+			FakeProvider provider,
+			FakeSettings settings,
+			FakeOwner owner,
+			FakeOperations operations,
+			Services.AppPlacement.IPlacementSessionFactory placementFactory)
 		{
 			this.Provider = provider;
 			this.Settings = settings;
 			this.Owner = owner;
 			this.Operations = operations;
-			this.Runtime = new DesktopTransitionRuntime(provider, settings, owner, operations);
+			this.Runtime = new DesktopTransitionRuntime(provider, settings, owner, operations, placementFactory: placementFactory);
 		}
 		internal FakeProvider Provider { get; }
 		internal FakeSettings Settings { get; }
 		internal FakeOwner Owner { get; }
 		internal FakeOperations Operations { get; }
 		internal DesktopTransitionRuntime Runtime { get; }
-		internal static Harness Create(VirtualDesktopStableBatch batch) => new Harness(new FakeProvider(batch), new FakeSettings(DesktopStartupSeed.Empty), new FakeOwner(), new FakeOperations());
+		internal static Harness Create(VirtualDesktopStableBatch batch, Services.AppPlacement.IPlacementSessionFactory placementFactory = null) => new Harness(new FakeProvider(batch), new FakeSettings(DesktopStartupSeed.Empty), new FakeOwner(), new FakeOperations(), placementFactory);
 		internal static async Task<Harness> Initialized()
 		{
 			var harness = Create(Batch(1, 1, A, Entry(A, 0, "name", "wall")));

@@ -1508,5 +1508,564 @@ namespace SylphyHorn.Properties {
                 return ResourceManager.GetString("TaskTray_TooltipText_DesktopCount", resourceCulture);
             }
         }
+        /// <summary>
+        ///   Looks up a localized string similar to Add from applications….
+        /// </summary>
+        public static string Placement_AddFromApp {
+            get {
+                return ResourceManager.GetString("Placement_AddFromApp", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Add a row.
+        /// </summary>
+        public static string Placement_AddManual {
+            get {
+                return ResourceManager.GetString("Placement_AddManual", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Application.
+        /// </summary>
+        public static string Placement_AppColumn {
+            get {
+                return ResourceManager.GetString("Placement_AppColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Browse for an executable….
+        /// </summary>
+        public static string Placement_Browse {
+            get {
+                return ResourceManager.GetString("Placement_Browse", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to _Cancel.
+        /// </summary>
+        public static string Placement_Cancel {
+            get {
+                return ResourceManager.GetString("Placement_Cancel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Select.
+        /// </summary>
+        public static string Placement_Choose {
+            get {
+                return ResourceManager.GetString("Placement_Choose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Choose an application.
+        /// </summary>
+        public static string Placement_ChooseApp {
+            get {
+                return ResourceManager.GetString("Placement_ChooseApp", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Settings changed elsewhere. The unsaved editor was closed; review the current rules before editing again..
+        /// </summary>
+        public static string Placement_ConfigurationChanged {
+            get {
+                return ResourceManager.GetString("Placement_ConfigurationChanged", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Delete rule.
+        /// </summary>
+        public static string Placement_Delete {
+            get {
+                return ResourceManager.GetString("Placement_Delete", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to An enabled rule already exists for this application. Cancel and edit that rule, or disable one of the rules..
+        /// </summary>
+        public static string Placement_Duplicate {
+            get {
+                return ResourceManager.GetString("Placement_Duplicate", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Automatically place new app windows.
+        /// </summary>
+        public static string Placement_Enable {
+            get {
+                return ResourceManager.GetString("Placement_Enable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enabled.
+        /// </summary>
+        public static string Placement_EnabledColumn {
+            get {
+                return ResourceManager.GetString("Placement_EnabledColumn", resourceCulture);
+            }
+        }
+        /// <summary>
+        ///   Looks up a localized string similar to Enter an executable path or choose an application..
+        /// </summary>
+        public static string Placement_EnterPath {
+            get {
+                return ResourceManager.GetString("Placement_EnterPath", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Executable files (*.exe).
+        /// </summary>
+        public static string Placement_ExeFilter {
+            get {
+                return ResourceManager.GetString("Placement_ExeFilter", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The application identity could not be verified. Choose another entry point..
+        /// </summary>
+        public static string Placement_IdentityUnavailable {
+            get {
+                return ResourceManager.GetString("Placement_IdentityUnavailable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter or leave the field to save. Esc restores the saved row..
+        /// </summary>
+        public static string Placement_InputHint {
+            get {
+                return ResourceManager.GetString("Placement_InputHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Installed applications.
+        /// </summary>
+        public static string Placement_Installed {
+            get {
+                return ResourceManager.GetString("Placement_Installed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter a desktop name. Spaces are matched exactly..
+        /// </summary>
+        public static string Placement_InvalidName {
+            get {
+                return ResourceManager.GetString("Placement_InvalidName", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter a whole number of 1 or greater..
+        /// </summary>
+        public static string Placement_InvalidNumber {
+            get {
+                return ResourceManager.GetString("Placement_InvalidNumber", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The executable could not be read. Check the path..
+        /// </summary>
+        public static string Placement_InvalidPath {
+            get {
+                return ResourceManager.GetString("Placement_InvalidPath", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to This entry does not identify a verifiable executable. Choose its actual executable or open window..
+        /// </summary>
+        public static string Placement_LauncherOnly {
+            get {
+                return ResourceManager.GetString("Placement_LauncherOnly", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Check this executable path: a shortcut may point to a launcher rather than the application window..
+        /// </summary>
+        public static string Placement_LauncherWarning {
+            get {
+                return ResourceManager.GetString("Placement_LauncherWarning", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Loading applications… You can cancel editing..
+        /// </summary>
+        public static string Placement_Loading {
+            get {
+                return ResourceManager.GetString("Placement_Loading", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Desktop name.
+        /// </summary>
+        public static string Placement_NameColumn {
+            get {
+                return ResourceManager.GetString("Placement_NameColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Place by desktop name.
+        /// </summary>
+        public static string Placement_NameList {
+            get {
+                return ResourceManager.GetString("Placement_NameList", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to No applications found..
+        /// </summary>
+        public static string Placement_NoCandidates {
+            get {
+                return ResourceManager.GetString("Placement_NoCandidates", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Desktop number.
+        /// </summary>
+        public static string Placement_NumberColumn {
+            get {
+                return ResourceManager.GetString("Placement_NumberColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Place by desktop number.
+        /// </summary>
+        public static string Placement_NumberList {
+            get {
+                return ResourceManager.GetString("Placement_NumberList", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Executable path.
+        /// </summary>
+        public static string Placement_PathColumn {
+            get {
+                return ResourceManager.GetString("Placement_PathColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The executable path could not be confirmed..
+        /// </summary>
+        public static string Placement_PathUnavailable {
+            get {
+                return ResourceManager.GetString("Placement_PathUnavailable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Applications could not be loaded. Try refreshing, an open window, or an executable file..
+        /// </summary>
+        public static string Placement_QueryFailed {
+            get {
+                return ResourceManager.GetString("Placement_QueryFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Restart monitoring.
+        /// </summary>
+        public static string Placement_Restart {
+            get {
+                return ResourceManager.GetString("Placement_Restart", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Save again.
+        /// </summary>
+        public static string Placement_RetrySave {
+            get {
+                return ResourceManager.GetString("Placement_RetrySave", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enable this rule.
+        /// </summary>
+        public static string Placement_RuleEnabled {
+            get {
+                return ResourceManager.GetString("Placement_RuleEnabled", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The change is active in memory, but could not be saved to disk. Check the settings storage and save again before closing..
+        /// </summary>
+        public static string Placement_SaveFailed {
+            get {
+                return ResourceManager.GetString("Placement_SaveFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Search.
+        /// </summary>
+        public static string Placement_Search {
+            get {
+                return ResourceManager.GetString("Placement_Search", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to App placement.
+        /// </summary>
+        public static string Placement_Title {
+            get {
+                return ResourceManager.GetString("Placement_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Application (name unavailable).
+        /// </summary>
+        public static string Placement_UnknownApplication {
+            get {
+                return ResourceManager.GetString("Placement_UnknownApplication", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Running applications.
+        /// </summary>
+        public static string Placement_Windows {
+            get {
+                return ResourceManager.GetString("Placement_Windows", resourceCulture);
+            }
+        }
+        public static string Placement_OpenApply {
+            get {
+                return ResourceManager.GetString("Placement_OpenApply", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyNotSelected {
+            get {
+                return ResourceManager.GetString("Placement_ApplyNotSelected", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyTitle {
+            get {
+                return ResourceManager.GetString("Placement_ApplyTitle", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyIntro {
+            get {
+                return ResourceManager.GetString("Placement_ApplyIntro", resourceCulture);
+            }
+        }
+        public static string Placement_WindowColumn {
+            get {
+                return ResourceManager.GetString("Placement_WindowColumn", resourceCulture);
+            }
+        }
+        public static string Placement_SourceColumn {
+            get {
+                return ResourceManager.GetString("Placement_SourceColumn", resourceCulture);
+            }
+        }
+        public static string Placement_TargetColumn {
+            get {
+                return ResourceManager.GetString("Placement_TargetColumn", resourceCulture);
+            }
+        }
+        public static string Placement_ResultColumn {
+            get {
+                return ResourceManager.GetString("Placement_ResultColumn", resourceCulture);
+            }
+        }
+        public static string Placement_RefreshWindows {
+            get {
+                return ResourceManager.GetString("Placement_RefreshWindows", resourceCulture);
+            }
+        }
+        public static string Placement_StopApply {
+            get {
+                return ResourceManager.GetString("Placement_StopApply", resourceCulture);
+            }
+        }
+        public static string Placement_CloseApply {
+            get {
+                return ResourceManager.GetString("Placement_CloseApply", resourceCulture);
+            }
+        }
+        public static string Placement_ApplySelection {
+            get {
+                return ResourceManager.GetString("Placement_ApplySelection", resourceCulture);
+            }
+        }
+        public static string Placement_DesktopNumber {
+            get {
+                return ResourceManager.GetString("Placement_DesktopNumber", resourceCulture);
+            }
+        }
+        public static string Placement_DesktopUnknown {
+            get {
+                return ResourceManager.GetString("Placement_DesktopUnknown", resourceCulture);
+            }
+        }
+        public static string Placement_ReadyToApply {
+            get {
+                return ResourceManager.GetString("Placement_ReadyToApply", resourceCulture);
+            }
+        }
+        public static string Placement_Applying {
+            get {
+                return ResourceManager.GetString("Placement_Applying", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyDisabled {
+            get {
+                return ResourceManager.GetString("Placement_ApplyDisabled", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyNoRules {
+            get {
+                return ResourceManager.GetString("Placement_ApplyNoRules", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyPreparing {
+            get {
+                return ResourceManager.GetString("Placement_ApplyPreparing", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyPaused {
+            get {
+                return ResourceManager.GetString("Placement_ApplyPaused", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyStopping {
+            get {
+                return ResourceManager.GetString("Placement_ApplyStopping", resourceCulture);
+            }
+        }
+        public static string Placement_ApplySuspended {
+            get {
+                return ResourceManager.GetString("Placement_ApplySuspended", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyChanged {
+            get {
+                return ResourceManager.GetString("Placement_ApplyChanged", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyEmpty {
+            get {
+                return ResourceManager.GetString("Placement_ApplyEmpty", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyReview {
+            get {
+                return ResourceManager.GetString("Placement_ApplyReview", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyCancelled {
+            get {
+                return ResourceManager.GetString("Placement_ApplyCancelled", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyQueryFailed {
+            get {
+                return ResourceManager.GetString("Placement_ApplyQueryFailed", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyRunning {
+            get {
+                return ResourceManager.GetString("Placement_ApplyRunning", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyFinished {
+            get {
+                return ResourceManager.GetString("Placement_ApplyFinished", resourceCulture);
+            }
+        }
+        public static string Placement_ApplyFailed {
+            get {
+                return ResourceManager.GetString("Placement_ApplyFailed", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeMoved {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeMoved", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeAlreadyPlaced {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeAlreadyPlaced", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeNoRule {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeNoRule", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeExcluded {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeExcluded", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeChanged {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeChanged", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeCancelled {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeCancelled", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeTimedOut {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeTimedOut", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeUnavailable {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeUnavailable", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeDestinationUnavailable {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeDestinationUnavailable", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeMoveFailed {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeMoveFailed", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeUnconfirmed {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeUnconfirmed", resourceCulture);
+            }
+        }
+        public static string Placement_OutcomeMonitorPaused {
+            get {
+                return ResourceManager.GetString("Placement_OutcomeMonitorPaused", resourceCulture);
+            }
+        }
     }
 }

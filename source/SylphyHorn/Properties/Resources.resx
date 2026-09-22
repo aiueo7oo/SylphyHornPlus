@@ -600,4 +600,253 @@
   <data name="TaskTray_TooltipText_DesktopCount" xml:space="preserve">
     <value>Desktop {0}/{1}</value>
   </data>
+  <data name="Placement_Title" xml:space="preserve">
+    <value>App placement</value>
+  </data>
+  <data name="Placement_Enable" xml:space="preserve">
+    <value>Automatically place new app windows</value>
+  </data>
+  <data name="Placement_Restart" xml:space="preserve">
+    <value>Restart monitoring</value>
+  </data>
+  <data name="Placement_DeleteLabel" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Placement_Delete" xml:space="preserve">
+    <value>Delete rule</value>
+  </data>
+  <data name="Placement_Cancel" xml:space="preserve">
+    <value>_Cancel</value>
+  </data>
+  <data name="Placement_ExeFilter" xml:space="preserve">
+    <value>Executable files (*.exe)</value>
+  </data>
+  <data name="Placement_PathUnavailable" xml:space="preserve">
+    <value>The executable path could not be confirmed.</value>
+  </data>
+  <data name="Placement_InvalidNumber" xml:space="preserve">
+    <value>Enter a whole number of 1 or greater.</value>
+  </data>
+  <data name="Placement_InvalidName" xml:space="preserve">
+    <value>Enter a desktop name. Spaces are matched exactly.</value>
+  </data>
+  <data name="Placement_Duplicate" xml:space="preserve">
+    <value>An enabled rule already exists for this application. Cancel and edit that rule, or disable one of the rules.</value>
+  </data>
+  <data name="Placement_SaveFailed" xml:space="preserve">
+    <value>The change is active in memory, but could not be saved to disk. Check the settings storage and save again before closing.</value>
+  </data>
+  <data name="Placement_ConfigurationChanged" xml:space="preserve">
+    <value>Settings changed elsewhere. The unsaved editor was closed; review the current rules before editing again.</value>
+  </data>
+  <data name="Placement_Loading" xml:space="preserve">
+    <value>Loading applications… You can cancel editing.</value>
+  </data>
+  <data name="Placement_QueryFailed" xml:space="preserve">
+    <value>Applications could not be loaded. Try refreshing, an open window, or an executable file.</value>
+  </data>
+  <data name="Placement_IdentityUnavailable" xml:space="preserve">
+    <value>The application identity could not be verified. Choose another entry point.</value>
+  </data>
+  <data name="Placement_LauncherOnly" xml:space="preserve">
+    <value>This entry does not identify a verifiable executable. Choose its actual executable or open window.</value>
+  </data>
+  <data name="Placement_RetrySave" xml:space="preserve">
+    <value>Save again</value>
+  </data>
+  <data name="Placement_AddFromApp" xml:space="preserve">
+    <value>Add from applications…</value>
+  </data>
+  <data name="Placement_AddManual" xml:space="preserve">
+    <value>Add a row</value>
+  </data>
+  <data name="Placement_AppColumn" xml:space="preserve">
+    <value>Application</value>
+  </data>
+  <data name="Placement_Browse" xml:space="preserve">
+    <value>Browse for an executable…</value>
+  </data>
+  <data name="Placement_Choose" xml:space="preserve">
+    <value>Select</value>
+  </data>
+  <data name="Placement_ChooseApp" xml:space="preserve">
+    <value>Choose an application</value>
+  </data>
+  <data name="Placement_EnterPath" xml:space="preserve">
+    <value>Enter an executable path or choose an application.</value>
+  </data>
+  <data name="Placement_InputHint" xml:space="preserve">
+    <value>Enter or leave the field to save. Esc restores the saved row.</value>
+  </data>
+  <data name="Placement_Installed" xml:space="preserve">
+    <value>Installed applications</value>
+  </data>
+  <data name="Placement_InvalidPath" xml:space="preserve">
+    <value>The executable could not be read. Check the path.</value>
+  </data>
+  <data name="Placement_LauncherWarning" xml:space="preserve">
+    <value>Check this executable path: a shortcut may point to a launcher rather than the application window.</value>
+  </data>
+  <data name="Placement_NameColumn" xml:space="preserve">
+    <value>Desktop name</value>
+  </data>
+  <data name="Placement_NameMatchHint" xml:space="preserve">
+    <value>If multiple desktops have the same name, windows are placed on the lowest-numbered desktop.</value>
+  </data>
+  <data name="Placement_NameList" xml:space="preserve">
+    <value>Place by desktop name</value>
+  </data>
+  <data name="Placement_NoCandidates" xml:space="preserve">
+    <value>No applications found.</value>
+  </data>
+  <data name="Placement_NumberColumn" xml:space="preserve">
+    <value>Desktop number</value>
+  </data>
+  <data name="Placement_NumberList" xml:space="preserve">
+    <value>Place by desktop number</value>
+  </data>
+  <data name="Placement_PathColumn" xml:space="preserve">
+    <value>Executable path</value>
+  </data>
+  <data name="Placement_RuleEnabled" xml:space="preserve">
+    <value>Enable this rule</value>
+  </data>
+  <data name="Placement_Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Placement_UnknownApplication" xml:space="preserve">
+    <value>Application (name unavailable)</value>
+  </data>
+  <data name="Placement_Windows" xml:space="preserve">
+    <value>Running applications</value>
+  </data>
+  <data name="Placement_EnabledColumn" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="Placement_OpenApply" xml:space="preserve">
+    <value>Apply to open windows…</value>
+  </data>
+  <data name="Placement_ApplyTitle" xml:space="preserve">
+    <value>Apply placement rules to open windows</value>
+  </data>
+  <data name="Placement_ApplyIntro" xml:space="preserve">
+    <value>Select the windows to move. Only windows matching enabled rules are listed. The displayed desktop will not switch.</value>
+  </data>
+  <data name="Placement_WindowColumn" xml:space="preserve">
+    <value>Window / application</value>
+  </data>
+  <data name="Placement_SourceColumn" xml:space="preserve">
+    <value>Position at review</value>
+  </data>
+  <data name="Placement_TargetColumn" xml:space="preserve">
+    <value>Destination</value>
+  </data>
+  <data name="Placement_ResultColumn" xml:space="preserve">
+    <value>Status / result</value>
+  </data>
+  <data name="Placement_RefreshWindows" xml:space="preserve">
+    <value>Refresh list</value>
+  </data>
+  <data name="Placement_StopApply" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="Placement_CloseApply" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Placement_ApplySelection" xml:space="preserve">
+    <value>Move selected ({0})</value>
+  </data>
+  <data name="Placement_DesktopNumber" xml:space="preserve">
+    <value>Desktop {0}</value>
+  </data>
+  <data name="Placement_DesktopUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Placement_ReadyToApply" xml:space="preserve">
+    <value>Ready to move</value>
+  </data>
+  <data name="Placement_Applying" xml:space="preserve">
+    <value>Processing…</value>
+  </data>
+  <data name="Placement_ApplyDisabled" xml:space="preserve">
+    <value>Enable automatic placement in settings to use this feature.</value>
+  </data>
+  <data name="Placement_ApplyNoRules" xml:space="preserve">
+    <value>Add an enabled placement rule first.</value>
+  </data>
+  <data name="Placement_ApplyPreparing" xml:space="preserve">
+    <value>Preparing window monitoring. Refresh the list when ready.</value>
+  </data>
+  <data name="Placement_ApplyPaused" xml:space="preserve">
+    <value>Window monitoring is paused. Resume it in settings.</value>
+  </data>
+  <data name="Placement_ApplyStopping" xml:space="preserve">
+    <value>Stopping. An operation already started may finish before cancellation takes effect.</value>
+  </data>
+  <data name="Placement_ApplySuspended" xml:space="preserve">
+    <value>Unavailable while importing settings or shutting down.</value>
+  </data>
+  <data name="Placement_ApplyChanged" xml:space="preserve">
+    <value>Desktop configuration changed. Refresh the list before moving windows.</value>
+  </data>
+  <data name="Placement_ApplyEmpty" xml:space="preserve">
+    <value>No open windows match the enabled placement rules.</value>
+  </data>
+  <data name="Placement_ApplyReview" xml:space="preserve">
+    <value>Check destinations, then select the windows to move. Refresh the list if it becomes out of date.</value>
+  </data>
+  <data name="Placement_ApplyCancelled" xml:space="preserve">
+    <value>List retrieval was cancelled. Refresh to try again.</value>
+  </data>
+  <data name="Placement_ApplyQueryFailed" xml:space="preserve">
+    <value>Could not retrieve the list. No windows were moved. Try refreshing it.</value>
+  </data>
+  <data name="Placement_ApplyRunning" xml:space="preserve">
+    <value>Moving selected windows. Closing this dialog cancels remaining work; moves already started may finish.</value>
+  </data>
+  <data name="Placement_ApplyFinished" xml:space="preserve">
+    <value>Processing finished. Check each result. Refresh the list before another move.</value>
+  </data>
+  <data name="Placement_ApplyFailed" xml:space="preserve">
+    <value>Results could not be confirmed. The list may have expired or the state may have changed. Refresh and check current positions before trying again.</value>
+  </data>
+  <data name="Placement_OutcomeMoved" xml:space="preserve">
+    <value>Moved</value>
+  </data>
+  <data name="Placement_OutcomeAlreadyPlaced" xml:space="preserve">
+    <value>Already placed</value>
+  </data>
+  <data name="Placement_OutcomeNoRule" xml:space="preserve">
+    <value>No matching rule</value>
+  </data>
+  <data name="Placement_OutcomeExcluded" xml:space="preserve">
+    <value>Excluded (such as pinned)</value>
+  </data>
+  <data name="Placement_OutcomeChanged" xml:space="preserve">
+    <value>Changed; not moved</value>
+  </data>
+  <data name="Placement_OutcomeCancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="Placement_OutcomeTimedOut" xml:space="preserve">
+    <value>Timed out</value>
+  </data>
+  <data name="Placement_OutcomeUnavailable" xml:space="preserve">
+    <value>Could not verify window</value>
+  </data>
+  <data name="Placement_OutcomeDestinationUnavailable" xml:space="preserve">
+    <value>Destination unavailable</value>
+  </data>
+  <data name="Placement_OutcomeMoveFailed" xml:space="preserve">
+    <value>Move failed; verify position</value>
+  </data>
+  <data name="Placement_OutcomeUnconfirmed" xml:space="preserve">
+    <value>Result unconfirmed</value>
+  </data>
+  <data name="Placement_OutcomeMonitorPaused" xml:space="preserve">
+    <value>Monitoring paused</value>
+  </data>
+  <data name="Placement_ApplyNotSelected" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
 </root>

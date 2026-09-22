@@ -158,6 +158,11 @@ namespace SylphyHorn
 				WallpaperService.Instance.BindDesktopRuntime(runtime);
 				SettingsService.StretchShortcutListsTo(runtime.State.Order.Count);
 				this.RegisterActions();
+				Settings.AppPlacement.Configuration.Subscribe(configuration =>
+				{
+					_ = runtime.ConfigurePlacementAsync(configuration);
+				}).AddTo(this._disposable);
+				await runtime.ConfigurePlacementAsync(Settings.AppPlacement.Configuration.Value);
 				this.CompleteSuccessfulInitialization();
 			}
 			catch (Exception ex)
@@ -233,13 +238,13 @@ namespace SylphyHorn
 				else if (Settings.General.LoopDesktop)
 				{
 					register(
-							() => settings.SwitchToLeftWithDefault.ToShortcutKey(),
-							_ => VirtualDesktopService.GetLeft()?.Switch())
+						() => settings.SwitchToLeftWithDefault.ToShortcutKey(),
+						_ => VirtualDesktopService.GetLeft()?.Switch())
 						.AddTo(this._disposable);
 
 					register(
-							() => settings.SwitchToRightWithDefault.ToShortcutKey(),
-							_ => VirtualDesktopService.GetRight()?.Switch())
+						() => settings.SwitchToRightWithDefault.ToShortcutKey(),
+						_ => VirtualDesktopService.GetRight()?.Switch())
 						.AddTo(this._disposable);
 				}
 

@@ -783,6 +783,7 @@ namespace SylphyHorn.UI.Bindings
 
 		public RelayCommand<string> ResizeMouseListToFitCommand { get; }
 		public ObservableCollection<LogViewModel> Logs { get; }
+		public AppPlacementSettingsViewModel AppPlacement { get; }
 
 		internal SettingsWindowViewModel(
 			HookService hookService,
@@ -803,6 +804,12 @@ namespace SylphyHorn.UI.Bindings
 			this._hookService = hookService;
 			this._desktopRuntime = desktopRuntime ?? throw new ArgumentNullException(nameof(desktopRuntime));
 			this._dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+			this.AppPlacement = new AppPlacementSettingsViewModel(
+				Settings.AppPlacement,
+				desktopRuntime,
+				new Services.AppPlacement.PlacementAppCatalog(),
+				() => LocalSettingsProvider.Instance.SaveWithResultAsync());
+			this.AppPlacement.AddTo(this);
 			ShortcutKeyBox.HookService = hookService;
 			MouseShortcutBox.HookService = hookService;
 

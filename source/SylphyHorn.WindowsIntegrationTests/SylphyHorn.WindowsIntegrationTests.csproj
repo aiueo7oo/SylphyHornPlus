@@ -3,6 +3,7 @@
 	<PropertyGroup>
 		<TargetFrameworks>net48;net10.0-windows10.0.26100.0</TargetFrameworks>
 		<OutputType>Exe</OutputType>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<Platforms>AnyCPU;x64;x86</Platforms>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
@@ -22,6 +23,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\SylphyHorn.PlacementTestHost\SylphyHorn.PlacementTestHost.csproj"
+		                  ReferenceOutputAssembly="false" />
 		<ProjectReference Include="..\SylphyHorn\SylphyHorn.csproj">
 			<AdditionalProperties>RunSylphyHornPostBuild=false</AdditionalProperties>
 		</ProjectReference>
@@ -40,6 +43,19 @@
 			<HintPath>..\libraries\MetroTrilithon.Desktop\$(MetroBinaryTfm)\MetroTrilithon.Desktop.dll</HintPath>
 		</Reference>
 	</ItemGroup>
+
+	<Target Name="WritePlacementTestHostPath"
+	        AfterTargets="Build">
+		<MSBuild Projects="..\SylphyHorn.PlacementTestHost\SylphyHorn.PlacementTestHost.csproj"
+		         Targets="GetAppHostPath"
+		         Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework)">
+			<Output TaskParameter="TargetOutputs" ItemName="_PlacementTestHostTarget" />
+		</MSBuild>
+		<WriteLinesToFile File="$(TargetDir)PlacementTestHost.path"
+		                  Lines="@(_PlacementTestHostTarget)"
+		                  Overwrite="true"
+		                  Encoding="UTF-8" />
+	</Target>
 
 	<Target Name="WriteSingleInstanceTestHostPath"
 	        AfterTargets="Build"

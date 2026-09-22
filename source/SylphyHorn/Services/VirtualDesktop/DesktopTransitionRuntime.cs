@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
 using WindowsDesktop;
 
@@ -97,7 +98,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		}
 	}
 
-	internal sealed class DesktopTransitionRuntime : IDisposable, IDesktopStartupTransactionRuntime, IDesktopImportTransactionRuntime
+	internal sealed partial class DesktopTransitionRuntime : IDisposable, IDesktopStartupTransactionRuntime, IDesktopImportTransactionRuntime
 	{
 		// Owner-dispatcher orchestrator for the provider, pure coordinator, settings
 		// projection/save transaction, and public StateChanged publication. It consumes
@@ -140,8 +141,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private bool _stopping;
 		private bool _shutdownStarted;
 		private int _disposeSignaled;
+		private DesktopRuntimeState _placementProjectionSource;
+		private PlacementDesktopMap _placementProjection;
 
-		internal DesktopTransitionRuntime(IDesktopProviderClient provider, IDesktopSettingsTransactions settings, IDesktopOwnerContext owner, IDesktopOperations operations, TimeSpan? providerWaitBudget = null)
+		internal DesktopTransitionRuntime(
+			IDesktopProviderClient provider,
+			IDesktopSettingsTransactions settings,
+			IDesktopOwnerContext owner,
+			IDesktopOperations operations,
+			TimeSpan? providerWaitBudget = null,
+			AppPlacement.IPlacementSessionFactory placementFactory = null)
 		{
 			this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
 			this._settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -150,12 +159,36 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this._startupSeed = settings.CaptureStartupSeed();
 			this._providerWaitBudget = providerWaitBudget ?? TimeSpan.FromSeconds(30);
 			this._coordinator = new DesktopTransitionCoordinator(this._startupSeed);
+			this._placementFactory = placementFactory ?? new AppPlacement.PlacementSessionFactory();
 		}
 
 		internal event EventHandler<DesktopRuntimeStateChanged> StateChanged;
 		internal event EventHandler<DesktopRuntimeFault> Faulted;
 		internal DesktopRuntimeState State => this._coordinator.State;
 		internal bool IsInitialized => this._initialized;
+
+		internal PlacementDesktopMap PlacementDestinations
+		{
+			get
+			{
+				this.EnsureOwnerAccess();
+				if (!this._initialized || this._shutdownStarted || this._stopping || this._placementSuspended || this._preparedRuntime != null
+					|| this._activeImportSession != null || (this._activeImportCommit != null && !this._activeImportCommit.IsCompleted))
+					return PlacementDesktopMap.Unavailable;
+				var state = this.State;
+				if (!ReferenceEquals(state, this._placementProjectionSource))
+				{
+					this._placementProjection = new PlacementDesktopMap(state.Order.Select(id =>
+					{
+						var name = state.Records[id].Name;
+						var available = name.HasValue && name.IsConfirmed && name.ReadStatus == VirtualDesktopReadStatus.Success;
+						return new PlacementDesktop(id, name.Value, available);
+					}));
+					this._placementProjectionSource = state;
+				}
+				return this._placementProjection;
+			}
+		}
 
 		DesktopRuntimeState IDesktopStartupTransactionRuntime.State => this.State;
 		Task<VirtualDesktopReconciliationResult> IDesktopStartupTransactionRuntime.RequestProviderAsync(VirtualDesktopStableReason reason, CancellationToken cancellationToken)
@@ -396,8 +429,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		internal Task<SettingsImportCommitResult> CommitPreparedImportAsync(StagedSettingsImport stage, bool overrideDesktops, CancellationToken cancellationToken, bool resetPositions = false)
 		{
+			this.EnsureOwnerAccess();
 			if (this._activeImportCommit != null && !this._activeImportCommit.IsCompleted) throw new InvalidOperationException("A settings import commit is already active.");
-			this._activeImportCommit = this.CommitPreparedImportCoreAsync(stage, overrideDesktops, cancellationToken, resetPositions);
+			this._activeImportCommit = this.CommitImportWithPlacementSuspendedAsync(stage, overrideDesktops, cancellationToken, resetPositions);
 			return this._activeImportCommit;
 		}
 
@@ -407,7 +441,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			if (stage == null) throw new ArgumentNullException(nameof(stage));
 			var claim = this._settings.ClaimImport(stage);
 			if (claim == null) return new SettingsImportCommitResult(SettingsImportCommitStatus.InvalidStage, null);
-			if (this._stopping)
+			if (this._shutdownStarted || this._stopping)
 			{
 				this._settings.DiscardImport(claim);
 				return SettingsImportCommitResult.ShuttingDown();
@@ -516,6 +550,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private async Task<DesktopRuntimeShutdownResult> ShutdownCoreAsync()
 		{
 			this._shutdownStarted = true;
+			await this.ReconcilePlacementAsync();
 			if (this._activeImportCommit != null && !this._activeImportCommit.IsCompleted)
 				await this._activeImportCommit;
 			if (this._activeImportSession != null)
@@ -769,7 +804,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this.ApplyTransition(this._coordinator.CommitLocalEdit(prepared));
 		}
 
-		private void ApplyTransition(DesktopCoordinatorTransition transition, bool applyProjection = true, bool requestSave = true, Action transitionCommitted = null)
+		private void ApplyTransition(
+			DesktopCoordinatorTransition transition,
+			bool applyProjection = true,
+			bool requestSave = true,
+			Action transitionCommitted = null)
 		{
 			if (transition == null) return;
 			if (!transition.Accepted)
@@ -778,6 +817,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 				return;
 			}
 
+			this._placementPermit?.Cancel();
 			if (applyProjection && transition.Projection != null) this._settings.ApplyProjection(this._persistenceProtection?.CreateProjection(transition.NewState) ?? transition.Projection);
 			transitionCommitted?.Invoke();
 			this._publishing = true;
@@ -791,8 +831,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					{
 						foreach (EventHandler<DesktopRuntimeStateChanged> handler in handlers.GetInvocationList())
 						{
-							try { handler(this, payload); }
-							catch (Exception ex) { this.ReportFault(new DesktopRuntimeFault("StateChangedSubscriber", ex.GetType())); }
+							try
+							{
+								handler(this, payload);
+							}
+							catch (Exception ex)
+							{
+								this.ReportFault(new DesktopRuntimeFault("StateChangedSubscriber", ex.GetType()));
+							}
 						}
 					}
 				}
@@ -820,7 +866,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			if (command == null || this._shutdownStarted || this._stopping) return;
 			if (!this._owner.CheckAccess()) throw new InvalidOperationException("Desktop commands must be submitted on the owner Dispatcher.");
-			if (this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._deferredDrainScheduled || this._deferredCommands.Count != 0)
+			if (this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._placementSuspended || this._deferredDrainScheduled || this._deferredCommands.Count != 0)
 			{
 				this._deferredCommands.Enqueue(command);
 				if (!this._publishing && this._preparedRuntime == null && this._activeImportSession == null) this.ScheduleDeferredCommands();
@@ -831,7 +877,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private void ScheduleDeferredCommands()
 		{
-			if (this._deferredDrainScheduled || this._deferredCommands.Count == 0 || this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._shutdownStarted || this._stopping) return;
+			if (this._deferredDrainScheduled || this._deferredCommands.Count == 0 || this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._placementSuspended || this._shutdownStarted || this._stopping) return;
 			this._deferredDrainScheduled = true;
 			if (!this._owner.Post(this.DrainDeferredCommands))
 			{
@@ -844,7 +890,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private void DrainDeferredCommands()
 		{
 			this.EnsureOwnerAccess();
-			if (this._publishing || this._preparedRuntime != null || this._activeImportSession != null)
+			if (this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._placementSuspended)
 			{
 				this._deferredDrainScheduled = false;
 				return;
@@ -885,7 +931,5 @@ namespace SylphyHorn.Services.DesktopTransitions
 				? record.WallpaperPath.Value
 				: null;
 		}
-
 	}
-
 }

@@ -1,0 +1,129 @@
+﻿<UserControl x:Class="SylphyHorn.UI.PlacementApplyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls"
+             Loaded="OnLoaded"
+             Unloaded="OnUnloaded">
+	<Grid Margin="16">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<TextBlock Text="{Binding Text[ApplyIntro]}" TextWrapping="Wrap" Margin="0,0,0,12" />
+		<Grid Grid.Row="1">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition />
+			</Grid.RowDefinitions>
+			<Grid Margin="12,0,12,4">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="32" />
+					<ColumnDefinition />
+					<ColumnDefinition Width="145" />
+					<ColumnDefinition Width="145" />
+					<ColumnDefinition Width="145" />
+				</Grid.ColumnDefinitions>
+				<TextBlock Grid.Column="1" Text="{Binding Text[WindowColumn]}" />
+				<TextBlock Grid.Column="2" Text="{Binding Text[SourceColumn]}" />
+				<TextBlock Grid.Column="3" Text="{Binding Text[TargetColumn]}" />
+				<TextBlock Grid.Column="4" Text="{Binding Text[ResultColumn]}" />
+			</Grid>
+			<ListBox x:Name="Windows"
+			         Grid.Row="1"
+			         ItemsSource="{Binding Rows}"
+			         HorizontalContentAlignment="Stretch"
+			         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+			         Background="{DynamicResource ThemeBrushKey}"
+			         Foreground="{DynamicResource ActiveForegroundBrushKey}">
+				<ListBox.ItemTemplate>
+					<DataTemplate>
+						<Grid Margin="4,6">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="32" />
+								<ColumnDefinition />
+								<ColumnDefinition Width="145" />
+								<ColumnDefinition Width="145" />
+								<ColumnDefinition Width="145" />
+							</Grid.ColumnDefinitions>
+							<CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
+							          IsEnabled="{Binding Selectable}"
+							          VerticalAlignment="Center"
+							          AutomationProperties.Name="{Binding Title}"
+							          ToolTip="{Binding Result}"
+							          ToolTipService.ShowOnDisabled="True" />
+							<StackPanel Grid.Column="1" Margin="0,0,8,0">
+								<TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+								<TextBlock Text="{Binding Path}"
+								           TextTrimming="CharacterEllipsis"
+								           Foreground="{DynamicResource InactiveForegroundBrushKey}"
+								           ToolTip="{Binding Path}" />
+							</StackPanel>
+							<TextBlock Grid.Column="2"
+							           Text="{Binding Source}"
+							           TextWrapping="Wrap"
+							           Margin="0,0,8,0"
+							           VerticalAlignment="Center" />
+							<TextBlock Grid.Column="3"
+							           Text="{Binding Target}"
+							           TextWrapping="Wrap"
+							           Margin="0,0,8,0"
+							           VerticalAlignment="Center" />
+							<TextBlock Grid.Column="4"
+							           Text="{Binding Result}"
+							           TextWrapping="Wrap"
+							           VerticalAlignment="Center" />
+						</Grid>
+					</DataTemplate>
+				</ListBox.ItemTemplate>
+			</ListBox>
+		</Grid>
+		<StackPanel Grid.Row="2" Margin="0,8,0,12">
+			<TextBlock Text="{Binding Text[PathColumn]}" Margin="0,0,0,4" />
+			<metro:PromptTextBox Prompt=""
+			                     Text="{Binding SelectedItem.Path, ElementName=Windows, Mode=OneWay}"
+			                     IsReadOnly="True"
+			                     HorizontalScrollBarVisibility="Auto"
+			                     AutomationProperties.Name="{Binding Text[PathColumn]}" />
+			<TextBlock Text="{Binding Status}"
+			           TextWrapping="Wrap"
+			           Margin="0,8,0,0"
+			           AutomationProperties.LiveSetting="Polite" />
+		</StackPanel>
+		<DockPanel Grid.Row="3" LastChildFill="False">
+			<Button DockPanel.Dock="Left"
+			        Content="{Binding Text[RefreshWindows]}"
+			        Command="{Binding RefreshCommand}"
+			        Margin="0"
+			        Padding="12,4" />
+			<Button DockPanel.Dock="Left"
+			        Content="{Binding Text[StopApply]}"
+			        Command="{Binding StopCommand}"
+			        Margin="8,0,0,0"
+			        Padding="12,4">
+				<Button.Style>
+					<Style TargetType="Button">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsBusy}" Value="True">
+								<Setter Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Button.Style>
+			</Button>
+			<Button DockPanel.Dock="Right"
+			        Content="{Binding Text[CloseApply]}"
+			        IsCancel="True"
+			        Click="Close"
+			        MinWidth="80"
+			        Margin="8,0,0,0" />
+			<Button DockPanel.Dock="Right"
+			        Content="{Binding ApplyLabel}"
+			        Command="{Binding ApplyCommand}"
+			        Padding="12,4"
+			        Margin="0" />
+		</DockPanel>
+	</Grid>
+</UserControl>
