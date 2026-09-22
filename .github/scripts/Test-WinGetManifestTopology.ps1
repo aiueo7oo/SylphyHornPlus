@@ -11,18 +11,29 @@ function New-Manifest {
 		[string] $RelativeFilePath,
 
 		[Parameter(Mandatory = $true)]
-		[string[]] $Architectures
+		[string[]] $Architectures,
+
+		[Parameter()]
+		[switch] $IncludeCli
 	)
+
+	$nestedFiles = @([pscustomobject]@{
+		RelativeFilePath = $RelativeFilePath
+		PortableCommandAlias = "SylphyHornPlus"
+	})
+	if ($IncludeCli) {
+		$nestedFiles += [pscustomobject]@{
+			RelativeFilePath = "SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe"
+			PortableCommandAlias = "sylphyhorn-cli"
+		}
+	}
 
 	return [pscustomobject]@{
 		PackageIdentifier = "hwtnb.SylphyHornPlus"
 		InstallerType = "zip"
 		NestedInstallerType = "portable"
 		UpgradeBehavior = "install"
-		NestedInstallerFiles = @([pscustomobject]@{
-			RelativeFilePath = $RelativeFilePath
-			PortableCommandAlias = "SylphyHornPlus"
-		})
+		NestedInstallerFiles = $nestedFiles
 		Installers = @($Architectures | ForEach-Object {
 			[pscustomobject]@{ Architecture = $_ }
 		})
@@ -45,9 +56,26 @@ if ($launcher.InstallerCount -ne 3 -or
 	throw "The launcher three-architecture fixture was not classified correctly."
 }
 
+$withCli = & $topologyScript -Manifest (
+	New-Manifest `
+		"SylphyHorn/SylphyHorn.WinGetLauncher.exe" `
+		@("x86", "x64", "arm64") `
+		-IncludeCli)
+if ($withCli.InstallerCount -ne 3 -or
+	$withCli.Topology -cne "LauncherAndCliThreeArchitecture") {
+	throw "The GUI and CLI three-architecture fixture was not classified correctly."
+}
+
+$wrongAlias = New-Manifest "SylphyHorn/SylphyHorn.WinGetLauncher.exe" `
+	@("x86", "x64", "arm64") -IncludeCli
+$wrongAlias.NestedInstallerFiles[1].PortableCommandAlias = "shp"
+
 foreach ($invalidManifest in @(
 	(New-Manifest "SylphyHorn/SylphyHorn.WinGetLauncher.exe" @("x86")),
-	(New-Manifest "SylphyHorn/SylphyHorn.exe" @("x86", "x64", "arm64"))
+	(New-Manifest "SylphyHorn/SylphyHorn.exe" @("x86", "x64", "arm64")),
+	(New-Manifest "SylphyHorn/SylphyHorn.exe" @("x86") -IncludeCli),
+	(New-Manifest "SylphyHorn/SylphyHorn.exe" @("x86", "x64", "arm64") -IncludeCli),
+	$wrongAlias
 )) {
 	$failed = $false
 	try {

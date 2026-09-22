@@ -1,12 +1,19 @@
 ﻿#include <windows.h>
 #include <shellapi.h>
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+#include <cstdio>
+#endif
 
 #include <string>
 #include <vector>
 
 namespace
 {
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+	constexpr wchar_t TargetExecutableName[] = L"sylphyhorn-cli.exe";
+#else
 	constexpr wchar_t TargetExecutableName[] = L"SylphyHorn.exe";
+#endif
 	constexpr size_t MaximumSupportedPathLength = MAX_PATH - 1;
 
 	struct PathResult
@@ -155,15 +162,27 @@ namespace
 
 	int ShowError(const wchar_t* message, DWORD error)
 	{
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+		fwprintf(stderr, L"%ls Windows error: %lu\n", message, error);
+		fputs("{\"schemaVersion\":1,\"command\":null,\"success\":false,"
+			"\"error\":{\"code\":\"launcher_failure\","
+			"\"message\":\"The CLI could not be started.\",\"retryable\":false}}\n", stdout);
+		return 4;
+#else
 		std::wstring text(message);
 		text.append(L"\n\nWindows error: ");
 		text.append(std::to_wstring(error));
 		MessageBoxW(nullptr, text.c_str(), L"SylphyHornPlus", MB_OK | MB_ICONERROR);
 		return static_cast<int>(error == ERROR_SUCCESS ? ERROR_GEN_FAILURE : error);
+#endif
 	}
 }
 
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+int wmain()
+#else
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
+#endif
 {
 	const auto modulePathResult = GetModulePath();
 	if (modulePathResult.Path.empty())
@@ -211,13 +230,22 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
 	STARTUPINFOW startupInfo{};
 	startupInfo.cb = sizeof(startupInfo);
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+	startupInfo.dwFlags = STARTF_USESTDHANDLES;
+	startupInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+	startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+	startupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+	constexpr BOOL inheritHandles = TRUE;
+#else
+	constexpr BOOL inheritHandles = FALSE;
+#endif
 	PROCESS_INFORMATION processInformation{};
 	if (!CreateProcessW(
 		targetPath.c_str(),
 		commandLine.data(),
 		nullptr,
 		nullptr,
-		FALSE,
+		inheritHandles,
 		0,
 		nullptr,
 		installationDirectory.c_str(),
@@ -228,6 +256,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	}
 
 	CloseHandle(processInformation.hThread);
+#ifdef SYLPHYHORN_CLI_LAUNCHER
+	const auto waitResult = WaitForSingleObject(processInformation.hProcess, INFINITE);
+	DWORD childExitCode = 0;
+	if (waitResult != WAIT_OBJECT_0 ||
+		!GetExitCodeProcess(processInformation.hProcess, &childExitCode))
+	{
+		const auto error = GetLastError();
+		CloseHandle(processInformation.hProcess);
+		return ShowError(L"The CLI result could not be obtained.", error);
+	}
+	CloseHandle(processInformation.hProcess);
+	return static_cast<int>(childExitCode);
+#else
 	CloseHandle(processInformation.hProcess);
 	return 0;
+#endif
 }

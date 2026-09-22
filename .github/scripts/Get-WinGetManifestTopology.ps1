@@ -17,9 +17,15 @@ if ($Manifest.PackageIdentifier -cne "hwtnb.SylphyHornPlus" -or
 }
 
 $nestedFiles = @($Manifest.NestedInstallerFiles)
-if ($nestedFiles.Count -ne 1 -or
+if ($nestedFiles.Count -notin @(1, 2) -or
 	$nestedFiles[0].PortableCommandAlias -cne "SylphyHornPlus") {
 	throw "The current WinGet nested portable contract has changed."
+}
+if ($nestedFiles.Count -eq 2 -and
+	($nestedFiles[1].PortableCommandAlias -cne "sylphyhorn-cli" -or
+	$nestedFiles[1].RelativeFilePath -cne
+		"SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe")) {
+	throw "The current WinGet CLI portable contract has changed."
 }
 
 $installerCount = @($Manifest.Installers).Count
@@ -28,7 +34,8 @@ $actualArchitectures = @(
 		Select-Object -ExpandProperty Architecture |
 		Sort-Object)
 if ($installerCount -eq 1) {
-	if ($nestedFiles[0].RelativeFilePath -cne "SylphyHorn/SylphyHorn.exe" -or
+	if ($nestedFiles.Count -ne 1 -or
+		$nestedFiles[0].RelativeFilePath -cne "SylphyHorn/SylphyHorn.exe" -or
 		@(Compare-Object @("x86") $actualArchitectures).Count -ne 0) {
 		throw "The current one-architecture WinGet manifest is not the reviewed legacy migration source."
 	}
@@ -48,7 +55,12 @@ if ($installerCount -eq 3) {
 
 	return [pscustomobject]@{
 		InstallerCount = 3
-		Topology = "LauncherThreeArchitecture"
+		Topology = if ($nestedFiles.Count -eq 2) {
+			"LauncherAndCliThreeArchitecture"
+		}
+		else {
+			"LauncherThreeArchitecture"
+		}
 	}
 }
 

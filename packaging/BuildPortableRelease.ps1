@@ -824,6 +824,9 @@ $cliProject = Join-Path $repositoryRoot "source/SylphyHorn.Cli/SylphyHorn.Cli.cs
 $schedulerProject = Join-Path `
 	$repositoryRoot `
 	"source/SylphyHorn.SchedulerManager/SylphyHorn.SchedulerManager.csproj"
+$cliWinGetLauncherProject = Join-Path `
+	$repositoryRoot `
+	"source/SylphyHorn.WinGetLauncher/sylphyhorn-cli.WinGetLauncher.vcxproj"
 $winGetLauncherProject = Join-Path `
 	$repositoryRoot `
 	"source/SylphyHorn.WinGetLauncher/SylphyHorn.WinGetLauncher.vcxproj"
@@ -836,6 +839,9 @@ $winGetAliasProbeProject = Join-Path `
 $winGetAliasProbeSource = Join-Path `
 	$repositoryRoot `
 	"source/SylphyHorn.WinGetLauncher/AliasTestProbe.cpp"
+$cliWinGetAliasTest = Join-Path `
+	$repositoryRoot `
+	"packaging/Test-CliWinGetPortableAlias.ps1"
 $winGetAliasTest = Join-Path `
 	$repositoryRoot `
 	"packaging/Test-WinGetPortableAlias.ps1"
@@ -892,11 +898,13 @@ $buildInputPaths = @(
 	$applicationProject,
 	$schedulerProject,
 	$cliProject,
+	$cliWinGetLauncherProject,
 	$winGetLauncherProject,
 	$winGetLauncherSource,
 	$winGetAliasProbeProject,
 	$winGetAliasProbeSource,
 	$winGetAliasTest,
+	$cliWinGetAliasTest,
 	$applicationLock,
 	$schedulerLock,
 	$cliLock,
@@ -1040,6 +1048,7 @@ $cliPublish = Join-Path $buildRoot "cli/p"
 $schedulerArtifacts = Join-Path $buildRoot "scheduler/a"
 $schedulerPublish = Join-Path $buildRoot "scheduler/p"
 $schedulerOutput = Join-Path $buildRoot "scheduler/b"
+$cliWinGetLauncherOutput = Join-Path $buildRoot "cli-winget-launcher"
 $winGetLauncherOutput = Join-Path $buildRoot "winget-launcher"
 $winGetAliasProbeOutput = Join-Path $buildRoot "winget-alias-probe"
 $stagingRoot = Join-Path $workRoot "staging"
@@ -1058,6 +1067,7 @@ foreach ($directory in @(
 	$schedulerArtifacts,
 	$schedulerPublish,
 	$schedulerOutput,
+	$cliWinGetLauncherOutput,
 	$winGetLauncherOutput,
 	$winGetAliasProbeOutput,
 	$wrapperRoot,
@@ -1233,6 +1243,20 @@ $commands += Invoke-LoggedCommand `
 $commands += Invoke-LoggedCommand `
 	-Executable $msbuildPath `
 	-Arguments @(
+		$cliWinGetLauncherProject,
+		"/t:Build",
+		"/p:Configuration=Release",
+		"/p:Platform=$launcherPlatform",
+		"/p:OutDir=$cliWinGetLauncherOutput\",
+		"/p:IntDir=$cliWinGetLauncherOutput\obj\",
+		"/m:1",
+		"/v:minimal",
+		"/bl:$logsRoot/sylphyhorn-cli.WinGetLauncher-build.binlog"
+	) `
+	-LogPath (Join-Path $logsRoot "sylphyhorn-cli.WinGetLauncher-build.log")
+$commands += Invoke-LoggedCommand `
+	-Executable $msbuildPath `
+	-Arguments @(
 		$winGetAliasProbeProject,
 		"/t:Build",
 		"/p:Configuration=Release",
@@ -1284,6 +1308,18 @@ Add-StagingFile `
 	-StagingRoot $wrapperRoot `
 	-Provenance $provenance
 
+$cliWinGetLauncherPath = Join-Path `
+	$cliWinGetLauncherOutput `
+	"sylphyhorn-cli.WinGetLauncher.exe"
+Assert-Condition (Test-Path -LiteralPath $cliWinGetLauncherPath -PathType Leaf) `
+	"CLI WinGet launcher build output is missing: $cliWinGetLauncherPath"
+Add-StagingFile `
+	-SourcePath $cliWinGetLauncherPath `
+	-RelativePath "sylphyhorn-cli.WinGetLauncher.exe" `
+	-Origin "build:sylphyhorn-cli.WinGetLauncher" `
+	-StagingRoot $wrapperRoot `
+	-Provenance $provenance
+
 $dependencyInventory = Get-LockDependencyInventory `
 	-LockPaths @($applicationLock, $schedulerLock, $cliLock)
 $releaseDependencyInventory = @(
@@ -1312,6 +1348,7 @@ foreach ($requiredFile in @(
 	"SylphyHorn.deps.json",
 	"SylphyHorn.runtimeconfig.json",
 	"SylphyHorn.WinGetLauncher.exe",
+	"sylphyhorn-cli.WinGetLauncher.exe",
 	"SchedulerManager.exe",
 	"SchedulerManager.dll",
 	"SchedulerManager.deps.json",
@@ -1344,6 +1381,7 @@ foreach ($nativeEntryPoint in @(
 	"SylphyHorn.exe",
 	"SchedulerManager.exe",
 	"sylphyhorn-cli.exe",
+	"sylphyhorn-cli.WinGetLauncher.exe",
 	"SylphyHorn.WinGetLauncher.exe")) {
 	$peInfo = Get-PeInformation (Join-Path $wrapperRoot $nativeEntryPoint)
 	Assert-Condition (-not $peInfo.IsManaged) `
@@ -1362,6 +1400,12 @@ if ($canExecuteTarget) {
 		-Arguments @("--help") `
 		-LogPath (Join-Path $logsRoot "sylphyhorn-cli-help.log")
 
+	$cliWinGetAliasTestResult = & $cliWinGetAliasTest `
+		-PackageRoot $wrapperRoot `
+		-RequireSymbolicLink:($env:GITHUB_ACTIONS -ceq "true")
+	Assert-Condition ($LASTEXITCODE -eq 0) `
+		"CLI WinGet portable alias integration test failed."
+
 	$winGetAliasTestResult = & $winGetAliasTest `
 		-LauncherPath (Join-Path $wrapperRoot "SylphyHorn.WinGetLauncher.exe") `
 		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
@@ -1370,6 +1414,10 @@ if ($canExecuteTarget) {
 		"WinGet portable alias integration test failed."
 }
 else {
+	$cliWinGetAliasTestResult = [pscustomobject]@{
+		Status = "NotRun"
+		Reason = "HostArchitectureCannotExecuteArm64"
+	}
 	$winGetAliasTestResult = [pscustomobject]@{
 		Status = "NotRun"
 		Reason = "HostArchitectureCannotExecuteArm64"
@@ -1643,6 +1691,11 @@ $result = [ordered]@{
 	WinGetLauncherMachine = (
 		Get-PeInformation (
 			Join-Path $wrapperRoot "SylphyHorn.WinGetLauncher.exe")).Machine
+	CliWinGetLauncherMachine = (
+		Get-PeInformation (
+			Join-Path $wrapperRoot "sylphyhorn-cli.WinGetLauncher.exe")).Machine
+	CliWinGetAliasTestStatus = $cliWinGetAliasTestResult.Status
+	CliWinGetAliasTestReason = $cliWinGetAliasTestResult.Reason
 	WinGetAliasTestStatus = $winGetAliasTestResult.Status
 	WinGetAliasTestReason = $winGetAliasTestResult.Reason
 	PdbCount            = 0

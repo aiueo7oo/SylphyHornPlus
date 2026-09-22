@@ -109,6 +109,8 @@ NestedInstallerType: portable
 NestedInstallerFiles:
 - RelativeFilePath: SylphyHorn/SylphyHorn.WinGetLauncher.exe
   PortableCommandAlias: SylphyHornPlus
+- RelativeFilePath: SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe
+  PortableCommandAlias: sylphyhorn-cli
 UpgradeBehavior: install
 ReleaseDate: $ReleaseDate
 Installers:
@@ -186,6 +188,8 @@ foreach ($requiredText in @(
 	"NestedInstallerType: portable",
 	"RelativeFilePath: SylphyHorn/SylphyHorn.WinGetLauncher.exe",
 	"PortableCommandAlias: SylphyHornPlus",
+	"RelativeFilePath: SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe",
+	"PortableCommandAlias: sylphyhorn-cli",
 	"UpgradeBehavior: install"
 )) {
 	if (-not $writtenInstallerManifest.Contains($requiredText)) {
