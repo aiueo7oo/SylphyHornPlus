@@ -26,6 +26,9 @@ namespace SylphyHorn
 		private readonly StartupTrace _startupTrace;
 		private TaskTrayIcon _taskTrayIcon;
 		private DesktopTransitionRuntime _desktopRuntime;
+#if !NETFRAMEWORK
+		private Services.Commands.CliServer _cliServer;
+#endif
 
 		public event Action VirtualDesktopInitialized;
 		public event Action VirtualDesktopInitializationCanceled;
@@ -163,6 +166,19 @@ namespace SylphyHorn
 					_ = runtime.ConfigurePlacementAsync(configuration);
 				}).AddTo(this._disposable);
 				await runtime.ConfigurePlacementAsync(Settings.AppPlacement.Configuration.Value);
+#if !NETFRAMEWORK
+				try
+				{
+					this._cliServer = new Services.Commands.CliServer(
+						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
+						(command, token) => Application.Current.Dispatcher.InvokeAsync(
+							() => runtime.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap());
+				}
+				catch (Exception ex)
+				{
+					LoggingService.Instance.Register(ex);
+				}
+#endif
 				this.CompleteSuccessfulInitialization();
 			}
 			catch (Exception ex)
@@ -182,10 +198,14 @@ namespace SylphyHorn
 			this.VirtualDesktopInitialized?.Invoke();
 		}
 
-		internal Task ShutdownAsync()
+		internal async Task ShutdownAsync()
 		{
-			return this._desktopRuntime?.ShutdownAsync() ?? Task.CompletedTask;
+#if !NETFRAMEWORK
+			if (this._cliServer != null) await this._cliServer.StopAsync();
+#endif
+			if (this._desktopRuntime != null) await this._desktopRuntime.ShutdownAsync();
 		}
+
 		private sealed class DesktopRuntimeLog : ILog
 		{
 			internal DesktopRuntimeLog(DesktopRuntimeFault fault)
