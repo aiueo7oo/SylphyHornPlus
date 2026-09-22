@@ -16,10 +16,10 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
-				Console.WriteLine("SylphyHorn.Cli desktop list");
-				Console.WriteLine("SylphyHorn.Cli desktop switch (--number N | --name NAME | --id ID | --next | --previous) [--wrap]");
-				Console.WriteLine("SylphyHorn.Cli window list");
-				Console.WriteLine("SylphyHorn.Cli window move --id ID (--desktop-number N | --desktop-name NAME | --desktop-id ID) [--follow]");
+				Console.WriteLine("sylphyhorn-cli desktop list");
+				Console.WriteLine("sylphyhorn-cli desktop switch (--number N | --name NAME | --id ID | --next | --previous) [--wrap]");
+				Console.WriteLine("sylphyhorn-cli window list");
+				Console.WriteLine("sylphyhorn-cli window move --id ID (--desktop-number N | --desktop-name NAME | --desktop-id ID) [--follow]");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
 				return 0;
 			}

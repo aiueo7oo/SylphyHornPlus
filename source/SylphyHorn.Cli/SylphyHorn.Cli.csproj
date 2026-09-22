@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
-		<AssemblyName>SylphyHorn.Cli</AssemblyName>
+		<AssemblyName>sylphyhorn-cli</AssemblyName>
 		<Company>hwtnb.net</Company>
 		<Product>SylphyHornPlus</Product>
 		<Platforms>AnyCPU;x64;x86</Platforms>
