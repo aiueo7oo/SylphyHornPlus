@@ -123,7 +123,7 @@ namespace SylphyHorn.Services.AppPlacement
 		internal PlacementWorkItem(PlacementCandidate candidate)
 		{
 			this.Candidate = candidate;
-			this.Deadline = candidate.CreatedAt + 5000;
+			this.Deadline = candidate.ObservedAt + 5000;
 		}
 
 		internal PlacementCandidate Candidate { get; }

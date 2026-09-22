@@ -56,7 +56,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 		[WpfFact]
 		[Trait(IntegrationTestExecutionEnvironment.TraitName, IntegrationTestExecutionEnvironment.InteractiveDesktop)]
-		public async Task NativeHookExcludesBaselineTracksNewHiddenFixtureAndUnhooks()
+		public async Task NativeHookAdmitsHiddenBaselineAndNewFixtureButExcludesChildren()
 		{
 			// Own, never-visible windows only. NotifyWinEvent simulates SHOW without activating any window.
 			var existing = CreateFixture();
@@ -72,6 +72,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 				created = CreateFixture();
 				NotifyWinEvent(0x8002, created, 0, 0);
 				PlacementCandidate candidate = null;
+				var admittedExisting = false;
 				await Until(() =>
 				{
 					monitor.Events.ProcessBatch();
@@ -79,12 +80,12 @@ namespace SylphyHorn.WindowsIntegrationTests
 					PlacementCandidate value;
 					while ((value = monitor.Events.TakeCandidate()) != null)
 					{
-						Assert.NotEqual(existing, value.Window);
+						if (value.Window == existing) admittedExisting = true;
 						Assert.NotEqual(child, value.Window);
 						if (value.Window == created) candidate = value;
 						else monitor.Events.Complete(value);
 					}
-					return candidate != null;
+					return candidate != null && admittedExisting;
 				});
 				Assert.True(monitor.Events.IsCurrent(candidate));
 				Assert.True(DestroyWindow(created));

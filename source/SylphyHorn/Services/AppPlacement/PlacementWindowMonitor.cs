@@ -77,6 +77,7 @@ namespace SylphyHorn.Services.AppPlacement
 				hook = SetWinEventHook(0x8000, 0x8003, IntPtr.Zero, callback, 0, 0, 0);
 				if (hook == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
 				var baseline = new List<IntPtr>();
+				var initiallyHidden = new HashSet<IntPtr>();
 				var overflow = false;
 				var enumerated = EnumWindows(
 					(window, state) =>
@@ -88,6 +89,8 @@ namespace SylphyHorn.Services.AppPlacement
 							return false;
 						}
 						baseline.Add(window);
+						// Minimized and Shell-cloaked windows still have WS_VISIBLE; preserve their placement.
+						if (!IsWindowVisible(window)) initiallyHidden.Add(window);
 						return true;
 					},
 					IntPtr.Zero);
@@ -104,7 +107,7 @@ namespace SylphyHorn.Services.AppPlacement
 				while (GetTickCount64() <= boundary)
 					if (this._stop.WaitOne(1)) return;
 				if (this._stop.WaitOne(0)) return;
-				this._ready.TrySetResult(this.Events.Ready(baseline, checked((long)boundary)));
+				this._ready.TrySetResult(this.Events.Ready(baseline, checked((long)boundary), initiallyHidden));
 				var handles = new[] { this._stop.SafeWaitHandle.DangerousGetHandle() };
 				while (!this._stop.WaitOne(0) && this.Events.State != PlacementMonitorState.Paused)
 				{
@@ -204,6 +207,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		[DllImport("user32.dll", SetLastError = true)]
 		private static extern bool EnumWindows(EnumWindow callback, IntPtr state);
+
+		[DllImport("user32.dll")]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool IsWindowVisible(IntPtr window);
 
 		[DllImport("user32.dll")]
 		private static extern IntPtr GetAncestor(IntPtr window, uint flags);

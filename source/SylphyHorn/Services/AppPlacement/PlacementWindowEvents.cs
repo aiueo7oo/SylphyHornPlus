@@ -85,12 +85,12 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal sealed class PlacementCandidate
 	{
-		internal PlacementCandidate(IntPtr window, Guid epoch, long lifetime, long createdAt)
+		internal PlacementCandidate(IntPtr window, Guid epoch, long lifetime, long observedAt)
 		{
 			this.Window = window;
 			this.Epoch = epoch;
 			this.Lifetime = lifetime;
-			this.CreatedAt = createdAt;
+			this.ObservedAt = observedAt;
 		}
 
 		internal IntPtr Window { get; }
@@ -99,7 +99,7 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal long Lifetime { get; }
 
-		internal long CreatedAt { get; }
+		internal long ObservedAt { get; }
 	}
 
 	/// <summary>Bounded native ingress and window lifetimes. Never calls COM, UI, or application identification.</summary>
@@ -166,7 +166,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
-		internal bool Ready(IEnumerable<IntPtr> baseline, long boundary)
+		internal bool Ready(IEnumerable<IntPtr> baseline, long boundary, ISet<IntPtr> initiallyHidden = null)
 		{
 			if (baseline == null) throw new ArgumentNullException(nameof(baseline));
 			lock (this._gate)
@@ -175,7 +175,7 @@ namespace SylphyHorn.Services.AppPlacement
 				foreach (var window in baseline)
 				{
 					if (window == IntPtr.Zero || this._windows.ContainsKey(window)) continue;
-					if (!this.AddLifetime(window, boundary, true)) return false;
+					if (!this.AddLifetime(window, initiallyHidden == null || !initiallyHidden.Contains(window))) return false;
 				}
 				this._boundary = boundary;
 				this._lastEventTime = boundary;
@@ -244,7 +244,7 @@ namespace SylphyHorn.Services.AppPlacement
 								this.RemoveCandidate(value.Window);
 								break;
 							}
-							this.AddLifetime(value.Window, value.OccurredAt, false);
+							this.AddLifetime(value.Window, false);
 							break;
 						case PlacementWindowEventKind.Destroy:
 							if (lifetime != null) this.Cancel(lifetime);
@@ -261,7 +261,7 @@ namespace SylphyHorn.Services.AppPlacement
 							}
 							lifetime.Admitted = true;
 							this._admitted++;
-							this._candidates.Enqueue(new PlacementCandidate(value.Window, this._epoch, lifetime.Id, lifetime.CreatedAt));
+							this._candidates.Enqueue(new PlacementCandidate(value.Window, this._epoch, lifetime.Id, value.OccurredAt));
 							break;
 					}
 				}
@@ -331,7 +331,7 @@ namespace SylphyHorn.Services.AppPlacement
 			=> candidate != null && this._state == PlacementMonitorState.Running && candidate.Epoch == this._epoch
 				&& this._windows.TryGetValue(candidate.Window, out var current) && current.Id == candidate.Lifetime && current.Admitted;
 
-		private bool AddLifetime(IntPtr window, long time, bool existing)
+		private bool AddLifetime(IntPtr window, bool existing)
 		{
 			if (this._windows.Count == this._trackingLimit)
 			{
@@ -341,7 +341,6 @@ namespace SylphyHorn.Services.AppPlacement
 			this._windows.Add(window, new Lifetime
 			{
 				Id = checked(++this._lifetime),
-				CreatedAt = time,
 				Completed = existing
 			});
 			return true;
@@ -382,7 +381,7 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private sealed class Lifetime
 		{
-			internal long Id, CreatedAt;
+			internal long Id;
 			internal bool Completed, Admitted, Ambiguous;
 		}
 	}

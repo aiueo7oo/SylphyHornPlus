@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using SylphyHorn.Services.AppPlacement;
 using Xunit;
 
@@ -118,7 +119,7 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
-		public void PreparationAndBaselineWindowsAreNeverAdmittedEvenWithLateShow()
+		public void PreparationAndVisibleBaselineWindowsAreNeverAdmittedEvenWithLateShow()
 		{
 			var state = new PlacementWindowEvents(32, 16, 4);
 			Send(state, PlacementWindowEventKind.Create, 99, 102);
@@ -134,6 +135,44 @@ namespace SylphyHorn.Tests
 			Assert.Equal(PlacementMonitorState.Running, state.State);
 		}
 
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void OnlyInitiallyHiddenBaselineWindowsAreAdmittedOnFirstShow(bool hidden)
+		{
+			var state = new PlacementWindowEvents(32, 16, 4);
+			var hiddenWindows = new HashSet<IntPtr>();
+			if (hidden) hiddenWindows.Add(Window);
+			Assert.True(state.Ready(new[] { Window }, 100, hiddenWindows));
+			Send(state, PlacementWindowEventKind.Show, 10101);
+			state.ProcessBatch();
+			var candidate = state.TakeCandidate();
+			if (hidden)
+			{
+				Assert.NotNull(candidate);
+				Assert.Equal(15101, new PlacementWorkItem(candidate).Deadline);
+				state.Complete(candidate);
+			}
+			else Assert.Null(candidate);
+			Send(state, PlacementWindowEventKind.Hide, 10200);
+			Send(state, PlacementWindowEventKind.Show, 10300);
+			state.ProcessBatch();
+			Assert.Null(state.TakeCandidate());
+		}
+
+		[Fact]
+		public void DelayedFirstShowStartsThePlacementDeadlineWhenTheWindowAppears()
+		{
+			var state = Running();
+			Send(state, PlacementWindowEventKind.Create, 101);
+			Send(state, PlacementWindowEventKind.Show, 10101);
+			state.ProcessBatch();
+			var candidate = Assert.IsType<PlacementCandidate>(state.TakeCandidate());
+			Assert.Equal(10101, candidate.ObservedAt);
+			Assert.Equal(15101, new PlacementWorkItem(candidate).Deadline);
+			Assert.True(state.IsCurrent(candidate));
+		}
+
 		[Fact]
 		public void HiddenThenShownWindowIsAdmittedOnceAndRestorationDoesNotRepeat()
 		{
@@ -145,7 +184,7 @@ namespace SylphyHorn.Tests
 			state.ProcessBatch();
 			var first = Assert.IsType<PlacementCandidate>(state.TakeCandidate());
 			Assert.Equal(Window, first.Window);
-			Assert.Equal(101, first.CreatedAt);
+			Assert.Equal(102, first.ObservedAt);
 			Assert.True(state.IsCurrent(first));
 			state.Complete(first);
 			state.Complete(first);
