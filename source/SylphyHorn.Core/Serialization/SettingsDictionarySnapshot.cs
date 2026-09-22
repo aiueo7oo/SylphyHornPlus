@@ -21,7 +21,7 @@ namespace SylphyHorn.Serialization
 		{
 			if (value == null || value is string || value.GetType().IsValueType) return value;
 			// The entire placement graph is immutable, including its read-only rule list.
-			if (value is AppPlacementConfiguration) return value;
+			if (value is AppPlacementConfiguration || value is PlacementCreatedGroup) return value;
 			if (value is Array array) return array.Clone();
 			if (value is IList<int> integers) return integers.ToList();
 			if (value is IList<string> strings) return strings.ToList();
@@ -59,6 +59,8 @@ namespace SylphyHorn.Serialization
 			{
 				AppendValue(builder, placement.Enabled);
 				AppendValue(builder, placement.CreateMissingDesktops);
+				AppendValue(builder, placement.CloseCreatedDesktops);
+				AppendValue(builder, placement.ClosingTargets);
 				builder.Append('[');
 				foreach (var rule in placement.Rules)
 				{
@@ -74,6 +76,19 @@ namespace SylphyHorn.Serialization
 					builder.Append(';');
 				}
 				builder.Append(']');
+				return;
+			}
+			if (value is PlacementDestination destination)
+			{
+				AppendValue(builder, destination.Kind);
+				AppendValue(builder, destination.Name);
+				AppendValue(builder, destination.Number);
+				return;
+			}
+			if (value is PlacementCreatedGroup group)
+			{
+				AppendValue(builder, group.Used);
+				AppendValue(builder, group.Desktops);
 				return;
 			}
 			if (value is string text)

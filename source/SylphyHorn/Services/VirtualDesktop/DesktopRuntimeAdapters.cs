@@ -47,6 +47,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private readonly LocalSettingsProvider _provider;
 		internal ApplicationDesktopSettingsTransactions(LocalSettingsProvider provider) => this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
 		public DesktopStartupSeed CaptureStartupSeed() => SettingsService.CaptureDesktopStartupSeed();
+		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value;
+		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value = groups;
 		public void ApplyProjection(DesktopSettingsProjection projection) => SettingsService.ApplyDesktopProjection(projection);
 		public long SettingsRevision => this._provider.SettingsRevision;
 		public Task<SettingsSaveResult> RequestSaveAsync(long stateRevision) => this._provider.SaveWithResultAsync(stateRevision);
@@ -84,6 +86,21 @@ namespace SylphyHorn.Services.DesktopTransitions
 		public void MoveLast(Guid desktopId) => Resolve(desktopId).MoveToLast();
 		public void Switch(Guid desktopId) => Resolve(desktopId).Switch();
 		public void Remove(Guid desktopId) => Resolve(desktopId).Remove();
+		public bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent)
+		{
+			var desktops = VirtualDesktop.GetDesktops();
+			if (desktops.Length < 2 || desktops[desktops.Length - 1].Id != desktopId
+				|| desktops[desktops.Length - 2].Id != fallbackId) return false;
+			var observation = new AppPlacement.PlacementDesktopOccupancyReader().Read(CancellationToken.None, () => true);
+			if (!observation.Complete || observation.Occupied.Contains(desktopId)) return false;
+			// Recheck topology after COM-based occupancy inspection, which can pump native events.
+			var latest = VirtualDesktop.GetDesktops();
+			if (!latest.Select(item => item.Id).SequenceEqual(desktops.Select(item => item.Id))) return false;
+			if (!stillCurrent()) return false;
+			desktops[desktops.Length - 1].Remove(desktops[desktops.Length - 2]);
+			return true;
+		}
+
 		private static VirtualDesktop Resolve(Guid desktopId) => VirtualDesktop.FromId(desktopId) ?? throw new InvalidOperationException("The virtual desktop is no longer active.");
 	}
 

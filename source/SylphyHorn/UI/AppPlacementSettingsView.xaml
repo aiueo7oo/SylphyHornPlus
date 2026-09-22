@@ -171,6 +171,36 @@
 			        HorizontalAlignment="Left"
 			        Margin="0,16,0,0"
 			        Padding="12,4" />
+			<TextBlock Text="{Binding Text[CloseTitle]}" Style="{DynamicResource HeaderStyleKey}" />
+			<CheckBox Content="{Binding Text[CloseCreated]}" IsChecked="{Binding CloseCreatedDesktops}" Margin="8,0,0,8" />
+			<TextBlock Text="{Binding Text[CloseHint]}" Style="{StaticResource InlineMessage}" Margin="8,0,0,8" />
+			<ItemsControl ItemsSource="{Binding ClosingGroups}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Margin="8,0,0,8">
+							<TextBlock Text="{Binding Title}" Margin="0,0,0,4" />
+							<ItemsControl ItemsSource="{Binding Rows}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<StackPanel Margin="0,0,0,8" PreviewKeyDown="ClosingInputKey">
+											<DockPanel>
+												<Button DockPanel.Dock="Right" Content="{Binding Group.Owner.Text[DeleteLabel]}"
+												        ToolTip="{Binding Group.Owner.Text[Delete]}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
+												<metro:PromptComboBox Prompt="" IsEditable="True"
+												                      Text="{Binding Destination, UpdateSourceTrigger=PropertyChanged}"
+												                      DropDownOpened="ClosingDestinationOpened" DropDownClosed="ClosingDestinationClosed"
+												                      LostKeyboardFocus="ClosingCommit" AutomationProperties.Name="{Binding Group.Title}" />
+											</DockPanel>
+											<TextBlock Text="{Binding Error}" Style="{StaticResource InlineMessage}" />
+										</StackPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<Button Content="{Binding Owner.Text[AddManual]}" Click="AddClosing" Margin="0" />
+						</StackPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
 			<TextBlock Text="{Binding Message}"
 			           Style="{StaticResource InlineMessage}"
 			           AutomationProperties.LiveSetting="Polite" />

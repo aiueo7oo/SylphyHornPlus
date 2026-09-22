@@ -21,6 +21,36 @@ namespace SylphyHorn.Tests
 	public sealed class AppPlacementSettingsViewModelTests
 	{
 		[Fact]
+		public async Task ClosingSettingsSurvivePlacementEditsAndRejectInvalidNumbers()
+		{
+			using (var fixture = await PlacementUiFixture.Create())
+			{
+				fixture.Model.CloseCreatedDesktops = true;
+				var name = fixture.Model.AddClosingRow(fixture.Model.ClosingGroups[0]);
+				name.Destination = "work";
+				await fixture.Model.CommitClosingAsync(name);
+				var number = fixture.Model.AddClosingRow(fixture.Model.ClosingGroups[1]);
+				number.Destination = "3";
+				await fixture.Model.CommitClosingAsync(number);
+				var app = await fixture.Add(@"C:\Apps\Editor.exe", 3);
+				fixture.Model.IsEnabled = true;
+				fixture.Model.CreateMissingDesktops = true;
+				await fixture.Model.RemoveAsync(app);
+				Assert.True(fixture.Settings.Configuration.Value.CloseCreatedDesktops);
+				Assert.Equal(2, fixture.Settings.Configuration.Value.ClosingTargets.Count);
+				number.Destination = "0";
+				await fixture.Model.CommitClosingAsync(number);
+				Assert.NotEmpty(number.Error);
+				Assert.Equal(3, number.Saved.Number);
+				number.Restore();
+				Assert.Equal("3", number.Destination);
+				await fixture.Model.RemoveClosingAsync(name);
+				Assert.Equal(3, Assert.Single(fixture.Settings.Configuration.Value.ClosingTargets).Number);
+				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+			}
+		}
+
+		[Fact]
 		public async Task EditingRulesAndTogglingPlacementPreservesCreationOption()
 		{
 			using (var fixture = await PlacementUiFixture.Create())

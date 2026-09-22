@@ -150,7 +150,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 			IDesktopOwnerContext owner,
 			IDesktopOperations operations,
 			TimeSpan? providerWaitBudget = null,
-			AppPlacement.IPlacementSessionFactory placementFactory = null)
+			AppPlacement.IPlacementSessionFactory placementFactory = null,
+			Func<long> closureClock = null)
 		{
 			this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
 			this._settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -160,6 +161,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this._providerWaitBudget = providerWaitBudget ?? TimeSpan.FromSeconds(30);
 			this._coordinator = new DesktopTransitionCoordinator(this._startupSeed);
 			this._placementFactory = placementFactory ?? new AppPlacement.PlacementSessionFactory();
+			this._closureClock = closureClock ?? (() => (long)(System.Diagnostics.Stopwatch.GetTimestamp() * (1000.0 / System.Diagnostics.Stopwatch.Frequency)));
 		}
 
 		internal event EventHandler<DesktopRuntimeStateChanged> StateChanged;
@@ -818,6 +820,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 
 			this._placementPermit?.Cancel();
+			this._placementSession?.DesktopChanged();
 			if (applyProjection && transition.Projection != null) this._settings.ApplyProjection(this._persistenceProtection?.CreateProjection(transition.NewState) ?? transition.Projection);
 			transitionCommitted?.Invoke();
 			this._publishing = true;

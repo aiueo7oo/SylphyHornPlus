@@ -184,12 +184,17 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
+		private long _version;
+
+		internal long Version { get { lock (this._gate) return this._version; } }
+
 		internal void Receive(PlacementWindowEvent value)
 		{
 			lock (this._gate)
 			{
 				if (this._state != PlacementMonitorState.Preparing && this._state != PlacementMonitorState.Running) return;
 				if (value.Window == IntPtr.Zero) return;
+				this._version++;
 				if (value.Kind == PlacementWindowEventKind.Show && this._count > 0)
 				{
 					var last = this._events[(this._head + this._count - 1) % this._events.Length];

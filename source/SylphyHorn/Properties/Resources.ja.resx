@@ -852,4 +852,19 @@
   <data name="Placement_ApplyNotSelected" xml:space="preserve">
     <value>未選択</value>
   </data>
+  <data name="Placement_CloseTitle" xml:space="preserve">
+    <value>空のデスクトップを自動で閉じる</value>
+  </data>
+  <data name="Placement_CloseCreated" xml:space="preserve">
+    <value>自動作成したデスクトップは個別指定なしで閉じる</value>
+  </data>
+  <data name="Placement_CloseHint" xml:space="preserve">
+    <value>使用後に空の状態が1秒続くと、末尾から閉じます。表示中のデスクトップを閉じると、一つ前に移ります。アプリの自動配置を有効にしてください。</value>
+  </data>
+  <data name="Placement_CloseByName" xml:space="preserve">
+    <value>個別に閉じるデスクトップ名</value>
+  </data>
+  <data name="Placement_CloseByNumber" xml:space="preserve">
+    <value>個別に閉じるデスクトップ番号</value>
+  </data>
 </root>

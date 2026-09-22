@@ -30,7 +30,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (this._placementChanging) return "Stopping";
 				if (this._shutdownStarted || this._stopping || this._placementSuspended) return "Suspended";
 				if (!this._placementConfiguration.Enabled) return "Disabled";
-				if (!this._placementConfiguration.Rules.Any(rule => rule.Enabled)) return "NoRules";
+				if (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets) return "NoRules";
 				if (this._placementSession == null || this._placementSession.Completion.IsCompleted) return "Paused";
 				return this._placementSession.IsReady ? "Active" : "Preparing";
 			}
@@ -79,6 +79,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			var generation = ++this._placementGeneration;
 			this._placementChanging = true;
+			this._desktopClosure.Reset();
+			this._closingArmed.Clear();
 			try
 			{
 				this._placementPermit?.Cancel();
@@ -95,13 +97,21 @@ namespace SylphyHorn.Services.DesktopTransitions
 					if (ReferenceEquals(previous, this._placementSession)) this._placementSession = null;
 				}
 				if (generation != this._placementGeneration || !this._initialized || this._shutdownStarted || this._stopping
-					|| this._placementSuspended || !this._placementConfiguration.Enabled || !this._placementConfiguration.Rules.Any(rule => rule.Enabled)) return;
+					|| this._placementSuspended || !this._placementConfiguration.Enabled
+					|| (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets)) return;
 				try
 				{
+					Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null;
+					if (this._placementConfiguration.HasClosingTargets)
+					{
+						closeDesktops = (observation, cancellation) => this.ObserveDesktopClosureAsync(generation, observation, cancellation);
+					}
+
 					this._placementSession = this._placementFactory.Start(
 						this._placementConfiguration,
 						(destination, allowCreation, cancellation) => this.AuthorizePlacementAsync(generation, destination, allowCreation, cancellation),
-						this._placementHistory);
+						this._placementHistory,
+						closeDesktops);
 					_ = this.ObservePlacementAsync(this._placementSession);
 				}
 				catch (Exception ex)
@@ -198,6 +208,13 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private void CompletePlacementAuthorization(PlacementAuthorizationRequest request, PlacementResolution resolution)
 		{
+			if (resolution.Status == PlacementResolutionStatus.Resolved && request.CreatedGroup != null)
+			{
+				this._createdGroups.Remove(request.CreatedGroup);
+				request.CreatedGroup = new PlacementCreatedGroup(request.CreatedGroup.Desktops, true);
+				this._createdGroups.Add(request.CreatedGroup);
+				this.SaveCreatedDesktopGroups();
+			}
 			this._placementPermit?.Cancel();
 			var permit = resolution.Status == PlacementResolutionStatus.Resolved ? new PlacementMovePermit() : null;
 			this._placementPermit = permit;
@@ -232,6 +249,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 						// Bound this request to its initial deficit, even if another actor removes desktops.
 						remaining--;
 						created = this._operations.Create();
+						this.RecordPlacementCreatedDesktop(request, created);
 						this.CheckPlacementCreation(request);
 						if (request.Destination.Kind == PlacementDestinationKind.Name)
 							this._operations.SetName(created, request.Destination.Name);
@@ -316,6 +334,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 			internal CancellationToken Cancellation { get; }
 
 			internal bool AllowCreation { get; }
+
+			internal PlacementCreatedGroup CreatedGroup { get; set; }
 		}
 
 		private async Task<SettingsImportCommitResult> CommitImportWithPlacementSuspendedAsync(StagedSettingsImport stage,
@@ -330,6 +350,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			finally
 			{
 				this._placementSuspended = false;
+				this._createdGroupsLoaded = false;
 				await this.ReconcilePlacementAsync();
 				this.ScheduleDeferredCommands();
 			}

@@ -15,6 +15,17 @@ namespace SylphyHorn.AppPlacement
 		[DataMember(Order = 2, EmitDefaultValue = false)]
 		public bool CreateMissingDesktops { get; private set; }
 
+		[DataMember(Order = 3, EmitDefaultValue = false)]
+		public bool CloseCreatedDesktops { get; private set; }
+
+		[DataMember(Name = "ClosingTargets", Order = 4, EmitDefaultValue = false)]
+		private PlacementDestination[] _closingTargets;
+		private ReadOnlyCollection<PlacementDestination> _closingView;
+
+		public IReadOnlyList<PlacementDestination> ClosingTargets => this._closingView;
+
+		public bool HasClosingTargets => this.CloseCreatedDesktops || this._closingTargets.Length != 0;
+
 		[DataMember(Name = "Rules", Order = 1, IsRequired = true)]
 		private AppPlacementRule[] _rules;
 		private ReadOnlyCollection<AppPlacementRule> _view;
@@ -24,10 +35,13 @@ namespace SylphyHorn.AppPlacement
 
 		public IReadOnlyList<AppPlacementRule> Rules => this._view;
 
-		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false)
+		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false,
+			bool closeCreatedDesktops = false, IEnumerable<PlacementDestination> closingTargets = null)
 		{
 			this.Enabled = enabled;
 			this.CreateMissingDesktops = createMissingDesktops;
+			this.CloseCreatedDesktops = closeCreatedDesktops;
+			this._closingTargets = closingTargets?.ToArray();
 			this._rules = rules?.ToArray() ?? throw new ArgumentNullException(nameof(rules));
 			this.Initialize();
 		}
@@ -40,6 +54,9 @@ namespace SylphyHorn.AppPlacement
 
 		private void Initialize()
 		{
+			this._closingTargets = this._closingTargets ?? Array.Empty<PlacementDestination>();
+			if (this._closingTargets.Any(target => target == null)) throw new SerializationException("Null closing targets are not allowed.");
+			this._closingView = Array.AsReadOnly(this._closingTargets);
 			if (this._rules == null) throw new SerializationException("A rule list is required.");
 			var ids = new HashSet<Guid>();
 			var index = new Dictionary<PlacementAppIdentity, AppPlacementRule>();

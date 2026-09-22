@@ -176,9 +176,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
 				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-				PlacementHistory history)
+				PlacementHistory history,
+				Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
 			{
-				var session = new PlacementSessionFactory().Start(configuration, authorize, history);
+				var session = new PlacementSessionFactory().Start(configuration, authorize, history, closeDesktops);
 				this.Sessions.Add(session);
 				return session;
 			}
@@ -270,6 +271,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 			public DesktopStartupSeed CaptureStartupSeed() => DesktopStartupSeed.Empty;
 
+			public PlacementCreatedGroup[] ReadCreatedDesktopGroups() => new AppPlacementSettings(this.Provider).CreatedDesktopGroups.Value;
+
+			public void WriteCreatedDesktopGroups(PlacementCreatedGroup[] groups) => new AppPlacementSettings(this.Provider).CreatedDesktopGroups.Value = groups;
+
 			public void ApplyProjection(DesktopSettingsProjection projection)
 			{
 				var values = new Dictionary<string, object>();
@@ -330,6 +335,8 @@ namespace SylphyHorn.WindowsIntegrationTests
 			}
 
 			public Guid Create() { this.Reject(); return Guid.Empty; }
+
+			public bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent) { this.Reject(); return false; }
 
 			public void SetName(Guid desktopId, string value) => this.Reject();
 

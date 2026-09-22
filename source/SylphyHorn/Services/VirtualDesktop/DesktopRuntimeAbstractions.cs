@@ -20,6 +20,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 	internal interface IDesktopSettingsTransactions
 	{
 		DesktopStartupSeed CaptureStartupSeed();
+		SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups();
+		void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups);
 		void ApplyProjection(DesktopSettingsProjection projection);
 		long SettingsRevision { get; }
 		Task<SettingsSaveResult> RequestSaveAsync(long stateRevision);
@@ -49,6 +51,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		void MoveLast(Guid desktopId);
 		void Switch(Guid desktopId);
 		void Remove(Guid desktopId);
+		bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent);
 	}
 
 }

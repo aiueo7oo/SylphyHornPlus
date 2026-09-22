@@ -83,7 +83,7 @@ namespace SylphyHorn.Tests
 							Assert.False(path.IsReadOnly);
 							Assert.True(path.Focusable && path.IsTabStop);
 							Assert.InRange(path.TransformToAncestor(view).TransformBounds(new Rect(path.RenderSize)).Right, 1, view.Width);
-							Assert.Equal(2, Descendants(view).OfType<Button>().Count(button => Equals(button.Content, fixture.Model.Text["AddManual"])));
+							Assert.Equal(4, Descendants(view).OfType<Button>().Count(button => Equals(button.Content, fixture.Model.Text["AddManual"])));
 							Assert.Empty(Descendants(view).OfType<RadioButton>());
 							using (var picker = fixture.Model.CreatePicker())
 							{
@@ -139,6 +139,9 @@ namespace SylphyHorn.Tests
 							var edited = fixture.Model.Groups[1].Rows[0];
 							edited.Destination = "invalid";
 							await fixture.Model.CommitAsync(edited);
+							var closing = fixture.Model.AddClosingRow(fixture.Model.ClosingGroups[1]);
+							closing.Destination = "3";
+							await fixture.Model.CommitClosingAsync(closing);
 							var originalSetting = SylphyHorn.Serialization.Settings.General.Culture.Value;
 							try
 							{
@@ -147,6 +150,8 @@ namespace SylphyHorn.Tests
 									SylphyHorn.Services.ResourceService.Current.ChangeCulture(language);
 									Render(view, scale);
 									Assert.Contains(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["NameList"]);
+									Assert.Contains(Descendants(view).OfType<CheckBox>(), box => Equals(box.Content, fixture.Model.Text["CloseCreated"]));
+									Assert.Contains(Descendants(view).OfType<ComboBox>(), combo => ReferenceEquals(combo.DataContext, closing) && combo.Text == "3");
 									Assert.Contains(Descendants(view).OfType<CheckBox>(), box => Equals(box.Content, fixture.Model.Text["Enable"]));
 									Assert.Contains(Descendants(view).OfType<Button>(), button => Equals(button.Content, language == "en" ? "Delete" : "削除"));
 									foreach (var button in Descendants(view).OfType<Button>().Where(button => Equals(button.Content, fixture.Model.Text["DeleteLabel"])))

@@ -43,6 +43,8 @@ namespace SylphyHorn.Tests
 				{
 					var restored = (AppPlacementConfiguration)serializer.ReadObject(reader);
 					Assert.Equal(create, restored.CreateMissingDesktops);
+					Assert.False(restored.CloseCreatedDesktops);
+					Assert.Empty(restored.ClosingTargets);
 					Assert.Single(restored.Rules);
 				}
 			}
@@ -182,6 +184,9 @@ namespace SylphyHorn.Tests
 			{
 				new AppPlacementConfiguration(false, new[] { rule }),
 				new AppPlacementConfiguration(true, new[] { rule }, true),
+				new AppPlacementConfiguration(true, new[] { rule }, closeCreatedDesktops: true),
+				new AppPlacementConfiguration(true, new[] { rule }, closingTargets: new[] { PlacementDestination.ByName("work") }),
+				new AppPlacementConfiguration(true, new[] { rule }, closingTargets: new[] { PlacementDestination.ByNumber(2) }),
 				new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>()),
 				new AppPlacementConfiguration(true, new[] { Rule(enabled: false) }),
 				new AppPlacementConfiguration(true, new[] { Rule(PlacementDestination.ByNumber(2)) }),
@@ -207,7 +212,9 @@ namespace SylphyHorn.Tests
 					new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Family_publisher!App"),
 					PlacementDestination.ByNumber(2),
 					"Package app");
-				var configuration = new AppPlacementConfiguration(true, new[] { Rule(), packageRule });
+				var configuration = new AppPlacementConfiguration(true, new[] { Rule(), packageRule }, true, true,
+					new[] { PlacementDestination.ByName("work"), PlacementDestination.ByNumber(3) });
+				new AppPlacementSettings(provider).CreatedDesktopGroups.Value = new[] { new PlacementCreatedGroup(new[] { Work, Other }, true) };
 				new AppPlacementSettings(provider).Configuration.Value = configuration;
 				provider.SetValue("Future.Unknown", 42);
 				Assert.True((await provider.SaveWithResultAsync()).Succeeded);
@@ -220,10 +227,16 @@ namespace SylphyHorn.Tests
 				Assert.Equal(await Fingerprint(configuration), await Fingerprint(loaded));
 				Assert.True(reader.TryGetValue<int>("Future.Unknown", out var unknown) && unknown == 42);
 				Assert.NotNull(loaded.FindEnabledRule(packageRule.App));
+				Assert.True(loaded.CloseCreatedDesktops);
+				Assert.Equal(2, loaded.ClosingTargets.Count);
+				var created = Assert.Single(new AppPlacementSettings(reader).CreatedDesktopGroups.Value);
+				Assert.True(created.Used);
+				Assert.Equal(new[] { Work, Other }, created.Desktops);
 				var reset = await reader.PrepareResetAsync();
 				Assert.True((await reader.CommitStagedImportAsync(reset, reset.CreateCommitDictionary())).Succeeded);
 				reader.PublishCommittedImport();
 				Assert.False(new AppPlacementSettings(reader).Configuration.Value.Enabled);
+				Assert.Empty(new AppPlacementSettings(reader).CreatedDesktopGroups.Value);
 				Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
 			});
 		}

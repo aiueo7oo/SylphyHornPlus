@@ -36,20 +36,20 @@ namespace SylphyHorn.Tests
 			FakeSettings settings,
 			FakeOwner owner,
 			FakeOperations operations,
-			Services.AppPlacement.IPlacementSessionFactory placementFactory)
+			Services.AppPlacement.IPlacementSessionFactory placementFactory, Func<long> closureClock)
 		{
 			this.Provider = provider;
 			this.Settings = settings;
 			this.Owner = owner;
 			this.Operations = operations;
-			this.Runtime = new DesktopTransitionRuntime(provider, settings, owner, operations, placementFactory: placementFactory);
+			this.Runtime = new DesktopTransitionRuntime(provider, settings, owner, operations, placementFactory: placementFactory, closureClock: closureClock);
 		}
 		internal FakeProvider Provider { get; }
 		internal FakeSettings Settings { get; }
 		internal FakeOwner Owner { get; }
 		internal FakeOperations Operations { get; }
 		internal DesktopTransitionRuntime Runtime { get; }
-		internal static Harness Create(VirtualDesktopStableBatch batch, Services.AppPlacement.IPlacementSessionFactory placementFactory = null) => new Harness(new FakeProvider(batch), new FakeSettings(DesktopStartupSeed.Empty), new FakeOwner(), new FakeOperations(), placementFactory);
+		internal static Harness Create(VirtualDesktopStableBatch batch, Services.AppPlacement.IPlacementSessionFactory placementFactory = null, Func<long> closureClock = null) => new Harness(new FakeProvider(batch), new FakeSettings(DesktopStartupSeed.Empty), new FakeOwner(), new FakeOperations(), placementFactory, closureClock);
 		internal static async Task<Harness> Initialized()
 		{
 			var harness = Create(Batch(1, 1, A, Entry(A, 0, "name", "wall")));
@@ -108,6 +108,9 @@ namespace SylphyHorn.Tests
 
 	internal sealed class FakeSettings : IDesktopSettingsTransactions
 	{
+		internal SylphyHorn.AppPlacement.PlacementCreatedGroup[] CreatedGroups = Array.Empty<SylphyHorn.AppPlacement.PlacementCreatedGroup>();
+		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this.CreatedGroups;
+		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => this.CreatedGroups = groups;
 		internal FakeSettings(DesktopStartupSeed seed)
 		{
 			this.Seed = seed;
@@ -236,6 +239,13 @@ namespace SylphyHorn.Tests
 
 	internal sealed class FakeOperations : IDesktopOperations
 	{
+		internal bool AllowEmptyRemoval = true;
+		public bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent)
+		{
+			if (!this.AllowEmptyRemoval || !stillCurrent()) return false;
+			this.Remove(desktopId);
+			return true;
+		}
 		internal List<string> DesktopOperationNames { get; } = new List<string>();
 		internal List<Guid> DesktopOperationIds { get; } = new List<Guid>();
 		internal int NameCalls { get; private set; }

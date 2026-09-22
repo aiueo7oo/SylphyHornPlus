@@ -41,6 +41,62 @@ namespace SylphyHorn.UI
 			else this._refresh.Stop();
 		}
 
+		private void AddClosing(object sender, RoutedEventArgs args)
+		{
+			if ((sender as FrameworkElement)?.DataContext is PlacementClosingGroup group)
+			{
+				var row = group.Owner.AddClosingRow(group);
+				this.Dispatcher.BeginInvoke(new Action(() =>
+				{
+					this.UpdateLayout();
+					var field = FindField(this, row, "Destination");
+					field?.BringIntoView();
+					field?.Focus();
+				}), DispatcherPriority.Input);
+			}
+		}
+
+		private void ClosingDestinationOpened(object sender, EventArgs args)
+		{
+			var combo = (ComboBox)sender;
+			var row = (PlacementClosingRow)combo.DataContext;
+			var text = combo.Text;
+			row.Group.Owner.RefreshDestinationChoices();
+			combo.ItemsSource = row.Group.Owner.Groups[row.Group.Kind == SylphyHorn.AppPlacement.PlacementDestinationKind.Name ? 0 : 1].Choices;
+			combo.Text = text;
+			combo.Tag = text;
+		}
+
+		private void ClosingDestinationClosed(object sender, EventArgs args)
+		{
+			var combo = (ComboBox)sender;
+			if (combo.Tag == null) return;
+			combo.Tag = null;
+			this.ClosingCommit(sender, args);
+		}
+
+		private async void ClosingCommit(object sender, EventArgs args)
+		{
+			if (sender is ComboBox combo && (combo.IsDropDownOpen || (args is KeyboardFocusChangedEventArgs && combo.IsKeyboardFocusWithin))) return;
+			if ((sender as FrameworkElement)?.DataContext is PlacementClosingRow row) await row.Group.Owner.CommitClosingAsync(row);
+		}
+
+		private async void ClosingInputKey(object sender, KeyEventArgs args)
+		{
+			if (!((sender as FrameworkElement)?.DataContext is PlacementClosingRow row)) return;
+			if (args.Key == Key.Escape)
+			{
+				if (FindField(this, row, "Destination") is ComboBox combo)
+				{
+					combo.Tag = null;
+					combo.IsDropDownOpen = false;
+				}
+				row.Restore();
+				args.Handled = true;
+			}
+			else if (args.Key == Key.Enter) { await row.Group.Owner.CommitClosingAsync(row); args.Handled = true; }
+		}
+
 		private void Add(object sender, RoutedEventArgs args)
 		{
 			if ((sender as FrameworkElement)?.DataContext is PlacementRuleGroup group) this.FocusRow(group.Owner.AddRow(group));
@@ -222,7 +278,7 @@ namespace SylphyHorn.UI
 				DispatcherPriority.Loaded);
 		}
 
-		private static Control FindField(DependencyObject parent, PlacementRuleRow row, string property)
+		private static Control FindField(DependencyObject parent, object row, string property)
 		{
 			for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
 			{

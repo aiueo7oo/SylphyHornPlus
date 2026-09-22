@@ -18,8 +18,12 @@ namespace SylphyHorn.Serialization
 
 		public SerializableProperty<AppPlacementConfiguration> Configuration => this.Cache(key => new SerializableProperty<AppPlacementConfiguration>(key, this._provider, AppPlacementConfiguration.Empty));
 
+		public SerializableProperty<PlacementCreatedGroup[]> CreatedDesktopGroups => this.Cache(key => new SerializableProperty<PlacementCreatedGroup[]>(key, this._provider, Array.Empty<PlacementCreatedGroup>()));
+
 		internal static void ValidateEntry(string key, object value)
 		{
+			if (key == "AppPlacementSettings.CreatedDesktopGroups" && (!(value is PlacementCreatedGroup[] groups) || Array.Exists(groups, group => group == null)))
+				throw new SerializationException("Invalid created desktop groups.");
 			if (key == ConfigurationKey && !(value is AppPlacementConfiguration))
 				throw new SerializationException("Invalid app placement configuration.");
 		}

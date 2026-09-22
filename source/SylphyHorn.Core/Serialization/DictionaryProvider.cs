@@ -33,7 +33,7 @@ namespace SylphyHorn.Serialization
 
 		public bool IsLoaded { get; private set; }
 		public virtual string Filename { get; } = "Settings.xml";
-		public virtual Type[] KnownTypes { get; } = { typeof(bool), typeof(int[]), typeof(AppPlacement.AppPlacementConfiguration), };
+		public virtual Type[] KnownTypes { get; } = { typeof(bool), typeof(int[]), typeof(AppPlacement.AppPlacementConfiguration), typeof(AppPlacement.PlacementCreatedGroup[]), };
 		public long SettingsRevision { get { lock (this._sync) return this._settingsRevision; } }
 		public bool ImportTransactionActive { get { lock (this._sync) return this._importActive; } }
 

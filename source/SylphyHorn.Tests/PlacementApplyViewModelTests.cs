@@ -202,7 +202,8 @@ namespace SylphyHorn.Tests
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
 				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-				PlacementHistory history) => this._session;
+				PlacementHistory history,
+				Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null) => this._session;
 		}
 	}
 
@@ -235,7 +236,9 @@ namespace SylphyHorn.Tests
 
 		public bool IsReady => true;
 
-		public Task Completion => this._end.Task;
+		public void DesktopChanged() { }
+
+			public Task Completion => this._end.Task;
 
 		public Task StopAsync()
 		{

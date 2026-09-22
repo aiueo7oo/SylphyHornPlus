@@ -88,6 +88,51 @@ namespace SylphyHorn.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Also close these desktop names.
+        /// </summary>
+        public static string Placement_CloseByName {
+            get {
+                return ResourceManager.GetString("Placement_CloseByName", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Also close these desktop numbers.
+        /// </summary>
+        public static string Placement_CloseByNumber {
+            get {
+                return ResourceManager.GetString("Placement_CloseByNumber", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Close automatically created desktops without listing them below.
+        /// </summary>
+        public static string Placement_CloseCreated {
+            get {
+                return ResourceManager.GetString("Placement_CloseCreated", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to After use, close from the last desktop when empty for one second. Closing the current desktop switches to the previous desktop. App placement must be enabled..
+        /// </summary>
+        public static string Placement_CloseHint {
+            get {
+                return ResourceManager.GetString("Placement_CloseHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Automatically close empty desktops.
+        /// </summary>
+        public static string Placement_CloseTitle {
+            get {
+                return ResourceManager.GetString("Placement_CloseTitle", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Create missing desktops when a matching app opens.
         /// </summary>
         public static string Placement_CreateMissing {

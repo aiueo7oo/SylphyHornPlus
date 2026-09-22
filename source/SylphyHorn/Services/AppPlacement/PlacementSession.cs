@@ -16,6 +16,8 @@ namespace SylphyHorn.Services.AppPlacement
 
 		Task StopAsync();
 
+		void DesktopChanged();
+
 		Task<PlacementPreview> PreviewAsync(PlacementDesktopMap map, CancellationToken cancellation);
 
 		Task<PlacementResult[]> ApplyAsync(PlacementPreview preview, Guid[] selection, CancellationToken cancellation);
@@ -26,7 +28,8 @@ namespace SylphyHorn.Services.AppPlacement
 		IPlacementSession Start(
 			AppPlacementConfiguration configuration,
 			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-			PlacementHistory history);
+			PlacementHistory history,
+			Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null);
 	}
 
 	internal sealed class PlacementSessionFactory : IPlacementSessionFactory
@@ -34,8 +37,9 @@ namespace SylphyHorn.Services.AppPlacement
 		public IPlacementSession Start(
 			AppPlacementConfiguration configuration,
 			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-			PlacementHistory history)
-			=> new PlacementSession(configuration, authorize, history);
+			PlacementHistory history,
+			Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
+			=> new PlacementSession(configuration, authorize, history, closeDesktops);
 	}
 
 	/// <summary>One hook and one serial STA worker per enabled configuration. Completion joins both.</summary>
@@ -53,8 +57,10 @@ namespace SylphyHorn.Services.AppPlacement
 		private readonly AppPlacementConfiguration _configuration;
 		private readonly Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> _authorize;
 		private readonly PlacementHistory _history;
+		private readonly Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> _closeDesktops;
 		private PlacementWindowMonitor _monitor;
 		private bool _ended;
+		private long _closureTopologyVersion;
 		private int _ready;
 
 		public bool IsReady => Volatile.Read(ref this._ready) != 0;
@@ -64,11 +70,13 @@ namespace SylphyHorn.Services.AppPlacement
 		internal PlacementSession(
 			AppPlacementConfiguration configuration,
 			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-			PlacementHistory history)
+			PlacementHistory history,
+			Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
 		{
 			this._configuration = configuration;
 			this._authorize = authorize;
 			this._history = history;
+			this._closeDesktops = closeDesktops;
 			var thread = new Thread(this.Run)
 			{
 				IsBackground = true,
@@ -85,6 +93,17 @@ namespace SylphyHorn.Services.AppPlacement
 				this._stop.Dispose();
 				this._requestReady.Dispose();
 				throw;
+			}
+		}
+
+		public void DesktopChanged()
+		{
+			if (this._closeDesktops == null) return;
+			lock (this._gate)
+			{
+				if (this._ended) return;
+				Interlocked.Increment(ref this._closureTopologyVersion);
+				this._requestReady.Set();
 			}
 		}
 
@@ -244,6 +263,11 @@ namespace SylphyHorn.Services.AppPlacement
 				var processor = new PlacementProcessor(this._configuration, windows,
 					this.Authorize, this.IsCurrent, Now);
 				var handles = new[] { this._stop, this._monitor.Changed, this._requestReady };
+				var occupancy = this._closeDesktops == null ? null : new PlacementDesktopOccupancyReader();
+				var usedDesktops = occupancy == null ? null : new HashSet<Guid>();
+				var observedVersion = -1L;
+				var observedTopology = -1L;
+				var nextCloseCheck = long.MaxValue;
 				while (!this._cancellation.IsCancellationRequested)
 				{
 					for (var n = 0; n < 32 && this._monitor.Events.BufferedCount != 0; n++) this._monitor.Events.ProcessBatch();
@@ -261,6 +285,8 @@ namespace SylphyHorn.Services.AppPlacement
 						if (work.NextAt <= Now() || !this._monitor.Events.IsCurrent(work.Candidate)) processor.Step(work);
 						if (work.Result != null)
 						{
+							if (work.Target.HasValue && (work.Result.Outcome == PlacementOutcome.Moved || work.Result.Outcome == PlacementOutcome.AlreadyPlaced))
+								usedDesktops?.Add(work.Target.Value);
 							if (work.Result.Outcome != PlacementOutcome.NoRule) this._history.Add(work.Result);
 							this._monitor.Events.Complete(work.Candidate);
 							pending.RemoveAt(i);
@@ -273,6 +299,32 @@ namespace SylphyHorn.Services.AppPlacement
 					}
 					if (this._monitor.Events.State != PlacementMonitorState.Running) break;
 					if (this._monitor.Events.BufferedCount != 0 || (capacityReached && pending.Count < CandidateLimit)) delay = 0;
+					if (occupancy != null)
+					{
+						var version = this._monitor.Events.Version;
+						var topology = Interlocked.Read(ref this._closureTopologyVersion);
+						if (version != observedVersion || topology != observedTopology)
+						{
+							observedVersion = version;
+							observedTopology = topology;
+							nextCloseCheck = Now() + 100; // Coalesce a burst of native events before inspecting occupancy.
+						}
+						if (pending.Count == 0 && nextCloseCheck <= Now())
+						{
+							bool Current() => !this._cancellation.IsCancellationRequested
+								&& this._monitor.Events.State == PlacementMonitorState.Running && this._monitor.Events.Version == version
+								&& Interlocked.Read(ref this._closureTopologyVersion) == topology;
+							var observed = occupancy.Read(this._cancellation.Token, Current);
+							var observation = new PlacementOccupancyObservation(observed.Complete, observed.Occupied, Current, usedDesktops);
+							var retry = this._closeDesktops(observation, this._cancellation.Token).GetAwaiter().GetResult();
+							nextCloseCheck = retry ? Now() + PlacementDesktopClosure.GraceMilliseconds : long.MaxValue;
+						}
+						if (nextCloseCheck != long.MaxValue)
+						{
+							var next = (int)Math.Max(50, nextCloseCheck - Now());
+							delay = delay < 0 ? next : Math.Min(delay, next);
+						}
+					}
 					WaitHandle.WaitAny(handles, delay);
 				}
 			}

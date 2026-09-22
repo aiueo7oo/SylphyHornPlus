@@ -54,6 +54,53 @@ namespace SylphyHorn.UI.Bindings
 		}
 	}
 
+	public sealed class PlacementClosingGroup : ObservableObject
+	{
+		internal PlacementClosingGroup(AppPlacementSettingsViewModel owner, PlacementDestinationKind kind)
+		{
+			this.Owner = owner;
+			this.Kind = kind;
+		}
+
+		public AppPlacementSettingsViewModel Owner { get; }
+		internal PlacementDestinationKind Kind { get; }
+		public string Title => this.Owner.Text[this.Kind == PlacementDestinationKind.Name ? "CloseByName" : "CloseByNumber"];
+		public ObservableCollection<PlacementClosingRow> Rows { get; } = new ObservableCollection<PlacementClosingRow>();
+		internal void RefreshLanguage()
+		{
+			this.OnPropertyChanged(nameof(this.Title));
+			foreach (var row in this.Rows) row.RefreshLanguage();
+		}
+	}
+
+	public sealed class PlacementClosingRow : ObservableObject
+	{
+		private string _destination;
+		private bool _invalid;
+
+		internal PlacementClosingRow(PlacementClosingGroup group, PlacementDestination saved = null)
+		{
+			this.Group = group;
+			this.Saved = saved;
+			this.Restore();
+			this.RemoveCommand = new AsyncRelayCommand(() => group.Owner.RemoveClosingAsync(this));
+		}
+
+		public PlacementClosingGroup Group { get; }
+		public AsyncRelayCommand RemoveCommand { get; }
+		internal PlacementDestination Saved { get; set; }
+		public string Destination { get => this._destination; set => this.SetProperty(ref this._destination, value); }
+		public string Error => this._invalid ? this.Group.Owner.Text[this.Group.Kind == PlacementDestinationKind.Name ? "InvalidName" : "InvalidNumber"] : "";
+		internal void Invalid(bool value) { this._invalid = value; this.RefreshLanguage(); }
+		internal void RefreshLanguage() => this.OnPropertyChanged(nameof(this.Error));
+		internal void Restore()
+		{
+			this.Destination = this.Saved == null ? "" : this.Saved.Kind == PlacementDestinationKind.Name
+				? this.Saved.Name : this.Saved.Number.ToString(CultureInfo.InvariantCulture);
+			this.Invalid(false);
+		}
+	}
+
 	public sealed class PlacementRuleRow : ObservableObject
 	{
 		private string _appText = "", _destination = "", _errorKey = "";
@@ -211,7 +258,7 @@ namespace SylphyHorn.UI.Bindings
 			set
 			{
 				if (!this._disposed && value != this.IsEnabled)
-					_ = this.PublishAsync(new AppPlacementConfiguration(value, this._settings.Configuration.Value.Rules, this.CreateMissingDesktops));
+					_ = this.PublishAsync(this.Configuration(enabled: value));
 			}
 		}
 
@@ -221,9 +268,66 @@ namespace SylphyHorn.UI.Bindings
 			set
 			{
 				if (!this._disposed && value != this.CreateMissingDesktops)
-					_ = this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, this._settings.Configuration.Value.Rules, value));
+					_ = this.PublishAsync(this.Configuration(createMissing: value));
 			}
 		}
+
+		public IReadOnlyList<PlacementClosingGroup> ClosingGroups { get; }
+
+		public bool CloseCreatedDesktops
+		{
+			get => this._settings.Configuration.Value.CloseCreatedDesktops;
+			set
+			{
+				if (!this._disposed && value != this.CloseCreatedDesktops) _ = this.PublishAsync(this.Configuration(closeCreated: value));
+			}
+		}
+
+		private AppPlacementConfiguration Configuration(bool? enabled = null, bool? createMissing = null,
+			bool? closeCreated = null, IEnumerable<AppPlacementRule> rules = null, IEnumerable<PlacementDestination> closingTargets = null)
+		{
+			var current = this._settings.Configuration.Value;
+			return new AppPlacementConfiguration(enabled ?? current.Enabled, rules ?? current.Rules,
+				createMissing ?? current.CreateMissingDesktops, closeCreated ?? current.CloseCreatedDesktops, closingTargets ?? current.ClosingTargets);
+		}
+
+		internal PlacementClosingRow AddClosingRow(PlacementClosingGroup group)
+		{
+			var row = new PlacementClosingRow(group);
+			group.Rows.Add(row);
+			return row;
+		}
+
+		internal Task CommitClosingAsync(PlacementClosingRow row)
+		{
+			if (this._disposed || !row.Group.Rows.Contains(row)) return Task.CompletedTask;
+			if (string.IsNullOrWhiteSpace(row.Destination))
+			{
+				row.Invalid(row.Saved != null);
+				return Task.CompletedTask;
+			}
+			if (row.Group.Kind == PlacementDestinationKind.Number)
+			{
+				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+				{
+					row.Invalid(true);
+					return Task.CompletedTask;
+				}
+				row.Saved = PlacementDestination.ByNumber(number);
+			}
+			else row.Saved = PlacementDestination.ByName(row.Destination);
+			row.Invalid(false);
+			return this.SaveClosingRowsAsync();
+		}
+
+		internal Task RemoveClosingAsync(PlacementClosingRow row)
+		{
+			if (this._disposed || !row.Group.Rows.Remove(row)) return Task.CompletedTask;
+			return row.Saved == null ? Task.CompletedTask : this.SaveClosingRowsAsync();
+		}
+
+		private Task SaveClosingRowsAsync() => this.PublishAsync(this.Configuration(closingTargets:
+			this.ClosingGroups.SelectMany(group => group.Rows).Select(row => row.Saved).Where(target => target != null)));
 
 		public bool IsPaused => this._runtime.PlacementStatus == "Paused";
 
@@ -241,6 +345,11 @@ namespace SylphyHorn.UI.Bindings
 			{
 				new PlacementRuleGroup(this, PlacementDestinationKind.Name),
 				new PlacementRuleGroup(this, PlacementDestinationKind.Number)
+			});
+			this.ClosingGroups = Array.AsReadOnly(new[]
+			{
+				new PlacementClosingGroup(this, PlacementDestinationKind.Name),
+				new PlacementClosingGroup(this, PlacementDestinationKind.Number)
 			});
 			this.RetrySaveCommand = new AsyncRelayCommand(this.SaveAsync, () => this.SaveFailed && !this._disposed);
 			this.RestartCommand = new AsyncRelayCommand(async () =>
@@ -262,6 +371,7 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.Text));
 			this.OnPropertyChanged(nameof(this.Message));
 			foreach (var group in this.Groups) group.RefreshLanguage();
+			foreach (var group in this.ClosingGroups) group.RefreshLanguage();
 		}
 
 		internal void RefreshDestinationChoices()
@@ -281,6 +391,7 @@ namespace SylphyHorn.UI.Bindings
 			if (this._disposed) return;
 			this.OnPropertyChanged(nameof(this.IsEnabled));
 			this.OnPropertyChanged(nameof(this.CreateMissingDesktops));
+			this.OnPropertyChanged(nameof(this.CloseCreatedDesktops));
 			if (this._publishing) return;
 			this._generation++;
 			foreach (var read in this._reads.Values) read.Cancel();
@@ -288,6 +399,12 @@ namespace SylphyHorn.UI.Bindings
 			{
 				group.Rows.Clear();
 				foreach (var rule in this._settings.Configuration.Value.Rules.Where(rule => rule.Destination.Kind == group.Kind)) group.Rows.Add(new PlacementRuleRow(group, rule));
+			}
+			foreach (var group in this.ClosingGroups)
+			{
+				group.Rows.Clear();
+				foreach (var target in this._settings.Configuration.Value.ClosingTargets.Where(target => target.Kind == group.Kind))
+					group.Rows.Add(new PlacementClosingRow(group, target));
 			}
 			if (this._generation > 1)
 			{
@@ -385,7 +502,7 @@ namespace SylphyHorn.UI.Bindings
 					var index = rules.FindIndex(existing => existing.Id == row.Id);
 					if (index < 0) rules.Add(rule); else rules[index] = rule;
 					row.Accept(rule, choice);
-					await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, rules, this.CreateMissingDesktops));
+					await this.PublishAsync(this.Configuration(rules: rules));
 				}
 				catch (OperationCanceledException) { }
 				catch (Exception)
@@ -413,7 +530,7 @@ namespace SylphyHorn.UI.Bindings
 			if (row.Saved != null)
 			{
 				var rules = this._settings.Configuration.Value.Rules.Where(rule => rule.Id != row.Id);
-				await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, rules, this.CreateMissingDesktops));
+				await this.PublishAsync(this.Configuration(rules: rules));
 			}
 		}
 

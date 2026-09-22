@@ -852,4 +852,19 @@
   <data name="Placement_ApplyNotSelected" xml:space="preserve">
     <value>Not selected</value>
   </data>
+  <data name="Placement_CloseTitle" xml:space="preserve">
+    <value>Automatically close empty desktops</value>
+  </data>
+  <data name="Placement_CloseCreated" xml:space="preserve">
+    <value>Close automatically created desktops without listing them below</value>
+  </data>
+  <data name="Placement_CloseHint" xml:space="preserve">
+    <value>After use, close from the last desktop when empty for one second. Closing the current desktop switches to the previous desktop. App placement must be enabled.</value>
+  </data>
+  <data name="Placement_CloseByName" xml:space="preserve">
+    <value>Also close these desktop names</value>
+  </data>
+  <data name="Placement_CloseByNumber" xml:space="preserve">
+    <value>Also close these desktop numbers</value>
+  </data>
 </root>

@@ -412,6 +412,97 @@ namespace SylphyHorn.Tests
 			await harness.Runtime.ShutdownAsync();
 		}
 
+		[Theory]
+		[InlineData(false, false)]
+		[InlineData(true, false)]
+		[InlineData(false, true)]
+		[InlineData(true, true)]
+		public async Task ClosingUsesManualTargetsOrPersistedCreatedGroupsWithoutChangingRules(bool created, bool current)
+		{
+			var factory = new Factory();
+			long now = 0;
+			var harness = Harness.Create(Batch(1, 1, current ? B : A, Entry(A, 0, "home", ""), Entry(B, 1, "work", "")), factory, () => now);
+			if (created) harness.Settings.CreatedGroups = new[] { new PlacementCreatedGroup(new[] { B }, true) };
+			await harness.Runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
+			var configuration = new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>(), closeCreatedDesktops: created,
+				closingTargets: created ? null : new[] { PlacementDestination.ByName("work") });
+			await harness.Runtime.ConfigurePlacementAsync(configuration);
+			var session = Assert.Single(factory.Sessions);
+			Assert.NotNull(session.Close);
+			if (!created) await session.Close(new PlacementOccupancyObservation(true, new[] { B }, () => true), session.Cancellation.Token);
+			Assert.True(await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token));
+			now = 999;
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			Assert.Empty(harness.Operations.RemovedIds);
+			now = 1000;
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			Assert.Equal(B, Assert.Single(harness.Operations.RemovedIds));
+			Assert.Same(configuration, session.Configuration);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public async Task IncompleteOrStaleWindowObservationCannotClose(bool incomplete)
+		{
+			var factory = new Factory();
+			long now = 0;
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "home", ""), Entry(B, 1, "work", "")), factory, () => now);
+			harness.Settings.CreatedGroups = new[] { new PlacementCreatedGroup(new[] { B }, true) };
+			await harness.Runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>(), closeCreatedDesktops: true));
+			var session = factory.Sessions[0];
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			now = 1000;
+			await session.Close(new PlacementOccupancyObservation(!incomplete, Array.Empty<Guid>(), () => incomplete), session.Cancellation.Token);
+			Assert.Empty(harness.Operations.RemovedIds);
+			now = 2000;
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			Assert.Empty(harness.Operations.RemovedIds);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task ClosureOffAddsNoCallbackAndGlobalDisableStartsNoSession()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(false, Array.Empty<AppPlacementRule>(), closeCreatedDesktops: true));
+			Assert.Empty(factory.Sessions);
+			await harness.Runtime.ConfigurePlacementAsync(PlacementProcessorTests.Configuration());
+			Assert.Null(Assert.Single(factory.Sessions).Close);
+			factory.Sessions[0].Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task UsingCreatedDestinationArmsItsEmptyFillersAndPersistsTheGroup()
+		{
+			var factory = new Factory();
+			long now = 0;
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "home", ""), Entry(B, 1, "", ""), Entry(C, 2, "work", "")), factory, () => now);
+			harness.Settings.CreatedGroups = new[] { new PlacementCreatedGroup(new[] { B, C }, false) };
+			await harness.Runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>(), closeCreatedDesktops: true));
+			var session = factory.Sessions[0];
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true, new[] { C }), session.Cancellation.Token);
+			Assert.True(Assert.Single(harness.Settings.CreatedGroups).Used);
+			now = 1000;
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			Assert.Equal(C, Assert.Single(harness.Operations.RemovedIds));
+			harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "home", ""), Entry(B, 1, "", "")));
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			now = 2000;
+			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
+			Assert.Equal(new[] { C, B }, harness.Operations.RemovedIds);
+			Assert.Equal(B, Assert.Single(Assert.Single(harness.Settings.CreatedGroups).Desktops));
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
 		private static async Task<Harness> Create(Factory factory)
 		{
 			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "name", "wall")), factory);
@@ -426,9 +517,10 @@ namespace SylphyHorn.Tests
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
 				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
-				PlacementHistory history)
+				PlacementHistory history,
+				Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
 			{
-				var session = new Session(configuration, authorize);
+				var session = new Session(configuration, authorize) { Close = closeDesktops };
 				this.Sessions.Add(session);
 				return session;
 			}
@@ -436,6 +528,7 @@ namespace SylphyHorn.Tests
 
 		private sealed class Session : IPlacementSession
 		{
+			internal Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> Close;
 			internal PlacementDesktopMap PreviewMap;
 			internal PlacementPreview AppliedPreview;
 
@@ -467,6 +560,8 @@ namespace SylphyHorn.Tests
 				this.Configuration = configuration;
 				this._authorize = authorize;
 			}
+
+			public void DesktopChanged() { }
 
 			public Task Completion => this.Ended.Task;
 
