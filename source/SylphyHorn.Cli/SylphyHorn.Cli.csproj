@@ -6,10 +6,13 @@
 		<AssemblyName>sylphyhorn-cli</AssemblyName>
 		<Company>hwtnb.net</Company>
 		<Product>SylphyHornPlus</Product>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+		<RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
 		<Platforms>AnyCPU;x64;x86</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<FrameworkReference Include="Microsoft.WindowsDesktop.App" />
 		<ProjectReference Include="..\SylphyHorn.Core\SylphyHorn.Core.csproj" />
 	</ItemGroup>
 

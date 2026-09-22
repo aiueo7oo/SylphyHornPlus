@@ -724,7 +724,9 @@ function Assert-AllowList {
 		"SylphyHorn.deps.json",
 		"SylphyHorn.runtimeconfig.json",
 		"SchedulerManager.deps.json",
-		"SchedulerManager.runtimeconfig.json")
+		"SchedulerManager.runtimeconfig.json",
+		"sylphyhorn-cli.deps.json",
+		"sylphyhorn-cli.runtimeconfig.json")
 	$approvedConfig = @("VirtualDesktop.dll.config")
 
 	$violations = @()
@@ -818,6 +820,7 @@ if ($outputIsInsideRepository) {
 }
 
 $applicationProject = Join-Path $repositoryRoot "source/SylphyHorn/SylphyHorn.csproj"
+$cliProject = Join-Path $repositoryRoot "source/SylphyHorn.Cli/SylphyHorn.Cli.csproj"
 $schedulerProject = Join-Path `
 	$repositoryRoot `
 	"source/SylphyHorn.SchedulerManager/SylphyHorn.SchedulerManager.csproj"
@@ -836,6 +839,7 @@ $winGetAliasProbeSource = Join-Path `
 $winGetAliasTest = Join-Path `
 	$repositoryRoot `
 	"packaging/Test-WinGetPortableAlias.ps1"
+$cliLock = Join-Path $repositoryRoot "source/SylphyHorn.Cli/packages.lock.json"
 $applicationLock = Join-Path $repositoryRoot "source/SylphyHorn/packages.lock.json"
 $schedulerLock = Join-Path `
 	$repositoryRoot `
@@ -846,6 +850,8 @@ Assert-Condition (Test-Path -LiteralPath $applicationLock -PathType Leaf) `
 	"Application lock file is missing: $applicationLock"
 Assert-Condition (Test-Path -LiteralPath $schedulerLock -PathType Leaf) `
 	"SchedulerManager lock file is missing: $schedulerLock"
+Assert-Condition (Test-Path -LiteralPath $cliLock -PathType Leaf) `
+	"CLI lock file is missing: $cliLock"
 
 $workingTreeStatus = @(& git -C $repositoryRoot status --porcelain=v1 --untracked-files=all)
 Assert-Condition ($LASTEXITCODE -eq 0) "Cannot read repository working-tree status."
@@ -885,6 +891,7 @@ $buildInputPaths = @(
 	$readmePath,
 	$applicationProject,
 	$schedulerProject,
+	$cliProject,
 	$winGetLauncherProject,
 	$winGetLauncherSource,
 	$winGetAliasProbeProject,
@@ -892,6 +899,7 @@ $buildInputPaths = @(
 	$winGetAliasTest,
 	$applicationLock,
 	$schedulerLock,
+	$cliLock,
 	(Join-Path $repositoryRoot "LICENSE.txt"),
 	(Join-Path $repositoryRoot "packaging/.gitignore")
 )
@@ -1026,6 +1034,9 @@ Assert-Condition (-not (Test-Path -LiteralPath $buildRoot)) `
 	"Unique build root already exists: $buildRoot"
 $applicationArtifacts = Join-Path $buildRoot "app/a"
 $applicationPublish = Join-Path $buildRoot "app/p"
+# Share intermediate outputs so both publishes use identical SylphyHorn.Core binaries.
+$cliArtifacts = $applicationArtifacts
+$cliPublish = Join-Path $buildRoot "cli/p"
 $schedulerArtifacts = Join-Path $buildRoot "scheduler/a"
 $schedulerPublish = Join-Path $buildRoot "scheduler/p"
 $schedulerOutput = Join-Path $buildRoot "scheduler/b"
@@ -1043,6 +1054,7 @@ foreach ($directory in @(
 	$logsRoot,
 	$applicationArtifacts,
 	$applicationPublish,
+	$cliPublish,
 	$schedulerArtifacts,
 	$schedulerPublish,
 	$schedulerOutput,
@@ -1079,6 +1091,30 @@ $applicationAssetsPath = Find-ProjectAssetsFile `
 	-ProjectPath $applicationProject
 $applicationAssets = Assert-AssetsClosure `
 	-AssetsPath $applicationAssetsPath `
+	-Rid $RuntimeIdentifier
+
+$commands += Invoke-LoggedCommand `
+	-Executable "dotnet" `
+	-Arguments @(
+		"restore",
+		$cliProject,
+		"-p:Configuration=$Configuration",
+		"-p:Platform=AnyCPU",
+		$ApprovedRuntimeIdentifiersArgument,
+		"-p:RuntimeIdentifier=$RuntimeIdentifier",
+		"-p:SelfContained=true",
+		"--locked-mode",
+		"--artifacts-path=$cliArtifacts",
+		"-p:RunSylphyHornPostBuild=false",
+		"-bl:$logsRoot/sylphyhorn-cli-restore.binlog"
+	) `
+	-LogPath (Join-Path $logsRoot "sylphyhorn-cli-restore.log")
+
+$cliAssetsPath = Find-ProjectAssetsFile `
+	-ArtifactsRoot $cliArtifacts `
+	-ProjectPath $cliProject
+$null = Assert-AssetsClosure `
+	-AssetsPath $cliAssetsPath `
 	-Rid $RuntimeIdentifier
 
 $commands += Invoke-LoggedCommand `
@@ -1127,6 +1163,29 @@ $commands += Invoke-LoggedCommand `
 		"-bl:$logsRoot/SylphyHorn-publish.binlog"
 	) `
 	-LogPath (Join-Path $logsRoot "SylphyHorn-publish.log")
+
+$commands += Invoke-LoggedCommand `
+	-Executable "dotnet" `
+	-Arguments @(
+		"publish",
+		$cliProject,
+		"-c",
+		$Configuration,
+		"-f",
+		$TargetFramework,
+		"-p:Platform=AnyCPU",
+		$ApprovedRuntimeIdentifiersArgument,
+		"-r",
+		$RuntimeIdentifier,
+		"--self-contained",
+		"true",
+		"--no-restore",
+		"--artifacts-path=$cliArtifacts",
+		"-p:RunSylphyHornPostBuild=false",
+		"-p:PublishDir=$cliPublish",
+		"-bl:$logsRoot/sylphyhorn-cli-publish.binlog"
+	) `
+	-LogPath (Join-Path $logsRoot "sylphyhorn-cli-publish.log")
 
 $commands += Invoke-LoggedCommand `
 	-Executable "dotnet" `
@@ -1189,7 +1248,8 @@ $commands += Invoke-LoggedCommand `
 $provenance = @{}
 foreach ($publishSource in @(
 	@($applicationPublish, "publish:SylphyHorn"),
-	@($schedulerPublish, "publish:SchedulerManager")
+	@($schedulerPublish, "publish:SchedulerManager"),
+	@($cliPublish, "publish:sylphyhorn-cli")
 )) {
 	$sourceRoot = Get-NormalizedPath $publishSource[0]
 	foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File) {
@@ -1225,7 +1285,7 @@ Add-StagingFile `
 	-Provenance $provenance
 
 $dependencyInventory = Get-LockDependencyInventory `
-	-LockPaths @($applicationLock, $schedulerLock)
+	-LockPaths @($applicationLock, $schedulerLock, $cliLock)
 $releaseDependencyInventory = @(
 	$dependencyInventory |
 		Where-Object {
@@ -1255,7 +1315,11 @@ foreach ($requiredFile in @(
 	"SchedulerManager.exe",
 	"SchedulerManager.dll",
 	"SchedulerManager.deps.json",
-	"SchedulerManager.runtimeconfig.json"
+	"SchedulerManager.runtimeconfig.json",
+	"sylphyhorn-cli.exe",
+	"sylphyhorn-cli.dll",
+	"sylphyhorn-cli.deps.json",
+	"sylphyhorn-cli.runtimeconfig.json"
 )) {
 	Assert-Condition `
 		(Test-Path -LiteralPath (Join-Path $wrapperRoot $requiredFile) -PathType Leaf) `
@@ -1279,6 +1343,7 @@ $nativeAssets = @($peAssets | Where-Object { -not $_.IsManaged })
 foreach ($nativeEntryPoint in @(
 	"SylphyHorn.exe",
 	"SchedulerManager.exe",
+	"sylphyhorn-cli.exe",
 	"SylphyHorn.WinGetLauncher.exe")) {
 	$peInfo = Get-PeInformation (Join-Path $wrapperRoot $nativeEntryPoint)
 	Assert-Condition (-not $peInfo.IsManaged) `
@@ -1292,6 +1357,11 @@ $hostArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchi
 $canExecuteTarget = $RuntimeIdentifier -ne "win-arm64" -or
 	$hostArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64
 if ($canExecuteTarget) {
+	$commands += Invoke-LoggedCommand `
+		-Executable (Join-Path $wrapperRoot "sylphyhorn-cli.exe") `
+		-Arguments @("--help") `
+		-LogPath (Join-Path $logsRoot "sylphyhorn-cli-help.log")
+
 	$winGetAliasTestResult = & $winGetAliasTest `
 		-LauncherPath (Join-Path $wrapperRoot "SylphyHorn.WinGetLauncher.exe") `
 		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
@@ -1334,6 +1404,21 @@ $runtimePackVersions = @(
 )
 Assert-Condition ($runtimePackVersions.Count -ge 2) `
 	"SCD runtime pack closure is incomplete."
+
+$cliDepsJson = Get-Content `
+	-LiteralPath (Join-Path $wrapperRoot "sylphyhorn-cli.deps.json") `
+	-Raw |
+	ConvertFrom-Json
+$cliRuntimePacks = @(
+	$cliDepsJson.libraries.PSObject.Properties.Name |
+	Where-Object { $_ -match "^runtimepack\." }
+)
+Assert-Condition ($cliRuntimePacks.Count -gt 0) `
+	"CLI SCD runtime pack closure is incomplete."
+foreach ($runtimePack in $cliRuntimePacks) {
+	Assert-Condition ($runtimePack -cin $depsJson.libraries.PSObject.Properties.Name) `
+		"CLI runtime pack does not match the shared GUI runtime: $runtimePack"
+}
 
 $parentCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 Assert-Condition ($LASTEXITCODE -eq 0) "Cannot read parent commit."
@@ -1388,6 +1473,10 @@ $manifestDocument = [ordered]@{
 		[ordered]@{
 			Path   = "source/SylphyHorn.SchedulerManager/packages.lock.json"
 			Sha256 = Get-Sha256 $schedulerLock
+		},
+		[ordered]@{
+			Path   = "source/SylphyHorn.Cli/packages.lock.json"
+			Sha256 = Get-Sha256 $cliLock
 		}
 	)
 	Dependencies = $dependencyInventory
