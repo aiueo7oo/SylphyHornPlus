@@ -32,6 +32,24 @@ namespace SylphyHorn.Tests
 			Assert.True(response.Data.Windows[0].Pinned);
 		}
 
+		[Fact]
+		public void DesktopWallpaperStateRoundTripsInJson()
+		{
+			var desktop = new CliDesktop
+			{
+				WallpaperPath = "C:\\Images\\wall.jpg",
+				WallpaperPathAvailable = true,
+				WallpaperPathConfirmed = false,
+				WallpaperPosition = "fit"
+			};
+			var bytes = CliProtocol.Serialize(CliResponse.Ok("desktop list", new CliData { Desktops = new[] { desktop } }));
+			var response = CliProtocol.Deserialize<CliResponse>(bytes);
+			Assert.Equal(desktop.WallpaperPath, response.Data.Desktops[0].WallpaperPath);
+			Assert.True(response.Data.Desktops[0].WallpaperPathAvailable);
+			Assert.False(response.Data.Desktops[0].WallpaperPathConfirmed);
+			Assert.Equal("fit", response.Data.Desktops[0].WallpaperPosition);
+		}
+
 		[Theory]
 		[InlineData("invalid_arguments", 2)]
 		[InlineData("host_unavailable", 3)]

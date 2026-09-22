@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
 using SylphyHorn.Commands;
 using SylphyHorn.Properties;
+using SylphyHorn.Serialization;
 using SylphyHorn.Services.AppPlacement;
 using WindowsDesktop;
 
@@ -88,6 +89,44 @@ namespace SylphyHorn.Services.DesktopTransitions
 						Changed = true,
 						Desktops = this.State.Order.Select(this.CliDesktopInfo).ToArray()
 					});
+				}
+				if (command.Operation == "desktop wallpaper")
+				{
+					if (!ProductInfo.IsWallpaperSupportBuild && !Settings.General.ChangeBackgroundEachDesktop)
+						throw new CliFailure("unsupported", "Per-desktop wallpaper is disabled on this Windows build.");
+					var record = this.State.Records[target];
+					if (command.WallpaperPath != null)
+					{
+						if (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported
+							&& string.IsNullOrEmpty(command.WallpaperPath))
+							throw new CliFailure("invalid_arguments", "The wallpaper path cannot be empty on this Windows build.");
+						var changed = !record.WallpaperPath.HasValue || record.WallpaperPath.Value != command.WallpaperPath
+							|| (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported && !record.WallpaperPath.IsConfirmed);
+						if (changed)
+						{
+							this.EnsureCliAvailable(cancellation);
+							submitted = true;
+							this.EditWallpaperPath(target, command.WallpaperPath);
+							if (!this.State.Records[target].WallpaperPath.HasValue
+								|| this.State.Records[target].WallpaperPath.Value != command.WallpaperPath)
+								throw new CliFailure("result_unconfirmed", "The wallpaper path could not be applied.");
+							if (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported)
+								await this.ConfirmCliDesktopAsync(() => this.State.Records[target].WallpaperPath.IsConfirmed
+									&& this.State.Records[target].WallpaperPath.Value == command.WallpaperPath, cancellation);
+						}
+						return CliResponse.Ok(command.Operation, new CliData { Changed = changed, Desktop = this.CliDesktopInfo(target) });
+					}
+					var position = (WallpaperPosition)Enum.Parse(typeof(WallpaperPosition), command.WallpaperPosition, true);
+					var positionChanged = record.WallpaperPosition != position;
+					if (positionChanged)
+					{
+						this.EnsureCliAvailable(cancellation);
+						submitted = true;
+						this.EditWallpaperPosition(target, position);
+						if (this.State.Records[target].WallpaperPosition != position)
+							throw new CliFailure("result_unconfirmed", "The wallpaper position could not be applied.");
+					}
+					return CliResponse.Ok(command.Operation, new CliData { Changed = positionChanged, Desktop = this.CliDesktopInfo(target) });
 				}
 				if (command.Operation == "desktop switch")
 				{
@@ -300,6 +339,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 				Number = Array.IndexOf(this.State.Order.ToArray(), id) + 1,
 				Name = available ? record.Name.Value : null,
 				NameAvailable = available,
+				WallpaperPath = record.WallpaperPath.HasValue ? record.WallpaperPath.Value : null,
+				WallpaperPathAvailable = record.WallpaperPath.HasValue,
+				WallpaperPathConfirmed = record.WallpaperPath.IsConfirmed,
+				WallpaperPosition = record.WallpaperPosition.ToString().ToLowerInvariant(),
 				Current = this.State.CurrentDesktopId == id
 			};
 		}

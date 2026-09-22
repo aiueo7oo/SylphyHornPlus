@@ -101,6 +101,18 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "nameAvailable")]
 		public bool NameAvailable;
 
+		[DataMember(Name = "wallpaperPath")]
+		public string WallpaperPath;
+
+		[DataMember(Name = "wallpaperPathAvailable")]
+		public bool WallpaperPathAvailable;
+
+		[DataMember(Name = "wallpaperPathConfirmed")]
+		public bool WallpaperPathConfirmed;
+
+		[DataMember(Name = "wallpaperPosition")]
+		public string WallpaperPosition;
+
 		[DataMember(Name = "current")]
 		public bool Current;
 	}

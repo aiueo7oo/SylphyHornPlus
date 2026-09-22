@@ -18,6 +18,10 @@ namespace SylphyHorn.Commands
 
 		internal int? Number { get; private set; }
 
+		internal string WallpaperPath { get; private set; }
+
+		internal string WallpaperPosition { get; private set; }
+
 		internal string Scope { get; private set; }
 
 		internal bool Wrap { get; private set; }
@@ -54,7 +58,7 @@ namespace SylphyHorn.Commands
 					RequireId(command.WindowId);
 				}
 				else if (option == "--id" && (command.Operation == "desktop rename" || command.Operation == "desktop reorder"
-					|| command.Operation == "desktop delete"))
+					|| command.Operation == "desktop delete" || command.Operation == "desktop wallpaper"))
 				{
 					var id = ReadValue(args, ref i);
 					RequireId(id);
@@ -68,6 +72,23 @@ namespace SylphyHorn.Commands
 					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
 						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
 					command.Number = number;
+				}
+				else if (option == "--number" && (command.Operation == "desktop delete" || command.Operation == "desktop wallpaper"))
+				{
+					var value = ReadValue(args, ref i);
+					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
+						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
+					command.SetTarget("number", value);
+				}
+				else if (option == "--path" && command.Operation == "desktop wallpaper")
+					command.WallpaperPath = ReadTextValue(args, ref i, "A wallpaper path is missing.");
+				else if (option == "--position" && command.Operation == "desktop wallpaper")
+				{
+					command.WallpaperPosition = ReadValue(args, ref i);
+					if (command.WallpaperPosition != "center" && command.WallpaperPosition != "tile"
+						&& command.WallpaperPosition != "stretch" && command.WallpaperPosition != "fit"
+						&& command.WallpaperPosition != "fill" && command.WallpaperPosition != "span")
+						throw new ArgumentException("--position must be center, tile, stretch, fit, fill, or span.");
 				}
 				else if (option == "--scope" && (command.Operation == "window pin" || command.Operation == "window unpin"))
 				{
@@ -96,8 +117,10 @@ namespace SylphyHorn.Commands
 			if ((command.Operation == "desktop rename" && command.Name == null)
 				|| (command.Operation == "desktop reorder" && command.Number == null)
 				|| ((command.Operation == "desktop rename" || command.Operation == "desktop reorder"
-					|| command.Operation == "desktop delete") && command.TargetKind == null))
-				throw new ArgumentException("Specify the desktop ID and required value.");
+					|| command.Operation == "desktop delete" || command.Operation == "desktop wallpaper") && command.TargetKind == null))
+				throw new ArgumentException("Specify a desktop selector and required value.");
+			if (command.Operation == "desktop wallpaper" && (command.WallpaperPath == null) == (command.WallpaperPosition == null))
+				throw new ArgumentException("Specify exactly one of --path or --position.");
 			if ((command.Operation == "window pin" || command.Operation == "window unpin") && (command.WindowId == null || command.Scope == null))
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
@@ -108,7 +131,7 @@ namespace SylphyHorn.Commands
 		private static bool IsKnown(string operation)
 			=> operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
 				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
-				|| operation == "window list"
+				|| operation == "desktop wallpaper" || operation == "window list"
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin";
 
 		private void SetTarget(string kind, string value)
@@ -126,9 +149,12 @@ namespace SylphyHorn.Commands
 		}
 
 		private static string ReadName(string[] args, ref int index)
+			=> ReadTextValue(args, ref index, "A desktop name is missing.");
+
+		private static string ReadTextValue(string[] args, ref int index, string error)
 		{
 			if (++index >= args.Length || args[index] == null || args[index].StartsWith("--", StringComparison.Ordinal))
-				throw new ArgumentException("A desktop name is missing.");
+				throw new ArgumentException(error);
 			return args[index];
 		}
 

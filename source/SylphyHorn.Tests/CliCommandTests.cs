@@ -76,9 +76,29 @@ namespace SylphyHorn.Tests
 			Assert.Equal(2, reorder.Number);
 			var delete = CliCommand.Parse(new[] { "desktop", "delete", "--id", id });
 			Assert.Equal(id, delete.TargetValue);
+			var deleteByNumber = CliCommand.Parse(new[] { "desktop", "delete", "--number", "2" });
+			Assert.Equal("number", deleteByNumber.TargetKind);
+			Assert.Equal("2", deleteByNumber.TargetValue);
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "rename", "--name", "work" }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "reorder", "--id", id, "--number", "0" }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete", "--id", id, "--number", "2" }));
+		}
+
+		[Fact]
+		public void WallpaperRequiresOneSelectorAndOneEdit()
+		{
+			var id = Guid.NewGuid().ToString();
+			var path = CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", id, "--path", "C:\\Images\\wall.jpg" });
+			Assert.Equal(id, path.TargetValue);
+			Assert.Equal("C:\\Images\\wall.jpg", path.WallpaperPath);
+			var position = CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "2", "--position", "fit" });
+			Assert.Equal("number", position.TargetKind);
+			Assert.Equal("fit", position.WallpaperPosition);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", id }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", id, "--path", "a", "--position", "fit" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "0", "--path", "a" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", id, "--position", "invalid" }));
 		}
 
 		[Fact]

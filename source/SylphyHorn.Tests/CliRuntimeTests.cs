@@ -138,6 +138,56 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
+		public async Task DeleteByNumberResolvesCurrentDesktopOrder()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--number", "2" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal(new[] { B }, harness.Operations.RemovedIds);
+			Assert.Equal(A.ToString(), Assert.Single(response.Data.Desktops).Id);
+		}
+
+		[Fact]
+		public async Task WallpaperPathWaitsForProviderConfirmation()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", "new.jpg"), Entry(B, 1, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", "new.jpg" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.True(response.Data.Changed);
+			Assert.Equal("new.jpg", response.Data.Desktop.WallpaperPath);
+			Assert.True(response.Data.Desktop.WallpaperPathConfirmed);
+			Assert.Equal(1, harness.Operations.WallpaperCalls);
+		}
+
+		[Fact]
+		public async Task WallpaperPositionUsesExistingLocalEdit()
+		{
+			var harness = await Create();
+			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", A.ToString(), "--position", "fit" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.True(response.Data.Changed);
+			Assert.Equal("fit", response.Data.Desktop.WallpaperPosition);
+			Assert.Equal(new[] { A }, harness.Operations.AppliedWallpaperIds);
+		}
+
+		[Fact]
+		public async Task FailedWallpaperWriteIsNotReportedAsSuccess()
+		{
+			var harness = await Create();
+			harness.Operations.FailWallpaperValue = "new.jpg";
+			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", A.ToString(), "--path", "new.jpg" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.False(response.Success);
+			Assert.Equal("result_unconfirmed", response.Error.Code);
+			Assert.False(response.Error.Retryable);
+		}
+
+		[Fact]
 		public async Task UnconfirmedDeleteCannotBeBlindlyRetried()
 		{
 			var harness = await Create();
