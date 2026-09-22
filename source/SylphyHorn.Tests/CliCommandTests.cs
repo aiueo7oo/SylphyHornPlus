@@ -110,5 +110,53 @@ namespace SylphyHorn.Tests
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "pin", "--id", id }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "unpin", "--id", id, "--scope", "all" }));
 		}
+
+		[Theory]
+		[InlineData("task-view")]
+		[InlineData("window-switch")]
+		[InlineData("settings")]
+		[InlineData("notification-toggle")]
+		public void UiCommandsRequireNoArguments(string action)
+		{
+			var args = new[] { "ui", action };
+			Assert.Equal("ui " + action, CliCommand.Recognize(args));
+			Assert.Equal("ui " + action, CliCommand.Parse(args).Operation);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "ui", action, "--unexpected" }));
+		}
+
+		[Fact]
+		public void CreateSwitchIsExplicitAndRejectsUnrelatedOptions()
+		{
+			Assert.False(CliCommand.Parse(new[] { "desktop", "create" }).SwitchAfterCreate);
+			Assert.True(CliCommand.Parse(new[] { "desktop", "create", "--switch" }).SwitchAfterCreate);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "create", "--switch", "--switch" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "list", "--switch" }));
+		}
+
+		[Theory]
+		[InlineData("--desktop-next", "next")]
+		[InlineData("--desktop-previous", "previous")]
+		[InlineData("--desktop-last-used", "last-used")]
+		[InlineData("--desktop-new", "new")]
+		public void MoveParsesRelativeAndNewDestinations(string option, string kind)
+		{
+			var id = Guid.NewGuid().ToString();
+			var command = CliCommand.Parse(new[] { "window", "move", "--id", id, option });
+			Assert.Equal(kind, command.TargetKind);
+			Assert.False(command.Wrap);
+			Assert.False(command.Follow);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--desktop-number", "2" }));
+			if (kind == "next" || kind == "previous")
+				Assert.True(CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--wrap" }).Wrap);
+			else
+				Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--wrap" }));
+		}
+
+		[Fact]
+		public void LastUsedSwitchDoesNotAcceptWrap()
+		{
+			Assert.Equal("last-used", CliCommand.Parse(new[] { "desktop", "switch", "--last-used" }).TargetKind);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "switch", "--last-used", "--wrap" }));
+		}
 	}
 }

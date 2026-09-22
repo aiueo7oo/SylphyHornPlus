@@ -17,16 +17,23 @@ namespace SylphyHorn.Cli
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
 				Console.WriteLine("sylphyhorn-cli desktop list");
-				Console.WriteLine("sylphyhorn-cli desktop switch (--number N | --name NAME | --id ID | --next | --previous) [--wrap]");
-				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME]");
+				Console.WriteLine("sylphyhorn-cli desktop switch " +
+					"(--number N | --name NAME | --id ID | --next | --previous | --last-used) [--wrap]");
+				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME] [--switch]");
 				Console.WriteLine("sylphyhorn-cli desktop rename --id ID --name NAME");
 				Console.WriteLine("sylphyhorn-cli desktop reorder --id ID --number N");
 				Console.WriteLine("sylphyhorn-cli desktop delete (--id ID | --number N)");
 				Console.WriteLine("sylphyhorn-cli desktop wallpaper (--id ID | --number N) (--path PATH | --position POSITION)");
 				Console.WriteLine("sylphyhorn-cli window list");
-				Console.WriteLine("sylphyhorn-cli window move --id ID (--desktop-number N | --desktop-name NAME | --desktop-id ID) [--follow]");
+				Console.WriteLine("sylphyhorn-cli window move --id ID " +
+					"(--desktop-number N | --desktop-name NAME | --desktop-id ID | --desktop-next | " +
+					"--desktop-previous | --desktop-last-used | --desktop-new) [--wrap] [--follow]");
 				Console.WriteLine("sylphyhorn-cli window pin --id ID --scope (window | app)");
 				Console.WriteLine("sylphyhorn-cli window unpin --id ID --scope (window | app)");
+				Console.WriteLine("sylphyhorn-cli ui task-view");
+				Console.WriteLine("sylphyhorn-cli ui window-switch");
+				Console.WriteLine("sylphyhorn-cli ui settings");
+				Console.WriteLine("sylphyhorn-cli ui notification-toggle");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
 				return 0;
 			}

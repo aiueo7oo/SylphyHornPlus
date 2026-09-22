@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WindowsDesktop;
 using MetroTrilithon.Lifetime;
+using SylphyHorn.Commands;
 using SylphyHorn.Interop;
 using SylphyHorn.Properties;
 using SylphyHorn.Serialization;
@@ -87,14 +88,67 @@ namespace SylphyHorn
 			if (SettingsWindow.Instance != null) SettingsWindow.Instance.Activate();
 			else
 			{
-				var window = new SettingsWindow();
-				var dialogService = new SettingsDialogService();
-				window.DataContext = new SettingsWindowViewModel(this._hookService, this._desktopRuntime, dialogService);
+				var window = this.CreateSettingsWindow();
 				SettingsWindow.Instance = window;
 				window.ShowDialog();
 				SettingsWindow.Instance = null;
 			}
 		}
+
+		private SettingsWindow CreateSettingsWindow()
+		{
+			var window = new SettingsWindow();
+			var dialogService = new SettingsDialogService();
+			window.DataContext = new SettingsWindowViewModel(this._hookService, this._desktopRuntime, dialogService);
+			return window;
+		}
+
+#if !NETFRAMEWORK
+		private bool ShowSettingsFromCli()
+		{
+			if (!Application.Args.CanSettings || this._desktopRuntime?.IsInitialized != true) return false;
+			if (SettingsWindow.Instance != null)
+			{
+				SettingsWindow.Instance.Activate();
+				return true;
+			}
+
+			var window = this.CreateSettingsWindow();
+			window.Closed += (_, __) =>
+			{
+				if (ReferenceEquals(SettingsWindow.Instance, window)) SettingsWindow.Instance = null;
+			};
+			SettingsWindow.Instance = window;
+			try { window.Show(); }
+			catch
+			{
+				SettingsWindow.Instance = null;
+				throw;
+			}
+			return true;
+		}
+
+		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
+		{
+			if (!command.Operation.StartsWith("ui ", StringComparison.Ordinal))
+				return this._desktopRuntime.ExecuteCliAsync(command, cancellation);
+			if (cancellation.IsCancellationRequested)
+				return Task.FromResult(CliResponse.Fail(command.Operation, "request_cancelled",
+					"The request expired before the UI action was submitted."));
+
+			if (command.Operation == "ui settings")
+			{
+				if (!this.ShowSettingsFromCli())
+					return Task.FromResult(CliResponse.Fail(command.Operation, "settings_unavailable",
+						"The settings window is unavailable."));
+			}
+			else if (command.Operation == "ui task-view") VirtualDesktopService.ShowTaskView();
+			else if (command.Operation == "ui window-switch") VirtualDesktopService.ShowWindowSwitch();
+			else if (command.Operation == "ui notification-toggle") NotificationService.Instance.ToggleCurrentDesktop();
+			else return Task.FromResult(CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown UI command."));
+			return Task.FromResult(CliResponse.Ok(command.Operation, new CliData()));
+		}
+#endif
 
 		public TaskTrayBaloon CreateFirstTimeBaloon()
 		{
@@ -172,7 +226,7 @@ namespace SylphyHorn
 					this._cliServer = new Services.Commands.CliServer(
 						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
 						(command, token) => Application.Current.Dispatcher.InvokeAsync(
-							() => runtime.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap());
+							() => this.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap());
 				}
 				catch (Exception ex)
 				{

@@ -28,6 +28,8 @@ namespace SylphyHorn.Commands
 
 		internal bool Follow { get; private set; }
 
+		internal bool SwitchAfterCreate { get; private set; }
+
 		internal static string Recognize(string[] args)
 		{
 			if (args == null || args.Length < 2) return null;
@@ -38,7 +40,7 @@ namespace SylphyHorn.Commands
 		internal static CliCommand Parse(string[] args)
 		{
 			if (args == null) throw new ArgumentNullException(nameof(args));
-			if (args.Length < 2) throw new ArgumentException("Specify a desktop or window command.");
+			if (args.Length < 2) throw new ArgumentException("Specify a command.");
 			var command = new CliCommand { Operation = args[0] + " " + args[1] };
 			if (!IsKnown(command.Operation)) throw new ArgumentException("Unknown command.");
 
@@ -47,10 +49,17 @@ namespace SylphyHorn.Commands
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
-				if (option == "--wrap" && command.Operation == "desktop switch") command.Wrap = true;
+				if (option == "--wrap" && (command.Operation == "desktop switch" || command.Operation == "window move"))
+					command.Wrap = true;
+				else if (option == "--switch" && command.Operation == "desktop create") command.SwitchAfterCreate = true;
 				else if (option == "--follow" && command.Operation == "window move") command.Follow = true;
 				else if ((option == "--next" || option == "--previous") && command.Operation == "desktop switch")
 					command.SetTarget(option.Substring(2), null);
+				else if (option == "--last-used" && command.Operation == "desktop switch")
+					command.SetTarget("last-used", null);
+				else if (command.Operation == "window move" && (option == "--desktop-next" || option == "--desktop-previous"
+					|| option == "--desktop-last-used" || option == "--desktop-new"))
+					command.SetTarget(option.Substring("--desktop-".Length), null);
 				else if (option == "--id" && (command.Operation == "window move" || command.Operation == "window pin"
 					|| command.Operation == "window unpin"))
 				{
@@ -124,7 +133,7 @@ namespace SylphyHorn.Commands
 			if ((command.Operation == "window pin" || command.Operation == "window unpin") && (command.WindowId == null || command.Scope == null))
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
-				throw new ArgumentException("--wrap requires --next or --previous.");
+				throw new ArgumentException("--wrap requires a next or previous destination.");
 			return command;
 		}
 
@@ -132,7 +141,9 @@ namespace SylphyHorn.Commands
 			=> operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
 				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
 				|| operation == "desktop wallpaper" || operation == "window list"
-				|| operation == "window move" || operation == "window pin" || operation == "window unpin";
+				|| operation == "window move" || operation == "window pin" || operation == "window unpin"
+				|| operation == "ui task-view" || operation == "ui window-switch" || operation == "ui settings"
+				|| operation == "ui notification-toggle";
 
 		private void SetTarget(string kind, string value)
 		{

@@ -89,6 +89,21 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
+		public async Task CreateAndSwitchWaitsForTheNewDesktopToBecomeCurrent()
+		{
+			var harness = await Create();
+			harness.Operations.Creating = () => C;
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", ""), Entry(B, 1, "work", ""), Entry(C, 2, "", "")));
+			harness.Provider.EnqueueResult(Batch(1, 4, C, Entry(A, 0, "work", ""), Entry(B, 1, "work", ""), Entry(C, 2, "", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "create", "--switch" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.True(response.Data.Desktop.Current);
+			Assert.Equal(C.ToString(), response.Data.Desktop.Id);
+			Assert.Equal(new[] { C }, harness.Operations.DesktopOperationIds);
+		}
+
+		[Fact]
 		public async Task RenameWaitsForConfirmedName()
 		{
 			var harness = await Create();

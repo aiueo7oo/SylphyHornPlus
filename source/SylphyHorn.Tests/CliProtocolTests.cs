@@ -22,6 +22,17 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
+		public void UiSuccessIncludesAnEmptyDataObject()
+		{
+			var bytes = CliProtocol.Serialize(CliResponse.Ok("ui settings", new CliData()));
+			var response = CliProtocol.Deserialize<CliResponse>(bytes);
+			Assert.True(response.Success);
+			Assert.Equal("ui settings", response.Command);
+			Assert.NotNull(response.Data);
+			Assert.Contains("\"data\":{}", Encoding.UTF8.GetString(bytes));
+		}
+
+		[Fact]
 		public void WindowPinScopesRemainDistinctInJson()
 		{
 			var window = new CliWindow { Pinned = true, WindowPinned = false, AppPinned = true };

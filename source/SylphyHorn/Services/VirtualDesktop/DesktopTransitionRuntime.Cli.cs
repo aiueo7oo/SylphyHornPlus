@@ -40,10 +40,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 					if (command.Name != null) this._operations.SetName(created, command.Name);
 					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(created)
 						&& (command.Name == null || this.CliDesktopInfo(created).Name == command.Name), cancellation);
+					if (command.SwitchAfterCreate)
+					{
+						this.EnsureCliAvailable(cancellation);
+						this._operations.Switch(created);
+						await this.ConfirmCliSwitchAsync(created, cancellation);
+					}
 					return CliResponse.Ok(command.Operation, new CliData { Changed = true, Desktop = this.CliDesktopInfo(created) });
 				}
 
-				var target = command.Operation == "window pin" || command.Operation == "window unpin"
+				var target = command.Operation == "window move" || command.Operation == "window pin" || command.Operation == "window unpin"
 					? Guid.Empty : this.ResolveCliTarget(command);
 				if (command.Operation == "desktop rename")
 				{
@@ -196,6 +202,18 @@ namespace SylphyHorn.Services.DesktopTransitions
 				var location = windows.Locate(entry.Identity.Window);
 				if (location == null) throw new CliFailure("state_unavailable", "The window location could not be read.", true);
 				if (location.Pinned) throw new CliFailure("window_pinned", "A pinned window cannot be assigned to one desktop.");
+				var createdDesktop = false;
+				if (command.TargetKind == "new")
+				{
+					this.EnsureCliAvailable(cancellation);
+					submitted = true;
+					target = this._operations.Create();
+					createdDesktop = true;
+					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(target), cancellation);
+				}
+				else if (command.TargetKind == "next" || command.TargetKind == "previous")
+					target = this.ResolveCliRelativeTarget(command, location.Desktop);
+				else target = this.ResolveCliTarget(command);
 				var moved = location.Desktop != target;
 				if (moved)
 				{
@@ -208,7 +226,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 							() => !cancellation.IsCancellationRequested && this.CliAvailable && this.State.Records.ContainsKey(target));
 						if (result != PlacementMoveStatus.Requested && result != PlacementMoveStatus.AlreadyPlaced)
 						{
-							submitted = false;
+							if (!createdDesktop) submitted = false;
 							throw new CliFailure("window_changed", "The window could not be moved because its state changed.");
 						}
 					}
@@ -298,18 +316,19 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private Guid ResolveCliTarget(CliCommand command)
 		{
-			var order = this.State.Order.ToArray();
 			if (command.TargetKind == "id")
 			{
 				var id = Guid.Parse(command.TargetValue);
 				if (this.State.Records.ContainsKey(id)) return id;
 			}
 			else if (command.TargetKind == "next" || command.TargetKind == "previous")
+				return this.ResolveCliRelativeTarget(command, this.State.CurrentDesktopId.Value);
+			else if (command.TargetKind == "last-used")
 			{
-				var index = Array.IndexOf(order, this.State.CurrentDesktopId.Value) + (command.TargetKind == "next" ? 1 : -1);
-				if (command.Wrap) index = (index + order.Length) % order.Length;
-				if (index >= 0 && index < order.Length) return order[index];
-				throw new CliFailure(command.TargetKind == "next" ? "no_next_desktop" : "no_previous_desktop", "There is no desktop in that direction.");
+				var previous = VirtualDesktop.History.Previous;
+				if (previous != null && previous.Id != this.State.CurrentDesktopId
+					&& this.State.Records.ContainsKey(previous.Id)) return previous.Id;
+				throw new CliFailure("no_last_used_desktop", "No previously used desktop is available.");
 			}
 			else
 			{
@@ -320,6 +339,18 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (resolution.Status == PlacementResolutionStatus.StateUnavailable) throw new CliFailure("state_unavailable", "Desktop names could not be resolved.", true);
 			}
 			throw new CliFailure("desktop_not_found", "The specified desktop does not exist.");
+		}
+
+		private Guid ResolveCliRelativeTarget(CliCommand command, Guid source)
+		{
+			var order = this.State.Order.ToArray();
+			var sourceIndex = Array.IndexOf(order, source);
+			if (sourceIndex < 0) throw new CliFailure("state_unavailable", "The source desktop is no longer available.", true);
+			var index = sourceIndex + (command.TargetKind == "next" ? 1 : -1);
+			if (command.Wrap) index = (index + order.Length) % order.Length;
+			if (index >= 0 && index < order.Length) return order[index];
+			throw new CliFailure(command.TargetKind == "next" ? "no_next_desktop" : "no_previous_desktop",
+				"There is no desktop in that direction.");
 		}
 
 		private CliWindowEntry ResolveCliWindow(Guid key)
