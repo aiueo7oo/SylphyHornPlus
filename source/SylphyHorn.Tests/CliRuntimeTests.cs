@@ -125,6 +125,44 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
+		public async Task DeleteWaitsForConfirmedRemovalAndReturnsRemainingDesktops()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, B, Entry(B, 0, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--id", A.ToString() });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.True(response.Data.Changed);
+			Assert.Equal(B.ToString(), Assert.Single(response.Data.Desktops).Id);
+			Assert.Equal(new[] { A }, harness.Operations.RemovedIds);
+		}
+
+		[Fact]
+		public async Task UnconfirmedDeleteCannotBeBlindlyRetried()
+		{
+			var harness = await Create();
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--id", A.ToString() });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.Equal("result_unconfirmed", response.Error.Code);
+			Assert.False(response.Error.Retryable);
+			Assert.Equal(new[] { A }, harness.Operations.RemovedIds);
+		}
+
+		[Fact]
+		public async Task DeletingTheLastDesktopReturnsItsReplacement()
+		{
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "work", "")));
+			await harness.Runtime.InitializeAsync(false, CancellationToken.None);
+			harness.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "work", "")));
+			harness.Provider.EnqueueResult(Batch(1, 3, B, Entry(B, 0, "", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--id", A.ToString() });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal(B.ToString(), Assert.Single(response.Data.Desktops).Id);
+			Assert.True(response.Data.Desktops[0].Current);
+		}
+
+		[Fact]
 		public async Task UnconfirmedCreateCannotBeBlindlyRetried()
 		{
 			var harness = await Create();

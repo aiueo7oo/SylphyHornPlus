@@ -53,7 +53,8 @@ namespace SylphyHorn.Commands
 					command.WindowId = ReadValue(args, ref i);
 					RequireId(command.WindowId);
 				}
-				else if (option == "--id" && (command.Operation == "desktop rename" || command.Operation == "desktop reorder"))
+				else if (option == "--id" && (command.Operation == "desktop rename" || command.Operation == "desktop reorder"
+					|| command.Operation == "desktop delete"))
 				{
 					var id = ReadValue(args, ref i);
 					RequireId(id);
@@ -94,7 +95,8 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id using a window ID returned by window list.");
 			if ((command.Operation == "desktop rename" && command.Name == null)
 				|| (command.Operation == "desktop reorder" && command.Number == null)
-				|| ((command.Operation == "desktop rename" || command.Operation == "desktop reorder") && command.TargetKind == null))
+				|| ((command.Operation == "desktop rename" || command.Operation == "desktop reorder"
+					|| command.Operation == "desktop delete") && command.TargetKind == null))
 				throw new ArgumentException("Specify the desktop ID and required value.");
 			if ((command.Operation == "window pin" || command.Operation == "window unpin") && (command.WindowId == null || command.Scope == null))
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
@@ -105,7 +107,8 @@ namespace SylphyHorn.Commands
 
 		private static bool IsKnown(string operation)
 			=> operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
-				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "window list"
+				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
+				|| operation == "window list"
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin";
 
 		private void SetTarget(string kind, string value)

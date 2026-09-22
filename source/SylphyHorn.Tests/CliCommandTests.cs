@@ -74,8 +74,11 @@ namespace SylphyHorn.Tests
 			Assert.Equal(string.Empty, clearName.Name);
 			var reorder = CliCommand.Parse(new[] { "desktop", "reorder", "--id", id, "--number", "2" });
 			Assert.Equal(2, reorder.Number);
+			var delete = CliCommand.Parse(new[] { "desktop", "delete", "--id", id });
+			Assert.Equal(id, delete.TargetValue);
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "rename", "--name", "work" }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "reorder", "--id", id, "--number", "0" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete" }));
 		}
 
 		[Fact]

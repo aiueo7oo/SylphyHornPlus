@@ -77,6 +77,18 @@ namespace SylphyHorn.Services.DesktopTransitions
 					}
 					return CliResponse.Ok(command.Operation, new CliData { Changed = original != command.Number, Desktop = this.CliDesktopInfo(target) });
 				}
+				if (command.Operation == "desktop delete")
+				{
+					this.EnsureCliAvailable(cancellation);
+					submitted = true;
+					this._operations.Remove(target);
+					await this.ConfirmCliDesktopAsync(() => !this.State.Records.ContainsKey(target), cancellation);
+					return CliResponse.Ok(command.Operation, new CliData
+					{
+						Changed = true,
+						Desktops = this.State.Order.Select(this.CliDesktopInfo).ToArray()
+					});
+				}
 				if (command.Operation == "desktop switch")
 				{
 					var changed = this.State.CurrentDesktopId != target;

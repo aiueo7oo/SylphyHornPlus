@@ -21,6 +21,7 @@ namespace SylphyHorn.Cli
 				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME]");
 				Console.WriteLine("sylphyhorn-cli desktop rename --id ID --name NAME");
 				Console.WriteLine("sylphyhorn-cli desktop reorder --id ID --number N");
+				Console.WriteLine("sylphyhorn-cli desktop delete --id ID");
 				Console.WriteLine("sylphyhorn-cli window list");
 				Console.WriteLine("sylphyhorn-cli window move --id ID (--desktop-number N | --desktop-name NAME | --desktop-id ID) [--follow]");
 				Console.WriteLine("sylphyhorn-cli window pin --id ID --scope (window | app)");
