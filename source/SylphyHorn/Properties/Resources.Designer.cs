@@ -88,6 +88,33 @@ namespace SylphyHorn.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Create missing desktops when a matching app opens.
+        /// </summary>
+        public static string Placement_CreateMissing {
+            get {
+                return ResourceManager.GetString("Placement_CreateMissing", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Delete.
+        /// </summary>
+        public static string Placement_DeleteLabel {
+            get {
+                return ResourceManager.GetString("Placement_DeleteLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to If multiple desktops have the same name, windows are placed on the lowest-numbered desktop..
+        /// </summary>
+        public static string Placement_NameMatchHint {
+            get {
+                return ResourceManager.GetString("Placement_NameMatchHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Background に類似しているローカライズされた文字列を検索します。
         /// </summary>
         public static string Settings_Background {

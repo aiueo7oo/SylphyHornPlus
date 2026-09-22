@@ -210,7 +210,18 @@ namespace SylphyHorn.UI.Bindings
 			get => this._settings.Configuration.Value.Enabled;
 			set
 			{
-				if (!this._disposed && value != this.IsEnabled) _ = this.PublishAsync(new AppPlacementConfiguration(value, this._settings.Configuration.Value.Rules));
+				if (!this._disposed && value != this.IsEnabled)
+					_ = this.PublishAsync(new AppPlacementConfiguration(value, this._settings.Configuration.Value.Rules, this.CreateMissingDesktops));
+			}
+		}
+
+		public bool CreateMissingDesktops
+		{
+			get => this._settings.Configuration.Value.CreateMissingDesktops;
+			set
+			{
+				if (!this._disposed && value != this.CreateMissingDesktops)
+					_ = this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, this._settings.Configuration.Value.Rules, value));
 			}
 		}
 
@@ -269,6 +280,7 @@ namespace SylphyHorn.UI.Bindings
 		{
 			if (this._disposed) return;
 			this.OnPropertyChanged(nameof(this.IsEnabled));
+			this.OnPropertyChanged(nameof(this.CreateMissingDesktops));
 			if (this._publishing) return;
 			this._generation++;
 			foreach (var read in this._reads.Values) read.Cancel();
@@ -373,7 +385,7 @@ namespace SylphyHorn.UI.Bindings
 					var index = rules.FindIndex(existing => existing.Id == row.Id);
 					if (index < 0) rules.Add(rule); else rules[index] = rule;
 					row.Accept(rule, choice);
-					await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, rules));
+					await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, rules, this.CreateMissingDesktops));
 				}
 				catch (OperationCanceledException) { }
 				catch (Exception)
@@ -398,7 +410,11 @@ namespace SylphyHorn.UI.Bindings
 			if (!this.Contains(row)) return;
 			if (this._reads.TryGetValue(row, out var read)) read.Cancel();
 			row.Group.Rows.Remove(row);
-			if (row.Saved != null) await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, this._settings.Configuration.Value.Rules.Where(rule => rule.Id != row.Id)));
+			if (row.Saved != null)
+			{
+				var rules = this._settings.Configuration.Value.Rules.Where(rule => rule.Id != row.Id);
+				await this.PublishAsync(new AppPlacementConfiguration(this.IsEnabled, rules, this.CreateMissingDesktops));
+			}
 		}
 
 		private Task PublishAsync(AppPlacementConfiguration configuration)

@@ -58,6 +58,7 @@ namespace SylphyHorn.Serialization
 			if (value is AppPlacementConfiguration placement)
 			{
 				AppendValue(builder, placement.Enabled);
+				AppendValue(builder, placement.CreateMissingDesktops);
 				builder.Append('[');
 				foreach (var rule in placement.Rules)
 				{

@@ -201,7 +201,7 @@ namespace SylphyHorn.Tests
 
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
-				Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 				PlacementHistory history) => this._session;
 		}
 	}

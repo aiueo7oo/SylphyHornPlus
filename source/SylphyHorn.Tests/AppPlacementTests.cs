@@ -27,6 +27,27 @@ namespace SylphyHorn.Tests
 
 		private static PlacementDesktop Desktop(Guid id, string name) => new PlacementDesktop(id, name, true);
 
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void CreationOptionRoundTripsAndLegacyConfigurationDefaultsToOff(bool create)
+		{
+			var serializer = new DataContractSerializer(typeof(AppPlacementConfiguration));
+			using (var stream = new MemoryStream())
+			{
+				serializer.WriteObject(stream, new AppPlacementConfiguration(true, new[] { Rule() }, create));
+				stream.Position = 0;
+				var xml = XDocument.Load(stream);
+				Assert.Equal(create, xml.Descendants().Any(element => element.Name.LocalName == "CreateMissingDesktops"));
+				using (var reader = xml.CreateReader())
+				{
+					var restored = (AppPlacementConfiguration)serializer.ReadObject(reader);
+					Assert.Equal(create, restored.CreateMissingDesktops);
+					Assert.Single(restored.Rules);
+				}
+			}
+		}
+
 		[Fact]
 		public void NameFollowsRecreationButNotRenameAndNumberFollowsOrder()
 		{
@@ -160,6 +181,7 @@ namespace SylphyHorn.Tests
 			var variants = new[]
 			{
 				new AppPlacementConfiguration(false, new[] { rule }),
+				new AppPlacementConfiguration(true, new[] { rule }, true),
 				new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>()),
 				new AppPlacementConfiguration(true, new[] { Rule(enabled: false) }),
 				new AppPlacementConfiguration(true, new[] { Rule(PlacementDestination.ByNumber(2)) }),

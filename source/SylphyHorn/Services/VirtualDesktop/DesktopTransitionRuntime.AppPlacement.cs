@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
 using SylphyHorn.Services.AppPlacement;
+using WindowsDesktop;
 
 namespace SylphyHorn.Services.DesktopTransitions
 {
@@ -61,6 +62,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		}
 
 		private readonly object _placementAuthorizationGate = new object();
+		private readonly SemaphoreSlim _placementCreationGate = new SemaphoreSlim(1, 1);
 		private PlacementAuthorizationRequest _placementAuthorizationPending;
 		private bool _placementAuthorizationPosted;
 
@@ -98,7 +100,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 				{
 					this._placementSession = this._placementFactory.Start(
 						this._placementConfiguration,
-						(destination, cancellation) => this.AuthorizePlacementAsync(generation, destination, cancellation),
+						(destination, allowCreation, cancellation) => this.AuthorizePlacementAsync(generation, destination, allowCreation, cancellation),
 						this._placementHistory);
 					_ = this.ObservePlacementAsync(this._placementSession);
 				}
@@ -126,7 +128,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			// Do not auto-restart after loss of event continuity. A later configuration starts a fresh baseline.
 		}
 
-		private async Task<PlacementAuthorization> AuthorizePlacementAsync(long generation, PlacementDestination destination, CancellationToken cancellation)
+		private async Task<PlacementAuthorization> AuthorizePlacementAsync(long generation, PlacementDestination destination, bool allowCreation, CancellationToken cancellation)
 		{
 			var completion = new TaskCompletionSource<PlacementAuthorization>(TaskCreationOptions.RunContinuationsAsynchronously);
 			using (cancellation.Register(() => completion.TrySetCanceled()))
@@ -137,7 +139,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 					{
 						// One mailbox/posted callback even if an unresponsive owner outlives several deadlines.
 						this._placementAuthorizationPending?.Completion.TrySetCanceled();
-						this._placementAuthorizationPending = new PlacementAuthorizationRequest(generation, destination, completion);
+						this._placementAuthorizationPending = new PlacementAuthorizationRequest(generation, destination, completion, cancellation, allowCreation);
 						if (!this._placementAuthorizationPosted)
 						{
 							this._placementAuthorizationPosted = true;
@@ -181,10 +183,12 @@ namespace SylphyHorn.Services.DesktopTransitions
 					return;
 				}
 				var resolution = this.PlacementDestinations.Resolve(request.Destination);
-				this._placementPermit?.Cancel();
-				var permit = resolution.Status == PlacementResolutionStatus.Resolved ? new PlacementMovePermit() : null;
-				this._placementPermit = permit;
-				if (!request.Completion.TrySetResult(new PlacementAuthorization(resolution, permit))) permit?.Cancel();
+				if (resolution.Status == PlacementResolutionStatus.Missing && request.AllowCreation && this._placementConfiguration.CreateMissingDesktops)
+				{
+					_ = this.CreatePlacementDestinationAsync(request);
+					return;
+				}
+				this.CompletePlacementAuthorization(request, resolution);
 			}
 			catch (Exception ex)
 			{
@@ -192,13 +196,115 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 		}
 
+		private void CompletePlacementAuthorization(PlacementAuthorizationRequest request, PlacementResolution resolution)
+		{
+			this._placementPermit?.Cancel();
+			var permit = resolution.Status == PlacementResolutionStatus.Resolved ? new PlacementMovePermit() : null;
+			this._placementPermit = permit;
+			if (!request.Completion.TrySetResult(new PlacementAuthorization(resolution, permit))) permit?.Cancel();
+		}
+
+		private async Task CreatePlacementDestinationAsync(PlacementAuthorizationRequest request)
+		{
+			var entered = false;
+			try
+			{
+				await this._placementCreationGate.WaitAsync(request.Cancellation).ConfigureAwait(false);
+				entered = true;
+				var remaining = 0;
+				await this.OnPlacementOwnerAsync(request, () =>
+				{
+					remaining = request.Destination.Kind == PlacementDestinationKind.Name
+						? 1 : Math.Max(0, request.Destination.Number - this.State.Order.Count);
+				}).ConfigureAwait(false);
+				while (true)
+				{
+					Task<VirtualDesktopReconciliationResult> refresh = null;
+					Guid created = Guid.Empty;
+					await this.OnPlacementOwnerAsync(request, () =>
+					{
+						var resolution = this.PlacementDestinations.Resolve(request.Destination);
+						if (resolution.Status != PlacementResolutionStatus.Missing || remaining == 0)
+						{
+							this.CompletePlacementAuthorization(request, resolution);
+							return;
+						}
+						// Bound this request to its initial deficit, even if another actor removes desktops.
+						remaining--;
+						created = this._operations.Create();
+						this.CheckPlacementCreation(request);
+						if (request.Destination.Kind == PlacementDestinationKind.Name)
+							this._operations.SetName(created, request.Destination.Name);
+						this.CheckPlacementCreation(request);
+						refresh = this.RequestProviderWithBudgetAsync(VirtualDesktopStableReason.ExplicitReconciliation, request.Cancellation);
+					}).ConfigureAwait(false);
+					if (refresh == null) return;
+					var result = await refresh.ConfigureAwait(false);
+					await this.OnPlacementOwnerAsync(request, () =>
+					{
+						if (result.Status != VirtualDesktopReconciliationStatus.Succeeded)
+							throw new InvalidOperationException("The created desktop could not be reconciled.");
+						this.ApplyStableBatch(result.Batch);
+						if (!this.State.Records.ContainsKey(created))
+							throw new InvalidOperationException("The created desktop is no longer available.");
+					}).ConfigureAwait(false);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				request.Completion.TrySetCanceled();
+			}
+			catch (Exception ex)
+			{
+				request.Completion.TrySetException(ex);
+			}
+			finally
+			{
+				if (entered) this._placementCreationGate.Release();
+			}
+		}
+
+		private void CheckPlacementCreation(PlacementAuthorizationRequest request)
+		{
+			this.EnsureOwnerAccess();
+			request.Cancellation.ThrowIfCancellationRequested();
+			if (request.Completion.Task.IsCompleted || request.Generation != this._placementGeneration
+				|| this._shutdownStarted || this._stopping || this._placementSuspended || this._placementChanging
+				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.CreateMissingDesktops)
+				throw new OperationCanceledException();
+		}
+
+		private async Task OnPlacementOwnerAsync(PlacementAuthorizationRequest request, Action action)
+		{
+			var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+			using (request.Cancellation.Register(() => completion.TrySetCanceled()))
+			{
+				void Invoke()
+				{
+					try
+					{
+						this.CheckPlacementCreation(request);
+						action();
+						completion.TrySetResult(true);
+					}
+					catch (Exception ex) { completion.TrySetException(ex); }
+				}
+				if (this._owner.CheckAccess()) Invoke();
+				else if (!this._owner.Post(Invoke)) completion.TrySetCanceled();
+				await completion.Task.ConfigureAwait(false);
+			}
+		}
+
 		private sealed class PlacementAuthorizationRequest
 		{
-			internal PlacementAuthorizationRequest(long generation, PlacementDestination destination, TaskCompletionSource<PlacementAuthorization> completion)
+			internal PlacementAuthorizationRequest(long generation, PlacementDestination destination,
+				TaskCompletionSource<PlacementAuthorization> completion, CancellationToken cancellation, bool allowCreation)
 			{
 				this.Generation = generation;
 				this.Destination = destination;
 				this.Completion = completion;
+				this.Cancellation = cancellation;
+				this.AllowCreation = allowCreation;
 			}
 
 			internal long Generation { get; }
@@ -206,6 +312,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			internal PlacementDestination Destination { get; }
 
 			internal TaskCompletionSource<PlacementAuthorization> Completion { get; }
+
+			internal CancellationToken Cancellation { get; }
+
+			internal bool AllowCreation { get; }
 		}
 
 		private async Task<SettingsImportCommitResult> CommitImportWithPlacementSuspendedAsync(StagedSettingsImport stage,

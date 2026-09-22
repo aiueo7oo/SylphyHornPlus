@@ -175,7 +175,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
-				Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 				PlacementHistory history)
 			{
 				var session = new PlacementSessionFactory().Start(configuration, authorize, history);
@@ -329,7 +329,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 				throw new InvalidOperationException("Desktop mutation is outside the placement fixture.");
 			}
 
-			public void Create() => this.Reject();
+			public Guid Create() { this.Reject(); return Guid.Empty; }
 
 			public void SetName(Guid desktopId, string value) => this.Reject();
 

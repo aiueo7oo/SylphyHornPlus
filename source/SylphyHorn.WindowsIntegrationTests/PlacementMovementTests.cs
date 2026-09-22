@@ -118,7 +118,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 			internal async Task Start()
 			{
 				Assert.Null(this.Session);
-				this.Session = new PlacementSessionFactory().Start(this.Environment.Configuration(), (destination, cancellation) => this.Authorize(destination, cancellation), this.History);
+				this.Session = new PlacementSessionFactory().Start(this.Environment.Configuration(), (destination, allowCreation, cancellation) => this.Authorize(destination, cancellation), this.History);
 				await Until(() => this.Session.IsReady || this.Session.Completion.IsCompleted, "placement session startup");
 				Assert.True(this.Session.IsReady && !this.Session.Completion.IsCompleted);
 			}

@@ -690,6 +690,9 @@
   <data name="Placement_NameColumn" xml:space="preserve">
     <value>Desktop name</value>
   </data>
+  <data name="Placement_CreateMissing" xml:space="preserve">
+    <value>Create missing desktops when a matching app opens</value>
+  </data>
   <data name="Placement_NameMatchHint" xml:space="preserve">
     <value>If multiple desktops have the same name, windows are placed on the lowest-numbered desktop.</value>
   </data>

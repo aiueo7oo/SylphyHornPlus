@@ -36,6 +36,10 @@
 		<StackPanel Margin="16,0,16,16" Focusable="True" Grid.IsSharedSizeScope="True">
 			<TextBlock Text="{Binding Text[Title]}" Style="{DynamicResource HeaderStyleKey}" />
 			<CheckBox Content="{Binding Text[Enable]}" IsChecked="{Binding IsEnabled}" Margin="8,0,0,8" />
+			<CheckBox Content="{Binding Text[CreateMissing]}"
+			          IsChecked="{Binding CreateMissingDesktops}"
+			          IsEnabled="{Binding IsEnabled}"
+			          Margin="8,0,0,8" />
 			<ItemsControl ItemsSource="{Binding Groups}">
 				<ItemsControl.ItemTemplate>
 					<DataTemplate>

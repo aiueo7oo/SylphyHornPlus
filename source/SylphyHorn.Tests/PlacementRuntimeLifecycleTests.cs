@@ -264,6 +264,154 @@ namespace SylphyHorn.Tests
 			await harness.Runtime.ShutdownAsync();
 		}
 
+		[Theory]
+		[InlineData(false, false)]
+		[InlineData(false, true)]
+		[InlineData(true, false)]
+		[InlineData(true, true)]
+		public async Task MissingDestinationsAreCreatedOnlyWhenEnabled(bool enabled, bool named)
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			var destination = named ? PlacementDestination.ByName("work") : PlacementDestination.ByNumber(3);
+			harness.Operations.Creating = () => harness.Operations.CreateCalls == 1 ? B : C;
+			harness.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, named ? "work" : "", "")));
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", ""), Entry(C, 2, "", "")));
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, enabled));
+			Assert.Equal(0, harness.Operations.CreateCalls);
+			var session = factory.Sessions[0];
+			var request = session.Authorize(destination, session.Cancellation.Token);
+			harness.Owner.Drain();
+			var result = await request;
+			Assert.Equal(enabled ? PlacementResolutionStatus.Resolved : PlacementResolutionStatus.Missing, result.Resolution.Status);
+			Assert.Equal(enabled ? (named ? 1 : 2) : 0, harness.Operations.CreateCalls);
+			Assert.Equal(enabled && named ? 1 : 0, harness.Operations.NameCalls);
+			if (enabled) Assert.Equal(named ? B : C, result.Resolution.DesktopId);
+			if (enabled && named) Assert.Equal("work", Assert.Single(harness.Operations.NameValues));
+			Assert.Empty(harness.Operations.DesktopOperationNames);
+			Assert.Equal(A, harness.Runtime.State.CurrentDesktopId);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task CreationReusesLowestNumberedDuplicateWithoutCreatingOrRenaming()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			harness.Provider.PublishStable(Batch(1, 2, A, Entry(B, 0, "name", ""), Entry(A, 1, "name", "")));
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByName("name"), session.Cancellation.Token);
+			harness.Owner.Drain();
+			Assert.Equal(B, (await request).Resolution.DesktopId);
+			Assert.Equal(0, harness.Operations.CreateCalls);
+			Assert.Equal(0, harness.Operations.NameCalls);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Theory]
+		[InlineData(0)]
+		[InlineData(1)]
+		[InlineData(2)]
+		public async Task CreationOrReconciliationFailureStopsWithoutRollbackOrSwitch(int failure)
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			if (failure == 0) harness.Operations.CreateFailure = new InvalidOperationException("synthetic");
+			if (failure == 1) harness.Operations.NameFailure = new InvalidOperationException("synthetic");
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var request = session.Authorize(failure == 1 ? PlacementDestination.ByName("work") : PlacementDestination.ByNumber(3), session.Cancellation.Token);
+			harness.Owner.Drain();
+			await Assert.ThrowsAsync<InvalidOperationException>(() => request);
+			Assert.Equal(1, harness.Operations.CreateCalls);
+			Assert.Empty(harness.Operations.DesktopOperationNames);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task DisableDuringReconciliationPreventsFurtherCreation()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			var refresh = new TaskCompletionSource<WindowsDesktop.VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+			harness.Provider.NextRequest = refresh.Task;
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByNumber(3), session.Cancellation.Token);
+			harness.Owner.Drain();
+			Assert.Equal(1, harness.Operations.CreateCalls);
+			var disable = harness.Runtime.ConfigurePlacementAsync(AppPlacementConfiguration.Empty);
+			await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+			session.Release();
+			await disable;
+			refresh.SetResult(WindowsDesktop.VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
+			harness.Owner.Drain();
+			Assert.Equal(1, harness.Operations.CreateCalls);
+			Assert.Empty(harness.Operations.DesktopOperationNames);
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task ConcurrentCreationRequestsRecheckStateBeforeCreatingAgain()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			var refresh = new TaskCompletionSource<WindowsDesktop.VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+			harness.Provider.NextRequest = refresh.Task;
+			harness.Operations.Creating = () => B;
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var first = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token);
+			harness.Owner.Drain();
+			var second = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token);
+			harness.Owner.Drain();
+			Assert.Equal(1, harness.Operations.CreateCalls);
+			refresh.SetResult(WindowsDesktop.VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
+			Assert.Equal(B, (await first).Resolution.DesktopId);
+			Assert.Equal(B, (await second).Resolution.DesktopId);
+			Assert.Equal(1, harness.Operations.CreateCalls);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task CancelledCreationRequestCannotCreateWhenOwnerResumes()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			using (var cancellation = new CancellationTokenSource())
+			{
+				var request = session.Authorize(PlacementDestination.ByNumber(2), cancellation.Token);
+				cancellation.Cancel();
+				await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+				harness.Owner.Drain();
+				Assert.Equal(0, harness.Operations.CreateCalls);
+			}
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task ExplicitApplicationNeverRecreatesAMissingPreviewDestination()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token, false);
+			harness.Owner.Drain();
+			Assert.Equal(PlacementResolutionStatus.Missing, (await request).Resolution.Status);
+			Assert.Equal(0, harness.Operations.CreateCalls);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
 		private static async Task<Harness> Create(Factory factory)
 		{
 			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "name", "wall")), factory);
@@ -277,7 +425,7 @@ namespace SylphyHorn.Tests
 
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
-				Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 				PlacementHistory history)
 			{
 				var session = new Session(configuration, authorize);
@@ -306,15 +454,18 @@ namespace SylphyHorn.Tests
 			public bool IsReady { get; set; }
 
 			internal readonly AppPlacementConfiguration Configuration;
-			internal readonly Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> Authorize;
+			private readonly Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> _authorize;
+
+			internal Task<PlacementAuthorization> Authorize(PlacementDestination destination, CancellationToken cancellation, bool allowCreation = true)
+				=> this._authorize(destination, allowCreation, cancellation);
 			internal readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
 			internal readonly TaskCompletionSource<bool> Ended = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 			internal bool Stopping;
 
-			internal Session(AppPlacementConfiguration configuration, Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize)
+			internal Session(AppPlacementConfiguration configuration, Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize)
 			{
 				this.Configuration = configuration;
-				this.Authorize = authorize;
+				this._authorize = authorize;
 			}
 
 			public Task Completion => this.Ended.Task;

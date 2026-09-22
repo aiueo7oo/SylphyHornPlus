@@ -240,6 +240,7 @@ namespace SylphyHorn.Tests
 		internal List<Guid> DesktopOperationIds { get; } = new List<Guid>();
 		internal int NameCalls { get; private set; }
 		internal int CreateCalls { get; private set; }
+		internal Func<Guid> Creating { get; set; }
 		internal List<Guid> RemovedIds { get; } = new List<Guid>();
 		internal Exception NameFailure { get; set; }
 		internal Exception CreateFailure { get; set; }
@@ -250,7 +251,7 @@ namespace SylphyHorn.Tests
 		internal List<string> AppliedWallpaperValues { get; } = new List<string>();
 		internal Action BeforeName { get; set; }
 		internal List<string> NameValues { get; } = new List<string>();
-		public void Create() { this.CreateCalls++; if (this.CreateFailure != null) throw this.CreateFailure; }
+		public Guid Create() { this.CreateCalls++; if (this.CreateFailure != null) throw this.CreateFailure; return this.Creating?.Invoke() ?? Guid.NewGuid(); }
 		public void SetName(Guid desktopId, string value) { this.NameCalls++; this.NameValues.Add(value); this.BeforeName?.Invoke(); if (this.NameFailure != null || this.FailNameValue == value) throw this.NameFailure ?? new InvalidOperationException("synthetic"); }
 		public void SetWallpaperPath(Guid desktopId, string value) { this.WallpaperCalls++; if (this.FailWallpaperValue == value) throw new InvalidOperationException("synthetic"); }
 		public void ApplyWallpaper(Guid desktopId, string value, WallpaperPosition position) { this.AppliedWallpaperIds.Add(desktopId); this.AppliedWallpaperValues.Add(value); }

@@ -29,7 +29,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 					true,
 					new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\placement-test-not-installed\app.exe"),
 					PlacementDestination.ByNumber(1)) });
-			var session = new PlacementSessionFactory().Start(configuration, (_, __) => throw new InvalidOperationException("Unexpected move authorization"), new PlacementHistory());
+			var session = new PlacementSessionFactory().Start(configuration, (_, __, ___) => throw new InvalidOperationException("Unexpected move authorization"), new PlacementHistory());
 			try
 			{
 				var watch = Stopwatch.StartNew();
@@ -77,7 +77,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 			var authorizations = 0;
 			var session = new PlacementSessionFactory().Start(
 				configuration,
-				(_, __) =>
+				(_, __, ___) =>
 				{
 					authorizations++;
 					throw new InvalidOperationException("The test host must be excluded before authorization.");
@@ -161,7 +161,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 					PlacementDestination.ByNumber(1)) });
 			for (var n = 0; n < 10; n++)
 			{
-				var session = new PlacementSessionFactory().Start(configuration, (_, __) => throw new InvalidOperationException("Unexpected authorization"), new PlacementHistory());
+				var session = new PlacementSessionFactory().Start(configuration, (_, __, ___) => throw new InvalidOperationException("Unexpected authorization"), new PlacementHistory());
 				await Task.WhenAll(session.StopAsync(), session.StopAsync());
 				Assert.Equal(TaskStatus.RanToCompletion, session.Completion.Status);
 			}

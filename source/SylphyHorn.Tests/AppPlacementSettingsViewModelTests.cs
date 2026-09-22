@@ -21,6 +21,25 @@ namespace SylphyHorn.Tests
 	public sealed class AppPlacementSettingsViewModelTests
 	{
 		[Fact]
+		public async Task EditingRulesAndTogglingPlacementPreservesCreationOption()
+		{
+			using (var fixture = await PlacementUiFixture.Create())
+			{
+				fixture.Model.CreateMissingDesktops = true;
+				var row = await fixture.Add(@"C:\Apps\Editor.exe", 3);
+				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+				fixture.Model.IsEnabled = true;
+				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+				await fixture.Model.RemoveAsync(row);
+				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+				fixture.Model.IsEnabled = false;
+				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+				fixture.Model.CreateMissingDesktops = false;
+				Assert.False(fixture.Settings.Configuration.Value.CreateMissingDesktops);
+			}
+		}
+
+		[Fact]
 		public async Task DestinationChoicesFollowCurrentStateWithoutChangingStoredOrTypedTargets()
 		{
 			using (var f = await PlacementUiFixture.Create())

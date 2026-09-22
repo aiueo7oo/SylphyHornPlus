@@ -39,7 +39,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 	internal interface IDesktopOperations
 	{
-		void Create();
+		Guid Create();
 		void SetName(Guid desktopId, string value);
 		void SetWallpaperPath(Guid desktopId, string value);
 		void ApplyWallpaper(Guid desktopId, string value, WallpaperPosition position);

@@ -74,7 +74,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 	internal sealed class VirtualDesktopOperations : IDesktopOperations
 	{
-		public void Create() => VirtualDesktop.Create();
+		public Guid Create() => VirtualDesktop.Create().Id;
 		public void SetName(Guid desktopId, string value) => Resolve(desktopId).Name = value;
 		public void SetWallpaperPath(Guid desktopId, string value) => Resolve(desktopId).WallpaperPath = value;
 		public void ApplyWallpaper(Guid desktopId, string value, WallpaperPosition position) => WallpaperService.Instance.ApplyDesktopWallpaperNow(value, position);

@@ -12,6 +12,9 @@ namespace SylphyHorn.AppPlacement
 		[DataMember(Order = 0, IsRequired = true)]
 		public bool Enabled { get; private set; }
 
+		[DataMember(Order = 2, EmitDefaultValue = false)]
+		public bool CreateMissingDesktops { get; private set; }
+
 		[DataMember(Name = "Rules", Order = 1, IsRequired = true)]
 		private AppPlacementRule[] _rules;
 		private ReadOnlyCollection<AppPlacementRule> _view;
@@ -21,9 +24,10 @@ namespace SylphyHorn.AppPlacement
 
 		public IReadOnlyList<AppPlacementRule> Rules => this._view;
 
-		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules)
+		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false)
 		{
 			this.Enabled = enabled;
+			this.CreateMissingDesktops = createMissingDesktops;
 			this._rules = rules?.ToArray() ?? throw new ArgumentNullException(nameof(rules));
 			this.Initialize();
 		}

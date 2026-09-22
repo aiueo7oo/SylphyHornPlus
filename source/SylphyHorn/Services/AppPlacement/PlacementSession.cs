@@ -25,7 +25,7 @@ namespace SylphyHorn.Services.AppPlacement
 	{
 		IPlacementSession Start(
 			AppPlacementConfiguration configuration,
-			Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 			PlacementHistory history);
 	}
 
@@ -33,7 +33,7 @@ namespace SylphyHorn.Services.AppPlacement
 	{
 		public IPlacementSession Start(
 			AppPlacementConfiguration configuration,
-			Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 			PlacementHistory history)
 			=> new PlacementSession(configuration, authorize, history);
 	}
@@ -51,7 +51,7 @@ namespace SylphyHorn.Services.AppPlacement
 		private PlacementExplicitApplication _explicit;
 		private readonly TaskCompletionSource<bool> _completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		private readonly AppPlacementConfiguration _configuration;
-		private readonly Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> _authorize;
+		private readonly Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> _authorize;
 		private readonly PlacementHistory _history;
 		private PlacementWindowMonitor _monitor;
 		private bool _ended;
@@ -63,7 +63,7 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal PlacementSession(
 			AppPlacementConfiguration configuration,
-			Func<PlacementDestination, CancellationToken, Task<PlacementAuthorization>> authorize,
+			Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 			PlacementHistory history)
 		{
 			this._configuration = configuration;
@@ -98,7 +98,7 @@ namespace SylphyHorn.Services.AppPlacement
 			return this.Submit(
 				token =>
 				{
-					var results = this._explicit.Apply(preview, selected, (destination, deadline) => this.Authorize(destination, deadline, token), token);
+					var results = this._explicit.Apply(preview, selected, (destination, deadline) => this.Authorize(destination, deadline, token, false), token);
 					foreach (var result in results) this._history.Add(result);
 					return results;
 				},
@@ -320,12 +320,12 @@ namespace SylphyHorn.Services.AppPlacement
 		private PlacementAuthorization Authorize(PlacementDestination destination, long deadline)
 			=> this.Authorize(destination, deadline, this._cancellation.Token);
 
-		private PlacementAuthorization Authorize(PlacementDestination destination, long deadline, CancellationToken request)
+		private PlacementAuthorization Authorize(PlacementDestination destination, long deadline, CancellationToken request, bool allowCreation = true)
 		{
 			using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(this._cancellation.Token, request))
 			{
 				cancellation.CancelAfter((int)Math.Max(1, deadline - Now()));
-				return this._authorize(destination, cancellation.Token).GetAwaiter().GetResult();
+				return this._authorize(destination, allowCreation, cancellation.Token).GetAwaiter().GetResult();
 			}
 		}
 
