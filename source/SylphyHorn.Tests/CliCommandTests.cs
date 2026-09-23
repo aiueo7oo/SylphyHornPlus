@@ -6,6 +6,47 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Fact]
+		public void AssignmentCommandsRecognizeThreeWordsAndPreservePaths()
+		{
+			var args = new[] { "app", "assignment", "set", "--path", @"C:\My Apps\Editor.exe", "--desktop-name", "Development" };
+			var command = CliCommand.Parse(args);
+			Assert.Equal("app assignment set", CliCommand.Recognize(args));
+			Assert.Equal(@"C:\My Apps\Editor.exe", command.AppPath);
+			Assert.Equal("name", command.TargetKind);
+			Assert.Equal("Development", command.TargetValue);
+		}
+
+		[Theory]
+		[InlineData("app assignment")]
+		[InlineData("app assignment list --path C:\\App.exe")]
+		[InlineData("app assignment remove")]
+		[InlineData("app assignment set --path C:\\App.exe")]
+		[InlineData("app assignment set --path C:\\App.exe --desktop-number 0")]
+		[InlineData("app assignment set --path C:\\App.exe --desktop-number 2 --desktop-name work")]
+		[InlineData("app assignment remove --path C:\\App.exe --all")]
+		public void AssignmentCommandsRejectMissingConflictingAndUnrelatedOptions(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
+		[Theory]
+		[InlineData("app assignment apply")]
+		[InlineData("app assignment apply --dry-run")]
+		[InlineData("app assignment apply --all --path C:\\App.exe")]
+		[InlineData("app assignment apply --all --desktop-number 2")]
+		[InlineData("app assignment list --dry-run")]
+		public void ApplyRequiresAnExplicitScope(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
+		[Fact]
+		public void DryRunUsesTheSameApplyCommandWithAnExplicitFlag()
+		{
+			var command = CliCommand.Parse(new[] { "app", "assignment", "apply", "--all", "--dry-run" });
+			Assert.Equal("app assignment apply", command.Operation);
+			Assert.True(command.All);
+			Assert.True(command.DryRun);
+			Assert.Null(command.AppPath);
+		}
+
 		[Theory]
 		[InlineData("--number", "2", "number")]
 		[InlineData("--name", "開発 作業", "name")]

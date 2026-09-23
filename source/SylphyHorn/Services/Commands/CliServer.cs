@@ -54,6 +54,7 @@ namespace SylphyHorn.Services.Commands
 									throw new ArgumentException("Unsupported request version or arguments.");
 								operation = CliCommand.Recognize(request.Args);
 								var command = CliCommand.Parse(request.Args);
+								if (command.Operation == "app assignment apply") deadline.CancelAfter(TimeSpan.FromSeconds(40));
 								response = await this._execute(command, deadline.Token).ConfigureAwait(false);
 							}
 							catch (ArgumentException ex)

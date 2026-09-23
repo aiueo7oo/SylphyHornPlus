@@ -29,6 +29,7 @@ namespace SylphyHorn
 		private DesktopTransitionRuntime _desktopRuntime;
 #if !NETFRAMEWORK
 		private Services.Commands.CliServer _cliServer;
+		private Services.Commands.CliAssignmentService _cliAssignments;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -130,6 +131,10 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "app assignment apply")
+				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
+			if (command.Operation.StartsWith("app assignment ", StringComparison.Ordinal))
+				return this._cliAssignments.ExecuteAsync(command, cancellation);
 			if (!command.Operation.StartsWith("ui ", StringComparison.Ordinal))
 				return this._desktopRuntime.ExecuteCliAsync(command, cancellation);
 			if (cancellation.IsCancellationRequested)
@@ -223,6 +228,9 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
+					this._cliAssignments = new Services.Commands.CliAssignmentService(Settings.AppPlacement,
+						new Services.AppPlacement.PlacementAppCatalog(), () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
+						() => runtime.CliAvailable);
 					this._cliServer = new Services.Commands.CliServer(
 						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
 						(command, token) => Application.Current.Dispatcher.InvokeAsync(

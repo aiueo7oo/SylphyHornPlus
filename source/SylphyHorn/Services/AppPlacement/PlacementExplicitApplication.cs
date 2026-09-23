@@ -59,6 +59,19 @@ namespace SylphyHorn.Services.AppPlacement
 		internal long ExpiresAt { get; }
 	}
 
+	internal sealed class PlacementRuleApplication
+	{
+		internal PlacementRuleApplication(PlacementPreview preview, PlacementResult[] results)
+		{
+			this.Preview = preview;
+			this.Results = results;
+		}
+
+		internal PlacementPreview Preview { get; }
+
+		internal PlacementResult[] Results { get; }
+	}
+
 	/// <summary>Preview and explicit application on the session's existing serial worker.</summary>
 	internal sealed class PlacementExplicitApplication
 	{
@@ -89,7 +102,7 @@ namespace SylphyHorn.Services.AppPlacement
 			this._wait = wait;
 		}
 
-		internal PlacementPreview Preview(PlacementDesktopMap map, CancellationToken cancellation)
+		internal PlacementPreview Preview(PlacementDesktopMap map, CancellationToken cancellation, PlacementAppIdentity app = null)
 		{
 			this._preview = null;
 			var deadline = this._now() + 5000;
@@ -101,6 +114,7 @@ namespace SylphyHorn.Services.AppPlacement
 				if (!this._current(candidate)) continue;
 				var inspection = this._windows.Inspect(candidate.Window);
 				if (inspection.Identity == null) continue;
+				if (app != null && !app.Equals(inspection.Identity.App)) continue;
 				var rule = this._configuration.FindEnabledRule(inspection.Identity.App);
 				if (rule == null) continue;
 				var location = this._windows.Locate(candidate.Window);
@@ -118,6 +132,25 @@ namespace SylphyHorn.Services.AppPlacement
 			cancellation.ThrowIfCancellationRequested();
 			if (this._now() >= deadline) throw new TimeoutException("Preview exceeded its time limit.");
 			return this._preview = new PlacementPreview(items, this._now() + 60000);
+		}
+
+		internal PlacementRuleApplication ApplyRules(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun,
+			Func<PlacementDestination, long, PlacementAuthorization> authorize, CancellationToken cancellation)
+		{
+			// The serial worker owns both operations. A CLI request must not consume the GUI's reviewed selection.
+			var previous = this._preview;
+			try
+			{
+				var preview = this.Preview(map, cancellation, app);
+				var selected = preview.Items.Where(item => item.CanApply).Select(item => item.Id).ToArray();
+				var results = dryRun || selected.Length == 0 ? Array.Empty<PlacementResult>()
+					: this.Apply(preview, selected, authorize, cancellation);
+				return new PlacementRuleApplication(preview, results);
+			}
+			finally
+			{
+				this._preview = previous;
+			}
 		}
 
 		internal PlacementResult[] Apply(
@@ -155,7 +188,14 @@ namespace SylphyHorn.Services.AppPlacement
 				while (work.Result == null)
 				{
 					processor.Step(work);
-					if (work.Result == null) this._wait((int)Math.Max(0, Math.Min(work.NextAt, batchDeadline) - this._now()), cancellation);
+					if (work.Result == null)
+					{
+						try { this._wait((int)Math.Max(0, Math.Min(work.NextAt, batchDeadline) - this._now()), cancellation); }
+						catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+						{
+							work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : PlacementOutcome.Cancelled);
+						}
+					}
 				}
 				results.Add(work.Result);
 			}

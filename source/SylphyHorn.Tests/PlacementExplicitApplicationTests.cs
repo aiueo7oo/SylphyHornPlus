@@ -10,6 +10,54 @@ namespace SylphyHorn.Tests
 	public sealed class PlacementExplicitApplicationTests
 	{
 		[Fact]
+		public void CancellationDuringReadbackRetainsSubmittedAndNotStartedOutcomes()
+		{
+			using (var cancellation = new CancellationTokenSource())
+			{
+				var f = new Fixture { Count = 2 };
+				f.Windows.ConfirmMove = false;
+				f.Waiting = () =>
+				{
+					cancellation.Cancel();
+					cancellation.Token.ThrowIfCancellationRequested();
+				};
+				var application = f.Engine.ApplyRules(f.Map, null, false, f.Authorize, cancellation.Token);
+				Assert.Equal(PlacementOutcome.Unconfirmed, application.Results[0].Outcome);
+				Assert.Equal(PlacementOutcome.Cancelled, application.Results[1].Outcome);
+				Assert.Equal(1, f.Windows.Moves);
+			}
+		}
+
+		[Fact]
+		public void DryRunDoesNotMoveOrInvalidateTheGuiPreview()
+		{
+			var f = new Fixture();
+			var gui = f.Preview();
+			var query = f.Engine.ApplyRules(f.Map, null, true, f.Authorize, CancellationToken.None);
+			Assert.Single(query.Preview.Items);
+			Assert.Empty(query.Results);
+			Assert.Equal(0, f.Windows.Moves);
+			Assert.Equal(PlacementOutcome.Moved, Assert.Single(f.Apply(gui, TestContext.Current.CancellationToken)).Outcome);
+		}
+
+		[Fact]
+		public void DirectApplyReenumeratesAndFiltersByApplication()
+		{
+			var f = new Fixture();
+			f.Engine.ApplyRules(f.Map, null, true, f.Authorize, CancellationToken.None);
+			f.Count = 2;
+			var other = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\other.exe");
+			Assert.Empty(f.Engine.ApplyRules(f.Map, other, false, f.Authorize, CancellationToken.None).Preview.Items);
+			Assert.Equal(0, f.Windows.Moves);
+			var result = f.Engine.ApplyRules(f.Map, null, false, f.Authorize, CancellationToken.None);
+			Assert.Equal(2, result.Preview.Items.Count);
+			Assert.Equal(2, result.Results.Length);
+			Assert.Equal(PlacementOutcome.Moved, result.Results[0].Outcome);
+			// This fixture shares location across windows, so the first move changes the second candidate's source.
+			Assert.Equal(PlacementOutcome.Changed, result.Results[1].Outcome);
+		}
+
+		[Fact]
 		public void PreviewDoesNotMoveAndOnlyTheSelectedSnapshotCanBeUsedOnce()
 		{
 			var f = new Fixture();
@@ -143,6 +191,7 @@ namespace SylphyHorn.Tests
 			internal long Now = 1000;
 			internal int Count = 1;
 			internal bool Current = true;
+			internal Action Waiting;
 			internal Guid Target = Guid.NewGuid();
 			internal readonly Windows Windows = new Windows();
 			internal readonly PlacementExplicitApplication Engine;
@@ -156,7 +205,11 @@ namespace SylphyHorn.Tests
 					_ => this.Current,
 					_ => "Fixture",
 					() => this.Now,
-					(delay, _) => this.Now += delay);
+					(delay, _) =>
+					{
+						this.Waiting?.Invoke();
+						this.Now += delay;
+					});
 			}
 
 			internal PlacementDesktopMap Map => new PlacementDesktopMap(new[] { new PlacementDesktop(this.Target, "target", true) });

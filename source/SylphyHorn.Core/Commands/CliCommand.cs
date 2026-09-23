@@ -24,6 +24,12 @@ namespace SylphyHorn.Commands
 
 		internal string Scope { get; private set; }
 
+		internal string AppPath { get; private set; }
+
+		internal bool All { get; private set; }
+
+		internal bool DryRun { get; private set; }
+
 		internal bool Wrap { get; private set; }
 
 		internal bool Follow { get; private set; }
@@ -34,6 +40,7 @@ namespace SylphyHorn.Commands
 		{
 			if (args == null || args.Length < 2) return null;
 			var operation = args[0] + " " + args[1];
+			if (operation == "app assignment" && args.Length >= 3) operation += " " + args[2];
 			return IsKnown(operation) ? operation : null;
 		}
 
@@ -41,15 +48,28 @@ namespace SylphyHorn.Commands
 		{
 			if (args == null) throw new ArgumentNullException(nameof(args));
 			if (args.Length < 2) throw new ArgumentException("Specify a command.");
-			var command = new CliCommand { Operation = args[0] + " " + args[1] };
-			if (!IsKnown(command.Operation)) throw new ArgumentException("Unknown command.");
+			var command = new CliCommand { Operation = Recognize(args) };
+			if (command.Operation == null) throw new ArgumentException("Unknown command.");
+			var assignment = command.Operation.StartsWith("app assignment ", StringComparison.Ordinal);
 
 			var options = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = 2; i < args.Length; i++)
+			for (var i = assignment ? 3 : 2; i < args.Length; i++)
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
-				if (option == "--wrap" && (command.Operation == "desktop switch" || command.Operation == "window move"))
+				if (option == "--all" && command.Operation == "app assignment apply") command.All = true;
+				else if (option == "--dry-run" && command.Operation == "app assignment apply") command.DryRun = true;
+				else if (option == "--path" && (command.Operation == "app assignment set" || command.Operation == "app assignment remove"
+					|| command.Operation == "app assignment apply"))
+					command.AppPath = ReadValue(args, ref i);
+				else if (command.Operation == "app assignment set" && (option == "--desktop-name" || option == "--desktop-number"))
+				{
+					var value = ReadValue(args, ref i);
+					if (option == "--desktop-number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
+						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
+					command.SetTarget(option.Substring("--desktop-".Length), value);
+				}
+				else if (option == "--wrap" && (command.Operation == "desktop switch" || command.Operation == "window move"))
 					command.Wrap = true;
 				else if (option == "--switch" && command.Operation == "desktop create") command.SwitchAfterCreate = true;
 				else if (option == "--follow" && command.Operation == "window move") command.Follow = true;
@@ -134,6 +154,12 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
 				throw new ArgumentException("--wrap requires a next or previous destination.");
+			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && command.AppPath == null)
+				throw new ArgumentException("Specify --path with an absolute executable path.");
+			if (command.Operation == "app assignment apply" && command.All == (command.AppPath != null))
+				throw new ArgumentException("Specify exactly one of --path or --all.");
+			if (command.Operation == "app assignment set" && command.TargetKind == null)
+				throw new ArgumentException("Specify exactly one of --desktop-name or --desktop-number.");
 			return command;
 		}
 
@@ -143,7 +169,8 @@ namespace SylphyHorn.Commands
 				|| operation == "desktop wallpaper" || operation == "window list"
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin"
 				|| operation == "ui task-view" || operation == "ui window-switch" || operation == "ui settings"
-				|| operation == "ui notification-toggle";
+				|| operation == "ui notification-toggle" || operation == "app assignment list"
+				|| operation == "app assignment set" || operation == "app assignment remove" || operation == "app assignment apply";
 
 		private void SetTarget(string kind, string value)
 		{

@@ -11,6 +11,24 @@ namespace SylphyHorn.Tests
 	public sealed class CliProtocolTests
 	{
 		[Fact]
+		public void PartialAssignmentResultsKeepConfirmedMovesInsideTheErrorEnvelope()
+		{
+			var response = CliResponse.Fail("app assignment apply", "result_unconfirmed", "Inspect results.");
+			response.Error.Results = new[]
+			{
+				new CliAssignmentResult { WindowId = "first", Outcome = "moved" },
+				new CliAssignmentResult { WindowId = "second", Outcome = "unconfirmed" },
+			};
+			var roundTrip = CliProtocol.Deserialize<CliResponse>(CliProtocol.Serialize(response));
+			Assert.False(roundTrip.Success);
+			Assert.Null(roundTrip.Data);
+			Assert.Equal(5, roundTrip.ExitCode);
+			Assert.Equal("moved", roundTrip.Error.Results[0].Outcome);
+			Assert.Equal("second", roundTrip.Error.Results[1].WindowId);
+			Assert.False(roundTrip.Error.Retryable);
+		}
+
+		[Fact]
 		public void SuccessIncludesCommandAndFalseChangedWithoutError()
 		{
 			var json = Encoding.UTF8.GetString(CliProtocol.Serialize(CliResponse.Ok("desktop switch", new CliData { Changed = false })));

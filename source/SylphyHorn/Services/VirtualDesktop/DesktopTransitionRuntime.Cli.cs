@@ -272,7 +272,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 		}
 
-		private bool CliAvailable => this._initialized && !this._shutdownStarted && !this._stopping && !this._publishing
+		internal bool CliAvailable => this._initialized && !this._shutdownStarted && !this._stopping && !this._publishing
 			&& this._preparedRuntime == null && this._activeImportSession == null && !this._placementSuspended
 			&& (this._activeImportCommit == null || this._activeImportCommit.IsCompleted)
 			&& !this._deferredDrainScheduled && this._deferredCommands.Count == 0;

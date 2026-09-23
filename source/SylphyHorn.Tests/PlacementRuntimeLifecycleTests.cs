@@ -532,6 +532,9 @@ namespace SylphyHorn.Tests
 			internal PlacementDesktopMap PreviewMap;
 			internal PlacementPreview AppliedPreview;
 
+			public Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation)
+				=> throw new NotSupportedException();
+
 			public Task<PlacementPreview> PreviewAsync(PlacementDesktopMap map, CancellationToken cancellation)
 			{
 				this.PreviewMap = map;

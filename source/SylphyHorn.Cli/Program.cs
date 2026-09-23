@@ -34,6 +34,10 @@ namespace SylphyHorn.Cli
 				Console.WriteLine("sylphyhorn-cli ui window-switch");
 				Console.WriteLine("sylphyhorn-cli ui settings");
 				Console.WriteLine("sylphyhorn-cli ui notification-toggle");
+				Console.WriteLine("sylphyhorn-cli app assignment list");
+				Console.WriteLine("sylphyhorn-cli app assignment set --path PATH (--desktop-name NAME | --desktop-number N)");
+				Console.WriteLine("sylphyhorn-cli app assignment remove --path PATH");
+				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --all) [--dry-run]");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
 				return 0;
 			}
@@ -52,7 +56,7 @@ namespace SylphyHorn.Cli
 			var company = assembly.GetCustomAttribute<AssemblyCompanyAttribute>().Company;
 			var product = assembly.GetCustomAttribute<AssemblyProductAttribute>().Product;
 			using (var pipe = new NamedPipeClientStream(".", CliProtocol.PipeName(company, product), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
-			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15)))
+			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(operation == "app assignment apply" ? 45 : 15)))
 			{
 				var submitted = false;
 				try

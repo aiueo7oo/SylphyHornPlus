@@ -21,6 +21,8 @@ namespace SylphyHorn.Services.AppPlacement
 		Task<PlacementPreview> PreviewAsync(PlacementDesktopMap map, CancellationToken cancellation);
 
 		Task<PlacementResult[]> ApplyAsync(PlacementPreview preview, Guid[] selection, CancellationToken cancellation);
+
+		Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation);
 	}
 
 	internal interface IPlacementSessionFactory
@@ -123,6 +125,15 @@ namespace SylphyHorn.Services.AppPlacement
 				},
 				cancellation);
 		}
+
+		public Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation)
+			=> this.Submit(token =>
+			{
+				var application = this._explicit.ApplyRules(map, app, dryRun,
+					(destination, deadline) => this.Authorize(destination, deadline, token, false), token);
+				foreach (var result in application.Results) this._history.Add(result);
+				return application;
+			}, cancellation);
 
 		private Task<T> Submit<T>(Func<CancellationToken, T> action, CancellationToken cancellation)
 		{

@@ -51,6 +51,9 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliError
 	{
+		[DataMember(Name = "results", Order = 3, EmitDefaultValue = false)]
+		public CliAssignmentResult[] Results;
+
 		[DataMember(Name = "code", Order = 0)]
 		public string Code;
 
@@ -64,6 +67,18 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "results", EmitDefaultValue = false)]
+		public CliAssignmentResult[] Results;
+
+		[DataMember(Name = "dryRun", EmitDefaultValue = false)]
+		public bool? DryRun;
+
+		[DataMember(Name = "assignmentEnabled", EmitDefaultValue = false)]
+		public bool? AssignmentEnabled;
+
+		[DataMember(Name = "assignments", EmitDefaultValue = false)]
+		public CliAssignment[] Assignments;
+
 		[DataMember(Name = "changed", EmitDefaultValue = false)]
 		public bool? Changed;
 
@@ -84,6 +99,59 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliAssignment
+	{
+		[DataMember(Name = "id")]
+		public string Id;
+
+		[DataMember(Name = "enabled")]
+		public bool Enabled;
+
+		[DataMember(Name = "appKind")]
+		public string AppKind;
+
+		[DataMember(Name = "appIdentity")]
+		public string AppIdentity;
+
+		[DataMember(Name = "executablePath")]
+		public string ExecutablePath;
+
+		[DataMember(Name = "displayName")]
+		public string DisplayName;
+
+		[DataMember(Name = "desktopName", EmitDefaultValue = false)]
+		public string DesktopName;
+
+		[DataMember(Name = "desktopNumber", EmitDefaultValue = false)]
+		public int? DesktopNumber;
+	}
+
+	[DataContract]
+	internal sealed class CliAssignmentResult
+	{
+		[DataMember(Name = "windowId")]
+		public string WindowId;
+
+		[DataMember(Name = "ruleId")]
+		public string RuleId;
+
+		[DataMember(Name = "title")]
+		public string Title;
+
+		[DataMember(Name = "sourceDesktopId")]
+		public string SourceDesktopId;
+
+		[DataMember(Name = "targetDesktopId")]
+		public string TargetDesktopId;
+
+		[DataMember(Name = "canApply")]
+		public bool CanApply;
+
+		[DataMember(Name = "outcome")]
+		public string Outcome;
 	}
 
 	[DataContract]
