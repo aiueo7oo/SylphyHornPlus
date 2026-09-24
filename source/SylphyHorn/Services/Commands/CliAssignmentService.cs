@@ -38,6 +38,23 @@ namespace SylphyHorn.Services.Commands
 				if (command.Operation == "app assignment status")
 					return CliResponse.Ok(command.Operation, this.Describe(this._settings.Configuration.Value, false));
 				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				if (command.Operation == "app list")
+				{
+					var apps = await this._catalog.ReadAsync(command.Source == "windows", cancellation, false).WaitAsync(cancellation);
+					return CliResponse.Ok(command.Operation, new CliData
+					{
+						Source = command.Source,
+						Apps = apps.Select(app => new CliApp
+						{
+							DisplayName = app.Name,
+							ExecutablePath = app.Path,
+							AppKind = app.Identity == null ? null : app.Identity.Kind == PlacementAppKind.ExecutablePath ? "executablePath" : "packageAppId",
+							AppIdentity = app.Identity?.Value,
+							CanAssign = app.Identity != null,
+							Reason = app.Identity != null ? null : app.Problem == "LauncherOnly" ? "launcher_only" : "identity_unavailable",
+						}).ToArray(),
+					});
+				}
 				var current = this._settings.Configuration.Value;
 				if (command.Operation == "app assignment list") return CliResponse.Ok(command.Operation, this.Describe(current));
 				if (command.Operation == "desktop autoclose list") return CliResponse.Ok(command.Operation, this.Describe(current, false));
@@ -94,8 +111,15 @@ namespace SylphyHorn.Services.Commands
 					}
 					else
 					{
-						identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath);
-						if (command.Operation == "app assignment set")
+						identity = command.AppId == null ? new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath)
+							: new PlacementAppIdentity(PlacementAppKind.PackageAppId, command.AppId);
+						if (command.AppId != null)
+						{
+							var apps = await this._catalog.ReadAsync(false, cancellation, false).WaitAsync(cancellation);
+							choice = apps.FirstOrDefault(app => identity.Equals(app.Identity));
+							if (choice == null) return CliResponse.Fail(command.Operation, "app_unavailable", "The registered package application could not be identified.");
+						}
+						else if (command.Operation == "app assignment set")
 						{
 							choice = await this._catalog.ReadExecutableAsync(identity.Value, cancellation).WaitAsync(cancellation);
 							if (choice?.Identity == null)
@@ -153,7 +177,7 @@ namespace SylphyHorn.Services.Commands
 			}
 			catch (System.Runtime.Serialization.SerializationException) when (!published)
 			{
-				return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a valid absolute executable path.");
+				return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a valid absolute executable path or package app ID.");
 			}
 			catch (Exception)
 			{

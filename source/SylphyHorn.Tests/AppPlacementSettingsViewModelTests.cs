@@ -385,6 +385,8 @@ namespace SylphyHorn.Tests
 	{
 		internal Task<IReadOnlyList<PlacementAppChoice>> Pending;
 		internal Task<PlacementAppChoice> ExecutablePending;
+		internal bool? IncludeIcons;
+		internal bool? Windows;
 
 		internal static PlacementAppChoice Choice(string path, bool confirm = false) => new PlacementAppChoice(
 			Path.GetFileNameWithoutExtension(path),
@@ -393,7 +395,12 @@ namespace SylphyHorn.Tests
 			new PlacementAppIdentity(PlacementAppKind.ExecutablePath, path),
 			confirmPath: confirm);
 
-		public Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation) => this.Pending ?? Task.FromResult<IReadOnlyList<PlacementAppChoice>>(Array.Empty<PlacementAppChoice>());
+		public Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation, bool includeIcons = true)
+		{
+			this.Windows = windows;
+			this.IncludeIcons = includeIcons;
+			return this.Pending ?? Task.FromResult<IReadOnlyList<PlacementAppChoice>>(Array.Empty<PlacementAppChoice>());
+		}
 
 		public Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation) => this.ExecutablePending ?? Task.FromResult(Choice(path));
 

@@ -37,13 +37,14 @@ namespace SylphyHorn.Cli
 				Console.WriteLine("sylphyhorn-cli ui window-switch");
 				Console.WriteLine("sylphyhorn-cli ui settings");
 				Console.WriteLine("sylphyhorn-cli ui notification-toggle");
+				Console.WriteLine("sylphyhorn-cli app list [--source (registered | windows)]");
 				Console.WriteLine("sylphyhorn-cli app assignment list");
 				Console.WriteLine("sylphyhorn-cli app assignment status");
 				Console.WriteLine("sylphyhorn-cli app assignment configure [--enabled true|false] " +
 					"[--create-missing-desktops true|false] [--close-created-desktops true|false]");
 				Console.WriteLine("sylphyhorn-cli app assignment enable --id RULE_ID");
 				Console.WriteLine("sylphyhorn-cli app assignment disable --id RULE_ID");
-				Console.WriteLine("sylphyhorn-cli app assignment set (--path PATH | --id RULE_ID) (--desktop-name NAME | --desktop-number N)");
+				Console.WriteLine("sylphyhorn-cli app assignment set (--path PATH | --app-id APP_ID | --id RULE_ID) (--desktop-name NAME | --desktop-number N)");
 				Console.WriteLine("sylphyhorn-cli app assignment remove (--path PATH | --id RULE_ID)");
 				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --id RULE_ID | --all) [--dry-run]");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");

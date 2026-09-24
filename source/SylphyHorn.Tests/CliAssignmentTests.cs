@@ -15,6 +15,87 @@ namespace SylphyHorn.Tests
 	[Collection(PlacementUiCollection.Name)]
 	public sealed class CliAssignmentTests
 	{
+		[Theory]
+		[InlineData("registered", false)]
+		[InlineData("windows", true)]
+		public async Task AppListReturnsIdentitiesAndUnavailableCandidatesWithoutSaving(string source, bool windows)
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var original = f.Settings.Configuration.Value;
+				var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				f.Catalog.Pending = Task.FromResult<System.Collections.Generic.IReadOnlyList<PlacementAppChoice>>(new[]
+				{
+					new PlacementAppChoice("Example", "", @"C:\Package\App.exe", app),
+					PlacementUiCatalog.Choice(@"C:\Apps\Editor.exe"),
+					new PlacementAppChoice("Launcher", "", null, null, problem: "LauncherOnly"),
+				});
+				var service = new CliAssignmentService(f.Settings, f.Catalog,
+					() => throw new InvalidOperationException("Listing must not save."), () => true, () => "Disabled");
+				var result = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "list", "--source", source }), CancellationToken.None);
+				Assert.True(result.Success);
+				Assert.Equal(source, result.Data.Source);
+				Assert.Equal(3, result.Data.Apps.Length);
+				Assert.Equal(app.Value, result.Data.Apps[0].AppIdentity);
+				Assert.Equal("packageAppId", result.Data.Apps[0].AppKind);
+				Assert.True(result.Data.Apps[0].CanAssign);
+				Assert.Equal("executablePath", result.Data.Apps[1].AppKind);
+				Assert.False(result.Data.Apps[2].CanAssign);
+				Assert.Equal("launcher_only", result.Data.Apps[2].Reason);
+				Assert.Equal(windows, f.Catalog.Windows);
+				Assert.False(f.Catalog.IncludeIcons);
+				Assert.Same(original, f.Settings.Configuration.Value);
+			}
+		}
+
+		[Fact]
+		public async Task PackageRegistrationRevalidatesCatalogAndPreservesExistingRuleState()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				var choice = new PlacementAppChoice("Example", "", @"C:\Package\App.exe", app);
+				f.Catalog.Pending = Task.FromResult<System.Collections.Generic.IReadOnlyList<PlacementAppChoice>>(new[] { choice });
+				var service = Service(f);
+				var command = CliCommand.Parse(new[] { "app", "assignment", "set", "--app-id", app.Value, "--desktop-name", "work" });
+				Assert.True((await service.ExecuteAsync(command, CancellationToken.None)).Success);
+				var rule = Assert.Single(f.Settings.Configuration.Value.Rules);
+				Assert.Equal(app, rule.App);
+				Assert.Equal("Example", rule.DisplayName);
+				Assert.False(f.Catalog.IncludeIcons);
+				Assert.False(f.Catalog.Windows);
+				Assert.False((await service.ExecuteAsync(command, CancellationToken.None)).Data.Changed);
+				await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "disable", "--id", rule.Id.ToString() }), CancellationToken.None);
+				command = CliCommand.Parse(new[] { "app", "assignment", "set", "--app-id", app.Value, "--desktop-number", "3" });
+				Assert.True((await service.ExecuteAsync(command, CancellationToken.None)).Success);
+				var updated = Assert.Single(f.Settings.Configuration.Value.Rules);
+				Assert.Equal(rule.Id, updated.Id);
+				Assert.False(updated.Enabled);
+				Assert.Equal(3, updated.Destination.Number);
+				f.Catalog.Pending = Task.FromResult<System.Collections.Generic.IReadOnlyList<PlacementAppChoice>>(Array.Empty<PlacementAppChoice>());
+				Assert.Equal("app_unavailable", (await service.ExecuteAsync(command, CancellationToken.None)).Error.Code);
+				Assert.Same(updated, Assert.Single(f.Settings.Configuration.Value.Rules));
+			}
+		}
+
+		[Fact]
+		public async Task SettingsChangesDuringPackageLookupAreNotOverwritten()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var pending = new TaskCompletionSource<System.Collections.Generic.IReadOnlyList<PlacementAppChoice>>();
+				f.Catalog.Pending = pending.Task;
+				var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				var command = CliCommand.Parse(new[] { "app", "assignment", "set", "--app-id", app.Value, "--desktop-number", "2" });
+				var task = Service(f).ExecuteAsync(command, CancellationToken.None);
+				f.Model.CreateMissingDesktops = true;
+				pending.SetResult(new[] { new PlacementAppChoice("Example", "", null, app) });
+				Assert.Equal("state_changed", (await task).Error.Code);
+				Assert.Empty(f.Settings.Configuration.Value.Rules);
+				Assert.True(f.Settings.Configuration.Value.CreateMissingDesktops);
+			}
+		}
+
 		[Fact]
 		public async Task AutocloseEditsPreserveRulesAndFlagsAndKeepNamesSeparateFromNumbers()
 		{

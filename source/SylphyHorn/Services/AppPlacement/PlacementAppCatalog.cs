@@ -53,7 +53,7 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal interface IPlacementAppCatalog
 	{
-		Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation);
+		Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation, bool includeIcons = true);
 
 		Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation);
 
@@ -65,8 +65,8 @@ namespace SylphyHorn.Services.AppPlacement
 		// Only explicit user queries enumerate applications/windows. One Shell operation at a time, including across reopened settings.
 		private static readonly SemaphoreSlim Gate = new SemaphoreSlim(1);
 
-		public Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation)
-			=> OnSta<IReadOnlyList<PlacementAppChoice>>(token => windows ? ReadWindows(token) : ReadInstalled(token), cancellation);
+		public Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation, bool includeIcons = true)
+			=> OnSta<IReadOnlyList<PlacementAppChoice>>(token => windows ? ReadWindows(token, includeIcons) : ReadInstalled(token, includeIcons), cancellation);
 
 		public Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation)
 			=> OnSta(token => Executable(path), cancellation);
@@ -134,7 +134,7 @@ namespace SylphyHorn.Services.AppPlacement
 				Icon(path));
 		}
 
-		private static IReadOnlyList<PlacementAppChoice> ReadWindows(CancellationToken cancellation)
+		private static IReadOnlyList<PlacementAppChoice> ReadWindows(CancellationToken cancellation, bool includeIcons)
 		{
 			var handles = new List<IntPtr>();
 			var ok = EnumWindows(
@@ -167,13 +167,13 @@ namespace SylphyHorn.Services.AppPlacement
 					title.ToString(),
 					path,
 					identity?.App,
-					path == null ? null : Icon(path),
+					!includeIcons || path == null ? null : Icon(path),
 					problem: identity == null ? "IdentityUnavailable" : null));
 			}
 			return choices.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
 		}
 
-		private static IReadOnlyList<PlacementAppChoice> ReadInstalled(CancellationToken cancellation)
+		private static IReadOnlyList<PlacementAppChoice> ReadInstalled(CancellationToken cancellation, bool includeIcons)
 		{
 			object shell = null, folder = null, items = null;
 			try
@@ -227,7 +227,7 @@ namespace SylphyHorn.Services.AppPlacement
 							identity?.Kind == PlacementAppKind.PackageAppId ? id : target ?? path,
 							target,
 							identity,
-							Icon("shell:AppsFolder\\" + (id ?? path)),
+							includeIcons ? Icon("shell:AppsFolder\\" + (id ?? path)) : null,
 							confirm,
 							problem));
 					}

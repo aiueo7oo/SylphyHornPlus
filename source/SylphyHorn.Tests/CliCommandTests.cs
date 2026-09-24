@@ -6,6 +6,25 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Fact]
+		public void AppCatalogDefaultsToRegisteredAndAcceptsWindows()
+		{
+			Assert.Equal("registered", CliCommand.Parse(new[] { "app", "list" }).Source);
+			Assert.Equal("windows", CliCommand.Parse(new[] { "app", "list", "--source", "windows" }).Source);
+			var command = CliCommand.Parse(new[] { "app", "assignment", "set", "--app-id", "Example_abc!App", "--desktop-number", "2" });
+			Assert.Equal("Example_abc!App", command.AppId);
+		}
+
+		[Theory]
+		[InlineData("app list --source all")]
+		[InlineData("app list --source")]
+		[InlineData("app list --source windows --source registered")]
+		[InlineData("app assignment remove --app-id Example_abc!App")]
+		[InlineData("app assignment set --app-id Example_abc!App --path C:\\App.exe --desktop-number 2")]
+		[InlineData("app assignment set --app-id Example_abc!App --id aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa --desktop-number 2")]
+		public void AppCatalogRejectsInvalidOrConflictingSelectors(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
 		[Theory]
 		[InlineData("add", "--name", "Development", "name")]
 		[InlineData("remove", "--number", "12", "number")]

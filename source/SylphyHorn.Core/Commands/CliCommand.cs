@@ -26,6 +26,10 @@ namespace SylphyHorn.Commands
 
 		internal string AppPath { get; private set; }
 
+		internal string AppId { get; private set; }
+
+		internal string Source { get; private set; } = "registered";
+
 		internal string RuleId { get; private set; }
 
 		internal bool? AssignmentEnabled { get; private set; }
@@ -81,6 +85,14 @@ namespace SylphyHorn.Commands
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
 				}
+				else if (option == "--source" && command.Operation == "app list")
+				{
+					command.Source = ReadValue(args, ref i);
+					if (command.Source != "registered" && command.Source != "windows")
+						throw new ArgumentException("--source must be registered or windows.");
+				}
+				else if (option == "--app-id" && command.Operation == "app assignment set")
+					command.AppId = ReadValue(args, ref i);
 				else if (option == "--all" && command.Operation == "app assignment apply") command.All = true;
 				else if (option == "--dry-run" && command.Operation == "app assignment apply") command.DryRun = true;
 				else if (option == "--path" && (command.Operation == "app assignment set" || command.Operation == "app assignment remove"
@@ -181,9 +193,10 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
 				throw new ArgumentException("--wrap requires a next or previous destination.");
-			var assignmentSelectors = (command.AppPath != null ? 1 : 0) + (command.RuleId != null ? 1 : 0) + (command.All ? 1 : 0);
+			var assignmentSelectors = (command.AppPath != null ? 1 : 0) + (command.RuleId != null ? 1 : 0) + (command.All ? 1 : 0) + (command.AppId != null ? 1 : 0);
 			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && assignmentSelectors != 1)
-				throw new ArgumentException("Specify exactly one of --path or --id.");
+				throw new ArgumentException(command.Operation == "app assignment set"
+					? "Specify exactly one of --path, --app-id or --id." : "Specify exactly one of --path or --id.");
 			if (command.Operation == "app assignment apply" && assignmentSelectors != 1)
 				throw new ArgumentException("Specify exactly one of --path, --id or --all.");
 			if ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove") && command.TargetKind == null)
@@ -199,7 +212,7 @@ namespace SylphyHorn.Commands
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
+			=> operation == "app list" || operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
 				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
 				|| operation == "desktop wallpaper" || operation == "window list"
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin"

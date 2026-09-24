@@ -67,6 +67,12 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "apps", EmitDefaultValue = false)]
+		public CliApp[] Apps;
+
+		[DataMember(Name = "source", EmitDefaultValue = false)]
+		public string Source;
+
 		[DataMember(Name = "assignmentStatus", EmitDefaultValue = false)]
 		public string AssignmentStatus;
 
@@ -111,6 +117,28 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliApp
+	{
+		[DataMember(Name = "displayName")]
+		public string DisplayName;
+
+		[DataMember(Name = "executablePath")]
+		public string ExecutablePath;
+
+		[DataMember(Name = "appKind")]
+		public string AppKind;
+
+		[DataMember(Name = "appIdentity")]
+		public string AppIdentity;
+
+		[DataMember(Name = "canAssign")]
+		public bool CanAssign;
+
+		[DataMember(Name = "reason")]
+		public string Reason;
 	}
 
 	[DataContract]
