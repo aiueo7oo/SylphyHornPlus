@@ -232,6 +232,7 @@ namespace SylphyHorn
 			taskDefinition.Principal.LogonType = TaskLogonType.InteractiveToken;
 			taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;
 			taskDefinition.Settings.DisallowStartIfOnBatteries = false;
+			taskDefinition.Settings.StopIfGoingOnBatteries = false;
 			taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
 			taskDefinition.Settings.Compatibility = TaskCompatibility.V2;
 			taskDefinition.Settings.Hidden = false;
