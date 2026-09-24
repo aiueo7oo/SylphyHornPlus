@@ -30,6 +30,7 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 		private Services.Commands.CliServer _cliServer;
 		private Services.Commands.CliAssignmentService _cliAssignments;
+		private Services.Commands.CliSettingsService _cliSettings;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -131,6 +132,8 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (Services.Commands.CliSettingsService.Handles(command.Operation))
+				return this._cliSettings.ExecuteAsync(command, cancellation);
 			if (command.Operation == "app assignment apply")
 				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
 			if (command.Operation == "app list" || command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)
@@ -221,6 +224,11 @@ namespace SylphyHorn
 				WallpaperService.Instance.BindDesktopRuntime(runtime);
 				SettingsService.StretchShortcutListsTo(runtime.State.Order.Count);
 				this.RegisterActions();
+				SettingsService.BindGeneralSettings(Settings.General, () => this._hookService.Reload(), alwaysShow =>
+				{
+					if (alwaysShow) NotificationService.Instance.ShowCurrentDesktop();
+					else NotificationService.Instance.HideCurrentDesktop();
+				}, () => this._taskTrayIcon.Reload()).AddTo(this._disposable);
 				Settings.AppPlacement.Configuration.Subscribe(configuration =>
 				{
 					_ = runtime.ConfigurePlacementAsync(configuration);
@@ -229,6 +237,9 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
+					this._cliSettings = new Services.Commands.CliSettingsService(Settings.General,
+						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable,
+						ResourceService.Current.StartupCulture);
 					this._cliAssignments = new Services.Commands.CliAssignmentService(Settings.AppPlacement,
 						new Services.AppPlacement.PlacementAppCatalog(), () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
 						() => runtime.CliAvailable, () => runtime.PlacementStatus);

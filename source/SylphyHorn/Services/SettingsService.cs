@@ -11,6 +11,29 @@ namespace SylphyHorn.Services
 		internal const string DesktopNamesKey = "GeneralSettings.DesktopNames";
 		internal const string DesktopWallpaperPathsKey = "GeneralSettings.DesktopBackgroundImagePaths";
 		internal const string DesktopPositionsKey = "GeneralSettings.DesktopBackgroundPositions";
+
+		internal static IDisposable BindGeneralSettings(GeneralSettings settings, Action reloadInput, Action<bool> showNotification, Action reloadTray)
+		{
+			var subscriptions = new SylphyHorn.Lifetime.DisposableCollection();
+			subscriptions.Add(ObserveChange(settings.LoopDesktop, _ => reloadInput()));
+			subscriptions.Add(ObserveChange(settings.OverrideWindowsDefaultKeyCombination, _ => reloadInput()));
+			subscriptions.Add(ObserveChange(settings.AlwaysShowDesktopNotification, showNotification));
+			subscriptions.Add(ObserveChange(settings.TrayShowDesktop, _ => reloadTray()));
+			subscriptions.Add(ObserveChange(settings.TrayShowOnlyCurrentNumber, _ => reloadTray()));
+			return subscriptions;
+		}
+
+		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action<T> changed)
+		{
+			var previous = property.Value;
+			return property.Subscribe(value =>
+			{
+				if (EqualityComparer<T>.Default.Equals(previous, value)) return;
+				previous = value;
+				changed(value);
+			});
+		}
+
 		internal static DesktopStartupSeed CaptureDesktopStartupSeed()
 		{
 			var general = Settings.General;

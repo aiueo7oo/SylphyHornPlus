@@ -16,6 +16,14 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
+				Console.WriteLine("sylphyhorn-cli desktop settings");
+				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false]");
+				Console.WriteLine("sylphyhorn-cli notification settings");
+				Console.WriteLine("sylphyhorn-cli notification configure [--on-switch true|false] [--always-show true|false] [--duration-ms N]");
+				Console.WriteLine("sylphyhorn-cli tray settings");
+				Console.WriteLine("sylphyhorn-cli tray configure [--show-desktop true|false] [--current-number-only true|false]");
+				Console.WriteLine("sylphyhorn-cli settings get");
+				Console.WriteLine("sylphyhorn-cli settings configure --language (auto | en | ja)");
 				Console.WriteLine("sylphyhorn-cli desktop list");
 				Console.WriteLine("sylphyhorn-cli desktop autoclose list");
 				Console.WriteLine("sylphyhorn-cli desktop autoclose add (--name NAME | --number N)");

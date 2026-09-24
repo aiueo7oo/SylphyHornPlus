@@ -6,6 +6,22 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Theory]
+		[InlineData("desktop configure")]
+		[InlineData("notification configure")]
+		[InlineData("tray configure")]
+		[InlineData("settings configure")]
+		[InlineData("desktop configure --loop yes")]
+		[InlineData("desktop configure --loop true --duration-ms 10")]
+		[InlineData("desktop settings --loop true")]
+		[InlineData("notification configure --on-switch false --duration-ms 0")]
+		[InlineData("notification configure --duration-ms 2147483648")]
+		[InlineData("notification configure --duration-ms -1")]
+		[InlineData("settings configure --language fr")]
+		[InlineData("tray configure --show-desktop true --show-desktop false")]
+		public void GeneralSettingsRejectInvalidValuesBeforeExecution(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
 		[Fact]
 		public void AppCatalogDefaultsToRegisteredAndAcceptsWindows()
 		{

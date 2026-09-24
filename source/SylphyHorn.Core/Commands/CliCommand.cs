@@ -6,6 +6,22 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal bool? Loop { get; private set; }
+
+		internal bool? OverrideWindowsShortcuts { get; private set; }
+
+		internal bool? OnSwitch { get; private set; }
+
+		internal bool? AlwaysShow { get; private set; }
+
+		internal int? DurationMs { get; private set; }
+
+		internal bool? ShowDesktop { get; private set; }
+
+		internal bool? CurrentNumberOnly { get; private set; }
+
+		internal string Language { get; private set; }
+
 		internal string Operation { get; private set; }
 
 		internal string TargetKind { get; private set; }
@@ -84,6 +100,30 @@ namespace SylphyHorn.Commands
 				{
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
+				}
+				else if (command.Operation == "desktop configure" && option == "--loop")
+					command.Loop = ReadBoolean(args, ref i);
+				else if (command.Operation == "desktop configure" && option == "--override-windows-shortcuts")
+					command.OverrideWindowsShortcuts = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--on-switch")
+					command.OnSwitch = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--always-show")
+					command.AlwaysShow = ReadBoolean(args, ref i);
+				else if (command.Operation == "tray configure" && option == "--show-desktop")
+					command.ShowDesktop = ReadBoolean(args, ref i);
+				else if (command.Operation == "tray configure" && option == "--current-number-only")
+					command.CurrentNumberOnly = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--duration-ms")
+				{
+					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var duration) || duration < 1)
+						throw new ArgumentException("--duration-ms requires a positive integer in milliseconds.");
+					command.DurationMs = duration;
+				}
+				else if (command.Operation == "settings configure" && option == "--language")
+				{
+					command.Language = ReadValue(args, ref i);
+					if (command.Language != "auto" && command.Language != "en" && command.Language != "ja")
+						throw new ArgumentException("--language must be auto, en or ja.");
 				}
 				else if (option == "--source" && command.Operation == "app list")
 				{
@@ -208,11 +248,20 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify at least one assignment setting.");
 			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
 				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
+			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null)
+				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null && command.DurationMs == null)
+				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)
+				|| (command.Operation == "settings configure" && command.Language == null))
+				throw new ArgumentException("Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.");
 			return command;
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "app list" || operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
+			=> operation == "desktop settings" || operation == "desktop configure"
+				|| operation == "notification settings" || operation == "notification configure"
+				|| operation == "tray settings" || operation == "tray configure"
+				|| operation == "settings get" || operation == "settings configure" || operation == "app list"
+				|| operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
 				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
 				|| operation == "desktop wallpaper" || operation == "window list"
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin"
@@ -228,6 +277,13 @@ namespace SylphyHorn.Commands
 			if (this.TargetKind != null) throw new ArgumentException("Destination options are mutually exclusive.");
 			this.TargetKind = kind;
 			this.TargetValue = value;
+		}
+
+		private static bool ReadBoolean(string[] args, ref int index)
+		{
+			var value = ReadValue(args, ref index);
+			if (value != "true" && value != "false") throw new ArgumentException("Boolean settings require true or false.");
+			return value == "true";
 		}
 
 		private static string ReadValue(string[] args, ref int index)

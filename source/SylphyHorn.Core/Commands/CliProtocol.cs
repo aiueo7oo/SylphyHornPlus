@@ -67,6 +67,33 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "loop", EmitDefaultValue = false)]
+		public bool? Loop;
+
+		[DataMember(Name = "overrideWindowsShortcuts", EmitDefaultValue = false)]
+		public bool? OverrideWindowsShortcuts;
+
+		[DataMember(Name = "onSwitch", EmitDefaultValue = false)]
+		public bool? OnSwitch;
+
+		[DataMember(Name = "alwaysShow", EmitDefaultValue = false)]
+		public bool? AlwaysShow;
+
+		[DataMember(Name = "durationMs", EmitDefaultValue = false)]
+		public int? DurationMs;
+
+		[DataMember(Name = "showDesktop", EmitDefaultValue = false)]
+		public bool? ShowDesktop;
+
+		[DataMember(Name = "currentNumberOnly", EmitDefaultValue = false)]
+		public bool? CurrentNumberOnly;
+
+		[DataMember(Name = "language", EmitDefaultValue = false)]
+		public string Language;
+
+		[DataMember(Name = "restartRequired", EmitDefaultValue = false)]
+		public bool? RestartRequired;
+
 		[DataMember(Name = "apps", EmitDefaultValue = false)]
 		public CliApp[] Apps;
 

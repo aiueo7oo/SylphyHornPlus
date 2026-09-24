@@ -35,6 +35,10 @@ namespace SylphyHorn.Services
 		/// </summary>
 		public IReadOnlyCollection<CultureInfo> SupportedCultures { get; }
 
+		internal string StartupCulture { get; private set; }
+
+		internal void CaptureStartupCulture() => this.StartupCulture = Settings.General.Culture.Value;
+
 		private ResourceService()
 		{
 			this.Resources = new Resources();

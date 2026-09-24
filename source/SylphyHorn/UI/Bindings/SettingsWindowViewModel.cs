@@ -27,8 +27,6 @@ namespace SylphyHorn.UI.Bindings
 {
 	public class SettingsWindowViewModel : ObservableObject, IDisposableHolder, IDisposable
 	{
-		private static bool _restartRequired;
-		private static readonly string _defaultCulture = Settings.General.Culture;
 		private static string _exportOrImportFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
 		private readonly HookService _hookService;
@@ -61,7 +59,7 @@ namespace SylphyHorn.UI.Bindings
 
 		public IReadOnlyCollection<LicenseViewModel> Licenses { get; }
 
-		public bool RestartRequired => _restartRequired;
+		public bool RestartRequired => Settings.General.Culture.Value != ResourceService.Current.StartupCulture;
 
 		public bool IsWindows10OrEarlier => !ProductInfo.IsWallpaperSupportBuild;
 
@@ -162,7 +160,6 @@ namespace SylphyHorn.UI.Bindings
 				if (Settings.General.Culture != value)
 				{
 					Settings.General.Culture.Value = value;
-					_restartRequired = value != _defaultCulture;
 
 					this.OnPropertyChanged();
 					this.OnPropertyChanged(nameof(this.RestartRequired));
@@ -913,26 +910,11 @@ namespace SylphyHorn.UI.Bindings
 				this.Logs);
 			logProjection.AddTo(this);
 
-			Settings.General.AlwaysShowDesktopNotification
-				.Subscribe(alwaysShow =>
-				{
-					if (alwaysShow)
-					{
-						NotificationService.Instance.ShowCurrentDesktop();
-					}
-					else
-					{
-						NotificationService.Instance.HideCurrentDesktop();
-					}
-				})
-				.AddTo(this);
-
-			Settings.General.OverrideWindowsDefaultKeyCombination
-				.Subscribe(_ => this._hookService.Reload())
-				.AddTo(this);
-			Settings.General.LoopDesktop
-				.Subscribe(_ => this._hookService.Reload())
-				.AddTo(this);
+			Settings.General.Culture.Subscribe(_ =>
+			{
+				this.OnPropertyChanged(nameof(this.Culture));
+				this.OnPropertyChanged(nameof(this.RestartRequired));
+			}).AddTo(this);
 
 			Settings.General.SimpleNotification
 				.Subscribe(_ => this.OnPropertyChanged(nameof(this.PreviewNotificationText)))

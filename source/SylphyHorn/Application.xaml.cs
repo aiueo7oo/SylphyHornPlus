@@ -121,6 +121,7 @@ Time: {now:O}"));
 			this._startupTrace.Write(StartupPhase.SettingsLoaded, StartupTraceResult.Succeeded);
 
 			Settings.General.Culture.Subscribe(x => ResourceService.Current.ChangeCulture(x)).AddTo(this);
+			ResourceService.Current.CaptureStartupCulture();
 			ThemeService.Current.Register(this, Theme.Windows, Accent.Windows);
 
 			this.HookService = new HookService().AddTo(this);
