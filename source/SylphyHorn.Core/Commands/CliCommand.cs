@@ -6,6 +6,14 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal string FilePath { get; private set; }
+
+		internal bool Overwrite { get; private set; }
+
+		internal bool? ApplyDesktops { get; private set; }
+
+		internal string StartupMode { get; private set; }
+
 		internal string Device { get; private set; }
 
 		internal string Action { get; private set; }
@@ -160,6 +168,14 @@ namespace SylphyHorn.Commands
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
 				}
+				else if ((command.Operation == "settings export" || command.Operation == "settings import") && option == "--path")
+					command.FilePath = ReadTextValue(args, ref i, "Specify a settings file path.");
+				else if (command.Operation == "settings export" && option == "--overwrite")
+					command.Overwrite = true;
+				else if (command.Operation == "settings import" && option == "--apply-desktops")
+					command.ApplyDesktops = ReadBoolean(args, ref i);
+				else if (command.Operation == "startup configure" && option == "--mode")
+					command.StartupMode = ReadChoice(args, ref i, "disabled", "normal", "elevated");
 				else if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal) && option == "--device")
 					command.Device = ReadChoice(args, ref i, "keyboard", "mouse");
 				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--action")
@@ -398,11 +414,18 @@ namespace SylphyHorn.Commands
 				if (command.Operation == "shortcut set" && command.Trigger == null)
 					throw new ArgumentException("Specify --trigger using shortcut keys.");
 			}
+			if ((command.Operation == "settings export" || command.Operation == "settings import") && command.FilePath == null)
+				throw new ArgumentException("Specify --path.");
+			if (command.Operation == "settings import" && command.ApplyDesktops == null)
+				throw new ArgumentException("Specify --apply-desktops true or false.");
+			if (command.Operation == "startup configure" && command.StartupMode == null)
+				throw new ArgumentException("Specify --mode disabled, normal or elevated.");
 			return command;
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "shortcut list" || operation == "shortcut keys" || operation == "shortcut set" || operation == "shortcut clear"
+			=> operation == "settings export" || operation == "settings import" || operation == "startup status" || operation == "startup configure"
+				|| operation == "shortcut list" || operation == "shortcut keys" || operation == "shortcut set" || operation == "shortcut clear"
 				|| operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
 				|| operation == "notification settings" || operation == "notification configure"
 				|| operation == "tray settings" || operation == "tray configure"

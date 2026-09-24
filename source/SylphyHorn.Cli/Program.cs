@@ -16,6 +16,10 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
+				Console.WriteLine("sylphyhorn-cli settings export --path PATH [--overwrite]");
+				Console.WriteLine("sylphyhorn-cli settings import --path PATH --apply-desktops true|false");
+				Console.WriteLine("sylphyhorn-cli startup status");
+				Console.WriteLine("sylphyhorn-cli startup configure --mode disabled|normal|elevated");
 				Console.WriteLine("sylphyhorn-cli shortcut list [--device keyboard|mouse]");
 				Console.WriteLine("sylphyhorn-cli shortcut keys --device keyboard|mouse");
 				Console.WriteLine("sylphyhorn-cli shortcut set --device keyboard|mouse --action ACTION [--number N] --trigger TRIGGER");
@@ -75,9 +79,20 @@ namespace SylphyHorn.Cli
 			CliResponse response;
 			try
 			{
-				operation = CliCommand.Parse(args).Operation;
+				var parsed = CliCommand.Parse(args);
+				operation = parsed.Operation;
+				if (parsed.FilePath != null)
+				{
+					args = (string[])args.Clone();
+					for (var index = 2; index < args.Length; index++)
+					{
+						if (args[index] != "--path") continue;
+						args[index + 1] = Path.GetFullPath(parsed.FilePath);
+						break;
+					}
+				}
 			}
-			catch (ArgumentException ex)
+			catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
 			{
 				return Print(CliResponse.Fail(operation, "invalid_arguments", ex.Message));
 			}
@@ -86,7 +101,9 @@ namespace SylphyHorn.Cli
 			var company = assembly.GetCustomAttribute<AssemblyCompanyAttribute>().Company;
 			var product = assembly.GetCustomAttribute<AssemblyProductAttribute>().Product;
 			using (var pipe = new NamedPipeClientStream(".", CliProtocol.PipeName(company, product), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
-			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(operation == "app assignment apply" ? 45 : 15)))
+			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(
+				operation == "app assignment apply" || operation == "settings import"
+				|| operation.StartsWith("startup ", StringComparison.Ordinal) ? 45 : 15)))
 			{
 				var submitted = false;
 				try

@@ -1039,6 +1039,16 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		internal void RefreshAfterExternalSettings() => this.NotifyOfAllPropertiesChanged();
+
+		internal void RefreshAfterExternalStartup(bool normalRegistered, bool elevatedRegistered)
+		{
+			this._HasStartupLink = normalRegistered;
+			this._HasStartupScheduler = elevatedRegistered;
+			this.OnPropertyChanged(nameof(this.HasStartupLink));
+			this.OnPropertyChanged(nameof(this.HasStartupScheduler));
+		}
+
 		public void OpenExportPathDialog()
 		{
 			var provider = LocalSettingsProvider.Instance;

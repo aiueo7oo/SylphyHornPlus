@@ -32,6 +32,8 @@ namespace SylphyHorn
 		private Services.Commands.CliAssignmentService _cliAssignments;
 		private Services.Commands.CliSettingsService _cliSettings;
 		private Services.Commands.CliShortcutService _cliShortcuts;
+		private Services.Commands.CliSettingsFileService _cliSettingsFiles;
+		private Services.Commands.CliStartupService _cliStartup;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -133,6 +135,10 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "settings export" || command.Operation == "settings import")
+				return this._cliSettingsFiles.ExecuteAsync(command, cancellation);
+			if (command.Operation.StartsWith("startup ", StringComparison.Ordinal))
+				return this._cliStartup.ExecuteAsync(command, cancellation);
 			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
 				return this._cliShortcuts.ExecuteAsync(command, cancellation);
 			if (Services.Commands.CliSettingsService.Handles(command.Operation))
@@ -242,6 +248,16 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
+					this._cliSettingsFiles = new Services.Commands.CliSettingsFileService(
+						LocalSettingsProvider.Instance, LocalSettingsProvider.Instance.FilePath,
+						() => runtime.CliAvailable && !this._hookService.IsSuspended, () => this._hookService.Suspend(),
+						(stage, apply, token) => runtime.CommitPreparedImportAsync(stage, apply, token),
+						() => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalSettings(),
+						ProductInfo.IsNameSupportBuild);
+					this._cliStartup = new Services.Commands.CliStartupService(
+						new Services.Commands.WindowsStartupRegistration(Environment.ProcessPath), () => runtime.CliAvailable,
+						state => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalStartup(
+							state.NormalRegistered, state.ElevatedRegistered));
 					this._cliShortcuts = new Services.Commands.CliShortcutService(Settings.ShortcutKey, Settings.MouseShortcut,
 						Settings.General, () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
 						() => runtime.CliAvailable && !this._hookService.IsSuspended,

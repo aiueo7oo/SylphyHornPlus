@@ -51,6 +51,9 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliError
 	{
+		[DataMember(Name = "importStatus", EmitDefaultValue = false)]
+		public string ImportStatus;
+
 		[DataMember(Name = "conflicts", EmitDefaultValue = false)]
 		public CliShortcut[] Conflicts;
 
@@ -70,6 +73,15 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "path", EmitDefaultValue = false)]
+		public string Path;
+
+		[DataMember(Name = "applyDesktops", EmitDefaultValue = false)]
+		public bool? ApplyDesktops;
+
+		[DataMember(Name = "startup", EmitDefaultValue = false)]
+		public CliStartup Startup;
+
 		[DataMember(Name = "shortcuts", EmitDefaultValue = false)]
 		public CliShortcut[] Shortcuts;
 
@@ -234,6 +246,31 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliStartup
+	{
+		[DataMember(Name = "mode")]
+		public string Mode;
+
+		[DataMember(Name = "normalRegistered")]
+		public bool NormalRegistered;
+
+		[DataMember(Name = "elevatedRegistered")]
+		public bool ElevatedRegistered;
+
+		[DataMember(Name = "normalTarget")]
+		public string NormalTarget;
+
+		[DataMember(Name = "elevatedTarget")]
+		public string ElevatedTarget;
+
+		[DataMember(Name = "targetMatches")]
+		public bool TargetMatches;
+
+		[DataMember(Name = "administrator")]
+		public bool Administrator;
 	}
 
 	[DataContract]
