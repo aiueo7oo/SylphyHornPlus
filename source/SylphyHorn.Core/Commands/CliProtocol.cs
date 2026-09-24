@@ -67,6 +67,39 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "simple", EmitDefaultValue = false)]
+		public bool? Simple;
+
+		[DataMember(Name = "useDesktopName", EmitDefaultValue = false)]
+		public bool? UseDesktopName;
+
+		[DataMember(Name = "theme", EmitDefaultValue = false)]
+		public string Theme;
+
+		[DataMember(Name = "corners", EmitDefaultValue = false)]
+		public string Corners;
+
+		[DataMember(Name = "fontFamily", EmitDefaultValue = false)]
+		public string FontFamily;
+
+		[DataMember(Name = "headerFontSize", EmitDefaultValue = false)]
+		public int? HeaderFontSize;
+
+		[DataMember(Name = "bodyFontSize", EmitDefaultValue = false)]
+		public int? BodyFontSize;
+
+		[DataMember(Name = "headerAlign", EmitDefaultValue = false)]
+		public string HeaderAlign;
+
+		[DataMember(Name = "bodyAlign", EmitDefaultValue = false)]
+		public string BodyAlign;
+
+		[DataMember(Name = "lineSpacing", EmitDefaultValue = false)]
+		public int? LineSpacing;
+
+		[DataMember(Name = "cornersSupported", EmitDefaultValue = false)]
+		public bool? CornersSupported;
+
 		[DataMember(Name = "loop", EmitDefaultValue = false)]
 		public bool? Loop;
 

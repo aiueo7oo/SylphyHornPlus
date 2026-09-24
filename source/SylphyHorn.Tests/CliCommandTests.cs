@@ -22,6 +22,20 @@ namespace SylphyHorn.Tests
 		public void GeneralSettingsRejectInvalidValuesBeforeExecution(string args)
 			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
 
+		[Theory]
+		[InlineData("notification configure --simple yes")]
+		[InlineData("notification configure --theme auto")]
+		[InlineData("notification configure --corners 2")]
+		[InlineData("notification configure --header-align stretch")]
+		[InlineData("notification configure --body-align wrong")]
+		[InlineData("notification configure --header-font-size 0")]
+		[InlineData("notification configure --body-font-size -1")]
+		[InlineData("notification configure --line-spacing 2147483648")]
+		[InlineData("notification settings --theme dark")]
+		[InlineData("desktop configure --theme dark")]
+		public void NotificationAppearanceRejectsInvalidOrMisplacedOptions(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
 		[Fact]
 		public void AppCatalogDefaultsToRegisteredAndAcceptsWindows()
 		{

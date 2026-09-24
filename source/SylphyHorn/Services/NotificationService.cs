@@ -13,6 +13,7 @@ namespace SylphyHorn.Services
 		private readonly INotificationHost _host;
 		private Dispatcher _dispatcher;
 		private DesktopTransitionRuntime _runtime;
+		private bool _appearanceRefreshPending;
 
 		private NotificationService() : this(new NotificationHost())
 		{
@@ -36,6 +37,18 @@ namespace SylphyHorn.Services
 			this._dispatcher = dispatcher;
 			this._runtime = runtime;
 			runtime.StateChanged += this.OnDesktopStateChanged;
+		}
+
+		internal void RefreshAppearance()
+		{
+			var dispatcher = this._dispatcher;
+			if (dispatcher == null || dispatcher.HasShutdownStarted || this._appearanceRefreshPending) return;
+			this._appearanceRefreshPending = true;
+			dispatcher.BeginInvoke(new Action(() =>
+			{
+				this._appearanceRefreshPending = false;
+				if (this._runtime != null && Settings.General.AlwaysShowDesktopNotification) this.ShowCurrentDesktop();
+			}), DispatcherPriority.Background);
 		}
 
 		public void ShowCurrentDesktop()

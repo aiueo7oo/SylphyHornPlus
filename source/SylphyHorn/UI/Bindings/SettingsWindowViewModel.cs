@@ -916,21 +916,22 @@ namespace SylphyHorn.UI.Bindings
 				this.OnPropertyChanged(nameof(this.RestartRequired));
 			}).AddTo(this);
 
-			Settings.General.SimpleNotification
-				.Subscribe(_ => this.OnPropertyChanged(nameof(this.PreviewNotificationText)))
-				.AddTo(this);
-			Settings.General.SimpleNotification
-				.Subscribe(_ => this.OnPropertyChanged(nameof(this.PreviewNotificationHeaderVisibility)))
-				.AddTo(this);
-			Settings.General.UseDesktopName
-				.Subscribe(_ => this.OnPropertyChanged(nameof(this.PreviewNotificationText)))
-				.AddTo(this);
-			Settings.General.NotificationWindowStyle
-				.Subscribe(mode => this.UpdateNotificationColor((BlurWindowThemeMode)mode))
-				.AddTo(this);
-			Settings.General.NotificationCornerStyle
-				.Subscribe(mode => this.UpdateNotificationCornerRadius((BlurWindowCornerMode)mode))
-				.AddTo(this);
+			SettingsService.ObserveNotificationAppearance(Settings.General, () =>
+			{
+				this.OnPropertyChanged(nameof(this.PreviewNotificationText));
+				this.OnPropertyChanged(nameof(this.PreviewNotificationHeaderVisibility));
+				this.OnPropertyChanged(nameof(this.NotificationWindowStyle));
+				this.OnPropertyChanged(nameof(this.NotificationCornerStyle));
+				this.OnPropertyChanged(nameof(this.NotificationFontFamily));
+				this.OnPropertyChanged(nameof(this.NotificationFontFamilyOrDefault));
+				this.OnPropertyChanged(nameof(this.NotificationHeaderFontSize));
+				this.OnPropertyChanged(nameof(this.NotificationBodyFontSize));
+				this.OnPropertyChanged(nameof(this.NotificationHeaderAlignment));
+				this.OnPropertyChanged(nameof(this.NotificationBodyAlignment));
+				this.OnPropertyChanged(nameof(this.NotificationLineSpacing));
+				this.UpdateNotificationColor(this.NotificationWindowStyle);
+				this.UpdateNotificationCornerRadius(this.NotificationCornerStyle);
+			}).AddTo(this);
 
 			Settings.ShortcutKey.SwitchToIndices
 				.Subscribe(_ => this.OnPropertyChanged(nameof(this.IsShortcutKeyOfSwitchToIndicesLarger)))

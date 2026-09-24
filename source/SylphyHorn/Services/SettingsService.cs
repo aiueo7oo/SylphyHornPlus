@@ -23,6 +23,22 @@ namespace SylphyHorn.Services
 			return subscriptions;
 		}
 
+		internal static IDisposable ObserveNotificationAppearance(GeneralSettings settings, Action changed)
+		{
+			var subscriptions = new SylphyHorn.Lifetime.DisposableCollection();
+			subscriptions.Add(ObserveChange(settings.SimpleNotification, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.UseDesktopName, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationWindowStyle, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationCornerStyle, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationFontFamily, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationHeaderFontSize, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationBodyFontSize, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationHeaderAlignment, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationBodyAlignment, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationLineSpacing, _ => changed()));
+			return subscriptions;
+		}
+
 		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action<T> changed)
 		{
 			var previous = property.Value;

@@ -6,6 +6,26 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal bool? Simple { get; private set; }
+
+		internal bool? UseDesktopName { get; private set; }
+
+		internal string Theme { get; private set; }
+
+		internal string Corners { get; private set; }
+
+		internal string FontFamily { get; private set; }
+
+		internal int? HeaderFontSize { get; private set; }
+
+		internal int? BodyFontSize { get; private set; }
+
+		internal string HeaderAlign { get; private set; }
+
+		internal string BodyAlign { get; private set; }
+
+		internal int? LineSpacing { get; private set; }
+
 		internal bool? Loop { get; private set; }
 
 		internal bool? OverrideWindowsShortcuts { get; private set; }
@@ -19,6 +39,10 @@ namespace SylphyHorn.Commands
 		internal bool? ShowDesktop { get; private set; }
 
 		internal bool? CurrentNumberOnly { get; private set; }
+
+		internal bool HasNotificationAppearance
+			=> this.Simple != null || this.UseDesktopName != null || this.Theme != null || this.Corners != null || this.FontFamily != null
+			|| this.HeaderFontSize != null || this.BodyFontSize != null || this.HeaderAlign != null || this.BodyAlign != null || this.LineSpacing != null;
 
 		internal string Language { get; private set; }
 
@@ -113,6 +137,30 @@ namespace SylphyHorn.Commands
 					command.ShowDesktop = ReadBoolean(args, ref i);
 				else if (command.Operation == "tray configure" && option == "--current-number-only")
 					command.CurrentNumberOnly = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--simple")
+					command.Simple = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--use-desktop-name")
+					command.UseDesktopName = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--theme")
+					command.Theme = ReadChoice(args, ref i, "apps", "system", "light", "dark", "accent");
+				else if (command.Operation == "notification configure" && option == "--corners")
+					command.Corners = ReadChoice(args, ref i, "square", "rounded", "small-rounded");
+				else if (command.Operation == "notification configure" && option == "--header-align")
+					command.HeaderAlign = ReadChoice(args, ref i, "left", "center", "right");
+				else if (command.Operation == "notification configure" && option == "--body-align")
+					command.BodyAlign = ReadChoice(args, ref i, "left", "center", "right");
+				else if (command.Operation == "notification configure" && option == "--font-family")
+					command.FontFamily = ReadTextValue(args, ref i, "A font family is missing; use an empty string to restore the default.");
+				else if (command.Operation == "notification configure"
+					&& (option == "--header-font-size" || option == "--body-font-size" || option == "--line-spacing"))
+				{
+					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number)
+						|| (option != "--line-spacing" && number < 1))
+						throw new ArgumentException("Font sizes must be positive integers; line spacing must be a signed integer.");
+					if (option == "--header-font-size") command.HeaderFontSize = number;
+					else if (option == "--body-font-size") command.BodyFontSize = number;
+					else command.LineSpacing = number;
+				}
 				else if (command.Operation == "notification configure" && option == "--duration-ms")
 				{
 					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var duration) || duration < 1)
@@ -249,7 +297,8 @@ namespace SylphyHorn.Commands
 			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
 				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
 			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null)
-				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null && command.DurationMs == null)
+				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null
+					&& command.DurationMs == null && !command.HasNotificationAppearance)
 				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)
 				|| (command.Operation == "settings configure" && command.Language == null))
 				throw new ArgumentException("Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.");
@@ -277,6 +326,13 @@ namespace SylphyHorn.Commands
 			if (this.TargetKind != null) throw new ArgumentException("Destination options are mutually exclusive.");
 			this.TargetKind = kind;
 			this.TargetValue = value;
+		}
+
+		private static string ReadChoice(string[] args, ref int index, params string[] choices)
+		{
+			var value = ReadValue(args, ref index);
+			if (Array.IndexOf(choices, value) < 0) throw new ArgumentException("Expected one of: " + string.Join(", ", choices) + ".");
+			return value;
 		}
 
 		private static bool ReadBoolean(string[] args, ref int index)

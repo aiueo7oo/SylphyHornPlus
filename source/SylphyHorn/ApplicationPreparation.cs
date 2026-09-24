@@ -229,6 +229,8 @@ namespace SylphyHorn
 					if (alwaysShow) NotificationService.Instance.ShowCurrentDesktop();
 					else NotificationService.Instance.HideCurrentDesktop();
 				}, () => this._taskTrayIcon.Reload()).AddTo(this._disposable);
+				SettingsService.ObserveNotificationAppearance(Settings.General,
+					NotificationService.Instance.RefreshAppearance).AddTo(this._disposable);
 				Settings.AppPlacement.Configuration.Subscribe(configuration =>
 				{
 					_ = runtime.ConfigurePlacementAsync(configuration);
