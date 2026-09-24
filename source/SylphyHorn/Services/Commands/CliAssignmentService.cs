@@ -74,15 +74,17 @@ namespace SylphyHorn.Services.Commands
 					}
 					else changed = targets.RemoveAll(item => SameDestination(item, target)) != 0;
 					updated = changed ? new AppPlacementConfiguration(current.Enabled, current.Rules,
-						current.CreateMissingDesktops, current.CloseCreatedDesktops, targets) : current;
+						current.CreateMissingDesktops, current.CloseCreatedDesktops, targets, current.FollowForeground) : current;
 				}
 				else if (command.Operation == "app assignment configure")
 				{
 					var enabled = command.AssignmentEnabled ?? current.Enabled;
 					var create = command.CreateMissingDesktops ?? current.CreateMissingDesktops;
 					var close = command.CloseCreatedDesktops ?? current.CloseCreatedDesktops;
-					updated = enabled == current.Enabled && create == current.CreateMissingDesktops && close == current.CloseCreatedDesktops
-						? current : new AppPlacementConfiguration(enabled, current.Rules, create, close, current.ClosingTargets);
+					var follow = command.FollowForeground == null ? current.FollowForeground : command.FollowForeground == "true";
+					updated = enabled == current.Enabled && create == current.CreateMissingDesktops
+						&& close == current.CloseCreatedDesktops && follow == current.FollowForeground
+						? current : new AppPlacementConfiguration(enabled, current.Rules, create, close, current.ClosingTargets, follow);
 				}
 				else if (command.Operation == "app assignment enable" || command.Operation == "app assignment disable")
 				{
@@ -93,9 +95,9 @@ namespace SylphyHorn.Services.Commands
 					if (enabled && current.Rules.Any(item => item.Id != id && item.Enabled && item.App.Equals(rule.App)))
 						return CliResponse.Fail(command.Operation, "assignment_conflict", "Another rule for this application is enabled. Disable it first.");
 					var rules = current.Rules.Select(item => item.Id != id ? item : new AppPlacementRule(item.Id, enabled,
-						item.App, item.Destination, item.DisplayName, item.DisplayExecutablePath));
+						item.App, item.Destination, item.DisplayName, item.DisplayExecutablePath, item.FollowForeground));
 					updated = rule.Enabled == enabled ? current : new AppPlacementConfiguration(current.Enabled, rules,
-						current.CreateMissingDesktops, current.CloseCreatedDesktops, current.ClosingTargets);
+						current.CreateMissingDesktops, current.CloseCreatedDesktops, current.ClosingTargets, current.FollowForeground);
 				}
 				else
 				{
@@ -142,17 +144,19 @@ namespace SylphyHorn.Services.Commands
 					}
 					else
 					{
-						var destination = ReadDestination(command);
-						changed = previous == null || !SameDestination(previous.Destination, destination);
+						var destination = command.TargetKind == null ? previous.Destination : ReadDestination(command);
+						var follow = command.FollowForeground == null ? previous?.FollowForeground
+							: command.FollowForeground == "default" ? (bool?)null : command.FollowForeground == "true";
+						changed = previous == null || !SameDestination(previous.Destination, destination) || previous.FollowForeground != follow;
 						if (changed)
 						{
 							var rule = new AppPlacementRule(previous?.Id ?? Guid.NewGuid(), previous?.Enabled ?? true,
-								identity, destination, choice?.Name ?? previous?.DisplayName, choice?.Path ?? previous?.DisplayExecutablePath);
+								identity, destination, choice?.Name ?? previous?.DisplayName, choice?.Path ?? previous?.DisplayExecutablePath, follow);
 							if (previous == null) rules.Add(rule); else rules[rules.IndexOf(previous)] = rule;
 						}
 					}
 					updated = changed ? new AppPlacementConfiguration(current.Enabled, rules, current.CreateMissingDesktops,
-						current.CloseCreatedDesktops, current.ClosingTargets) : current;
+						current.CloseCreatedDesktops, current.ClosingTargets, current.FollowForeground) : current;
 				}
 				var configurationChanged = !ReferenceEquals(updated, current);
 				if (configurationChanged)
@@ -197,6 +201,7 @@ namespace SylphyHorn.Services.Commands
 		private CliData Describe(AppPlacementConfiguration configuration, bool includeRules = true) => new CliData
 		{
 			AssignmentEnabled = configuration.Enabled,
+			FollowForeground = configuration.FollowForeground,
 			AssignmentStatus = this._status() == "NoRules" ? "no_rules" : this._status().ToLowerInvariant(),
 			CreateMissingDesktops = configuration.CreateMissingDesktops,
 			CloseCreatedDesktops = configuration.CloseCreatedDesktops,
@@ -209,6 +214,8 @@ namespace SylphyHorn.Services.Commands
 			{
 				Id = rule.Id.ToString(),
 				Enabled = rule.Enabled,
+				FollowForeground = rule.FollowForeground.HasValue ? (rule.FollowForeground.Value ? "true" : "false") : "default",
+				EffectiveFollowForeground = rule.FollowForeground ?? configuration.FollowForeground,
 				AppKind = rule.App.Kind == PlacementAppKind.ExecutablePath ? "executablePath" : "packageAppId",
 				AppIdentity = rule.App.Value,
 				ExecutablePath = rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : rule.DisplayExecutablePath,

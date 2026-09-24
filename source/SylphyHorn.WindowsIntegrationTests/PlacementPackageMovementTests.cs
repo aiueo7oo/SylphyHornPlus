@@ -231,11 +231,12 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 			public PlacementWindowLocation Locate(IntPtr window) => this._inner.Locate(window);
 
-			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target, PlacementMovePermit permit, Func<bool> stillCurrent)
+			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target,
+				PlacementMovePermit permit, Func<bool> stillCurrent, Action beforeMove = null)
 			{
 				Assert.True(this.Owns(expected));
 				this.MoveRequests++;
-				return this._inner.Move(expected, source, target, permit, () => this.Owns(expected) && stillCurrent());
+				return this._inner.Move(expected, source, target, permit, () => this.Owns(expected) && stillCurrent(), beforeMove);
 			}
 
 			public void Dispose()

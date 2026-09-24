@@ -232,6 +232,9 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "createMissingDesktops", EmitDefaultValue = false)]
 		public bool? CreateMissingDesktops;
 
+		[DataMember(Name = "followForeground", EmitDefaultValue = false)]
+		public bool? FollowForeground;
+
 		[DataMember(Name = "closeCreatedDesktops", EmitDefaultValue = false)]
 		public bool? CloseCreatedDesktops;
 
@@ -399,6 +402,12 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliAssignment
 	{
+		[DataMember(Name = "followForeground")]
+		public string FollowForeground;
+
+		[DataMember(Name = "effectiveFollowForeground")]
+		public bool EffectiveFollowForeground;
+
 		[DataMember(Name = "id")]
 		public string Id;
 

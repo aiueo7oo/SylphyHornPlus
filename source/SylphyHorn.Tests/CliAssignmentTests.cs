@@ -15,6 +15,38 @@ namespace SylphyHorn.Tests
 	[Collection(PlacementUiCollection.Name)]
 	public sealed class CliAssignmentTests
 	{
+		[Fact]
+		public async Task FollowOverrideUpdatesByIdPreservesDestinationAndTracksGlobalDefault()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var row = await f.Add(@"C:\Apps\Editor.exe", 3);
+				var service = Service(f);
+				var command = new[] { "app", "assignment", "set", "--id", row.Id.ToString(), "--follow-foreground", "false" };
+				var response = await service.ExecuteAsync(CliCommand.Parse(command), CancellationToken.None);
+				Assert.True(response.Success);
+				Assert.Equal(3, Assert.Single(response.Data.Assignments).DesktopNumber);
+				Assert.False(Assert.Single(response.Data.Assignments).EffectiveFollowForeground);
+				Assert.False(Assert.Single(f.Settings.Configuration.Value.Rules).FollowForeground);
+				command[6] = "default";
+				response = await service.ExecuteAsync(CliCommand.Parse(command), CancellationToken.None);
+				Assert.Equal("default", Assert.Single(response.Data.Assignments).FollowForeground);
+				Assert.True(Assert.Single(response.Data.Assignments).EffectiveFollowForeground);
+				response = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "configure", "--follow-foreground", "false" }), CancellationToken.None);
+				Assert.False(response.Data.FollowForeground);
+				Assert.False(Assert.Single(response.Data.Assignments).EffectiveFollowForeground);
+				var edited = Assert.Single(f.Model.Groups[1].Rows);
+				edited.FollowForeground = true;
+				await f.Model.CommitAsync(edited);
+				edited.Destination = "4";
+				await f.Model.CommitAsync(edited);
+				Assert.True(Assert.Single(f.Settings.Configuration.Value.Rules).FollowForeground);
+				Assert.False(f.Settings.Configuration.Value.FollowForeground);
+				Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "app", "assignment", "set", "--path", @"C:\Apps\Other.exe", "--follow-foreground", "true" }));
+				Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "app", "assignment", "configure", "--follow-foreground", "default" }));
+			}
+		}
+
 		[Theory]
 		[InlineData("registered", false)]
 		[InlineData("windows", true)]

@@ -105,6 +105,7 @@ namespace SylphyHorn.UI.Bindings
 	{
 		private string _appText = "", _destination = "", _errorKey = "";
 		private bool _enabled = true;
+		private bool? _followForeground;
 		private PlacementAppChoice _choice;
 		private string _choiceText;
 
@@ -163,6 +164,26 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		public bool? FollowForeground
+		{
+			get => this._followForeground;
+			set
+			{
+				if (!this.SetProperty(ref this._followForeground, value)) return;
+				this.Revision++;
+				this.RefreshLanguage();
+			}
+		}
+
+		public string FollowLabel => string.Format(CultureInfo.CurrentCulture, this.Group.Owner.Text["FollowLabel"],
+			this.FollowForeground.HasValue ? this.Group.Owner.Text[this.FollowForeground.Value ? "FollowYes" : "FollowNo"]
+				: string.Format(CultureInfo.CurrentCulture, this.Group.Owner.Text["FollowDefaultState"],
+					this.Group.Owner.Text[this.Group.Owner.FollowForeground ? "FollowYes" : "FollowNo"]));
+
+		public bool IsFollowDefault => !this.FollowForeground.HasValue;
+		public bool IsFollowYes => this.FollowForeground == true;
+		public bool IsFollowNo => this.FollowForeground == false;
+
 		public string Error => string.IsNullOrEmpty(this._errorKey) ? "" : this.Group.Owner.Text[this._errorKey];
 
 		internal void SetErrorKey(string key)
@@ -170,7 +191,14 @@ namespace SylphyHorn.UI.Bindings
 			this.SetProperty(ref this._errorKey, key, nameof(this.Error));
 		}
 
-		internal void RefreshLanguage() => this.OnPropertyChanged(nameof(this.Error));
+		internal void RefreshLanguage()
+		{
+			this.OnPropertyChanged(nameof(this.Error));
+			this.OnPropertyChanged(nameof(this.FollowLabel));
+			this.OnPropertyChanged(nameof(this.IsFollowDefault));
+			this.OnPropertyChanged(nameof(this.IsFollowYes));
+			this.OnPropertyChanged(nameof(this.IsFollowNo));
+		}
 
 		public string Name => this.Choice?.Name ?? "";
 
@@ -213,6 +241,7 @@ namespace SylphyHorn.UI.Bindings
 				rule.App));
 			this.Destination = rule == null ? (this.Group.Kind == PlacementDestinationKind.Number ? "1" : "") : rule.Destination.Kind == PlacementDestinationKind.Number ? rule.Destination.Number.ToString(CultureInfo.InvariantCulture) : rule.Destination.Name;
 			this.Enabled = rule?.Enabled ?? true;
+			this.FollowForeground = rule?.FollowForeground;
 			this.SetErrorKey("");
 		}
 	}
@@ -262,6 +291,15 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		public bool FollowForeground
+		{
+			get => this._settings.Configuration.Value.FollowForeground;
+			set
+			{
+				if (!this._disposed && value != this.FollowForeground) _ = this.PublishAsync(this.Configuration(followForeground: value));
+			}
+		}
+
 		public bool CreateMissingDesktops
 		{
 			get => this._settings.Configuration.Value.CreateMissingDesktops;
@@ -284,11 +322,12 @@ namespace SylphyHorn.UI.Bindings
 		}
 
 		private AppPlacementConfiguration Configuration(bool? enabled = null, bool? createMissing = null,
-			bool? closeCreated = null, IEnumerable<AppPlacementRule> rules = null, IEnumerable<PlacementDestination> closingTargets = null)
+			bool? closeCreated = null, IEnumerable<AppPlacementRule> rules = null, IEnumerable<PlacementDestination> closingTargets = null, bool? followForeground = null)
 		{
 			var current = this._settings.Configuration.Value;
 			return new AppPlacementConfiguration(enabled ?? current.Enabled, rules ?? current.Rules,
-				createMissing ?? current.CreateMissingDesktops, closeCreated ?? current.CloseCreatedDesktops, closingTargets ?? current.ClosingTargets);
+				createMissing ?? current.CreateMissingDesktops, closeCreated ?? current.CloseCreatedDesktops, closingTargets ?? current.ClosingTargets,
+				followForeground ?? current.FollowForeground);
 		}
 
 		internal PlacementClosingRow AddClosingRow(PlacementClosingGroup group)
@@ -391,6 +430,8 @@ namespace SylphyHorn.UI.Bindings
 			if (this._disposed) return;
 			this.OnPropertyChanged(nameof(this.IsEnabled));
 			this.OnPropertyChanged(nameof(this.CreateMissingDesktops));
+			this.OnPropertyChanged(nameof(this.FollowForeground));
+			foreach (var row in this.Groups.SelectMany(group => group.Rows)) row.RefreshLanguage();
 			this.OnPropertyChanged(nameof(this.CloseCreatedDesktops));
 			if (this._publishing) return;
 			this._generation++;
@@ -474,7 +515,7 @@ namespace SylphyHorn.UI.Bindings
 				row.SetErrorKey("EnterPath");
 				return;
 			}
-			if (row.Saved != null && row.Choice != null && row.Saved.Enabled == row.Enabled && row.Saved.App.Equals(row.Choice.Identity)
+			if (row.Saved != null && row.Choice != null && row.Saved.Enabled == row.Enabled && row.Saved.FollowForeground == row.FollowForeground && row.Saved.App.Equals(row.Choice.Identity)
 				&& row.Saved.Destination.Kind == destination.Kind && row.Saved.Destination.Number == destination.Number && row.Saved.Destination.Name == destination.Name)
 			{
 				row.SetErrorKey("");
@@ -498,7 +539,7 @@ namespace SylphyHorn.UI.Bindings
 						row.SetErrorKey("Duplicate");
 						return;
 					}
-					var rule = new AppPlacementRule(row.Id, row.Enabled, choice.Identity, destination, choice.Name, choice.Path);
+					var rule = new AppPlacementRule(row.Id, row.Enabled, choice.Identity, destination, choice.Name, choice.Path, row.FollowForeground);
 					var index = rules.FindIndex(existing => existing.Id == row.Id);
 					if (index < 0) rules.Add(rule); else rules[index] = rule;
 					row.Accept(rule, choice);

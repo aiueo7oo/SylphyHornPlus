@@ -13,6 +13,32 @@ namespace SylphyHorn.Tests
 {
 	public sealed class AppPlacementTests
 	{
+		[Theory]
+		[InlineData(true, null, false)]
+		[InlineData(false, true, false)]
+		[InlineData(true, false, false)]
+		[InlineData(false, false, true)]
+		public void FollowPreferencesRoundTripAndLegacyDefaultsArePreserved(bool global, bool? follow, bool legacy)
+		{
+			var rule = Rule();
+			var config = new AppPlacementConfiguration(true, new[] { new AppPlacementRule(rule.Id, rule.Enabled,
+				rule.App, rule.Destination, followForeground: follow) }, followForeground: global);
+			var serializer = new DataContractSerializer(typeof(AppPlacementConfiguration));
+			using (var stream = new MemoryStream())
+			{
+				serializer.WriteObject(stream, config);
+				stream.Position = 0;
+				var xml = XDocument.Load(stream);
+				if (legacy) xml.Descendants().Where(element => element.Name.LocalName == "FollowForeground").Remove();
+				using (var reader = xml.CreateReader())
+				{
+					var restored = (AppPlacementConfiguration)serializer.ReadObject(reader);
+					Assert.Equal(legacy || global, restored.FollowForeground);
+					Assert.Equal(legacy ? null : follow, Assert.Single(restored.Rules).FollowForeground);
+				}
+			}
+		}
+
 		private const string Key = "AppPlacementSettings.Configuration";
 		private static readonly Guid RuleId = new Guid("70c72736-00bd-49c4-9d6a-b859dadc2273");
 		private static readonly Guid Work = new Guid("9f9b1ee6-16ee-442b-b341-88f60dfb4bf7");

@@ -15,6 +15,9 @@ namespace SylphyHorn.AppPlacement
 		[DataMember(Order = 2, EmitDefaultValue = false)]
 		public bool CreateMissingDesktops { get; private set; }
 
+		[DataMember(Order = 5)]
+		public bool FollowForeground { get; private set; }
+
 		[DataMember(Order = 3, EmitDefaultValue = false)]
 		public bool CloseCreatedDesktops { get; private set; }
 
@@ -36,9 +39,10 @@ namespace SylphyHorn.AppPlacement
 		public IReadOnlyList<AppPlacementRule> Rules => this._view;
 
 		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false,
-			bool closeCreatedDesktops = false, IEnumerable<PlacementDestination> closingTargets = null)
+			bool closeCreatedDesktops = false, IEnumerable<PlacementDestination> closingTargets = null, bool followForeground = true)
 		{
 			this.Enabled = enabled;
+			this.FollowForeground = followForeground;
 			this.CreateMissingDesktops = createMissingDesktops;
 			this.CloseCreatedDesktops = closeCreatedDesktops;
 			this._closingTargets = closingTargets?.ToArray();
@@ -70,6 +74,9 @@ namespace SylphyHorn.AppPlacement
 			this._view = Array.AsReadOnly(this._rules);
 			this._enabledRules = index;
 		}
+
+		[OnDeserializing]
+		private void OnDeserializing(StreamingContext context) => this.FollowForeground = true;
 
 		[OnDeserialized]
 		private void OnDeserialized(StreamingContext context) => this.Initialize();

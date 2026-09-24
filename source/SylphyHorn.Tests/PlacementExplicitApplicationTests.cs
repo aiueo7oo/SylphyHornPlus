@@ -243,11 +243,13 @@ namespace SylphyHorn.Tests
 
 			public PlacementWindowLocation Locate(IntPtr window) => new PlacementWindowLocation(this.Location, this.Pinned);
 
-			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target, PlacementMovePermit permit, Func<bool> current)
+			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target,
+				PlacementMovePermit permit, Func<bool> current, Action beforeMove = null)
 			{
 				if (!current()) return PlacementMoveStatus.Cancelled;
 				this.BeforePermit?.Invoke();
 				if (!permit.TryStart()) return PlacementMoveStatus.Cancelled;
+				beforeMove?.Invoke();
 				this.Moves++;
 				if (this.ConfirmMove) this.Location = target;
 				return PlacementMoveStatus.Requested;

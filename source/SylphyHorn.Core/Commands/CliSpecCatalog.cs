@@ -79,13 +79,13 @@ namespace SylphyHorn.Commands
 				notes: "Use canAssign and reason. A launcher or unknown identity is not a safe assignment target.", queries: Q("app list"));
 			foreach (var verb in new[] { "list", "status" })
 				yield return C("app assignment " + verb, verb == "list" ? "Read saved application assignment rules." : "Read assignment configuration and monitoring status.",
-					verb == "list" ? "assignments assignmentEnabled assignmentStatus createMissingDesktops closeCreatedDesktops closingTargets" : "assignmentEnabled assignmentStatus createMissingDesktops closeCreatedDesktops closingTargets",
+					verb == "list" ? "assignments assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets" : "assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets",
 					queries: Q("app assignment " + verb));
 			yield return C("app assignment configure", "Change automatic assignment, desktop creation and closure settings.",
-				"assignments assignmentEnabled assignmentStatus createMissingDesktops closeCreatedDesktops closingTargets changed",
-				Bools("--enabled --create-missing-desktops --close-created-desktops"), new[] { Some("--enabled --create-missing-desktops --close-created-desktops") },
+				"assignments assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets changed",
+				Bools("--enabled --create-missing-desktops --close-created-desktops --follow-foreground"), new[] { Some("--enabled --create-missing-desktops --close-created-desktops --follow-foreground") },
 				"Omitted settings are preserved. Closing created desktops also covers them without an individual closing target; closure still uses the " +
-					"application's occupancy conditions.",
+					"application's occupancy conditions. Follow is a default for rules without an override, applies only to foreground windows, and never follows explicit apply.",
 				"persist-settings change-monitoring", "--enabled true", Q("app assignment status"));
 			foreach (var verb in new[] { "set", "remove", "apply", "enable", "disable" })
 			{
@@ -102,7 +102,9 @@ namespace SylphyHorn.Commands
 						selectors += " --app-id";
 						arguments.Add(Desktop("--desktop-name"));
 						arguments.Add(Desktop("--desktop-number"));
-						constraints.Add(One("--desktop-name --desktop-number"));
+						arguments.Add(A("--follow-foreground", "string", values: "default true false", omission: "preserve-existing-or-default",
+							description: "default inherits the global setting. true/false override it, still only for foreground windows during automatic placement."));
+						constraints.Add(new CliSpecConstraint { Kind = "atMostOne", Arguments = Split("--desktop-name --desktop-number") });
 						queries.Add("app list");
 						queries.Add("desktop list");
 					}
@@ -119,18 +121,18 @@ namespace SylphyHorn.Commands
 				var sample = verb == "set" ? "--id <RULE_ID> --desktop-number 2" : verb == "apply" ? "--all --dry-run" : "--id <RULE_ID>";
 				yield return C("app assignment " + verb,
 					verb == "apply" ? "Apply saved rules to existing windows, or inspect the planned moves." : verb + " a saved application assignment rule.",
-					verb == "apply" ? "results dryRun changed" : "assignments assignmentEnabled assignmentStatus createMissingDesktops closeCreatedDesktops closingTargets changed",
+					verb == "apply" ? "results dryRun changed" : "assignments assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets changed",
 					arguments.ToArray(), constraints.ToArray(),
 					verb == "apply" ? "Requires enabled, active monitoring. --dry-run does not move windows or create desktops. Rechecks identity and destination during actual apply. " +
 						"Inspect each result, not only the envelope success."
 						: "Rules store a destination name or number, not a desktop ID. Destinations may be absent. set with --id updates that rule; executable paths and " +
-							"package identities are distinct.",
+							"package identities are distinct. set requires a destination unless both --id and --follow-foreground are supplied; in that case omission preserves the destination.",
 					verb == "apply" ? "move-windows-unless-dry-run possible-create" : "persist-rules",
 					sample, Q(queries.ToArray()));
 			}
 			foreach (var verb in new[] { "list", "add", "remove" })
 				yield return C("desktop autoclose " + verb, verb == "list" ? "Read automatic desktop closure targets." : verb + " an automatic desktop closure target.",
-					"closingTargets assignmentEnabled assignmentStatus createMissingDesktops closeCreatedDesktops changed",
+					"closingTargets assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops changed",
 					verb == "list" ? null : new[] { Desktop("--name"), Desktop("--number") },
 					verb == "list" ? null : new[] { One("--name --number") },
 					"Configures future automatic closure; does not immediately delete a desktop. Targets can name desktops not currently present.",

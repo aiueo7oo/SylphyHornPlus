@@ -160,12 +160,13 @@ namespace SylphyHorn.WindowsIntegrationTests
 				return this._inner.Locate(window);
 			}
 
-			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target, PlacementMovePermit permit, Func<bool> current)
+			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target,
+				PlacementMovePermit permit, Func<bool> current, Action beforeMove = null)
 			{
 				this.AssertOwned(expected.Window);
 				Assert.Equal(this._process.StartTime.ToFileTimeUtc(), expected.Owner.CreatedAt);
 				this.Moves++;
-				return this._inner.Move(expected, source, target, permit, current);
+				return this._inner.Move(expected, source, target, permit, current, beforeMove);
 			}
 		}
 

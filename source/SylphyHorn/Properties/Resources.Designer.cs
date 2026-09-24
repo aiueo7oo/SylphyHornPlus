@@ -142,6 +142,60 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Use global setting.
+        /// </summary>
+        public static string Placement_FollowDefault {
+            get {
+                return ResourceManager.GetString("Placement_FollowDefault", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Global ({0}).
+        /// </summary>
+        public static string Placement_FollowDefaultState {
+            get {
+                return ResourceManager.GetString("Placement_FollowDefaultState", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switch to the foreground app’s destination unless overridden below.
+        /// </summary>
+        public static string Placement_FollowForeground {
+            get {
+                return ResourceManager.GetString("Placement_FollowForeground", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switch: {0}.
+        /// </summary>
+        public static string Placement_FollowLabel {
+            get {
+                return ResourceManager.GetString("Placement_FollowLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Do not switch.
+        /// </summary>
+        public static string Placement_FollowNo {
+            get {
+                return ResourceManager.GetString("Placement_FollowNo", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switch.
+        /// </summary>
+        public static string Placement_FollowYes {
+            get {
+                return ResourceManager.GetString("Placement_FollowYes", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Delete.
         /// </summary>
         public static string Placement_DeleteLabel {

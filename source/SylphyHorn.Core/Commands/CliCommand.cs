@@ -123,6 +123,8 @@ namespace SylphyHorn.Commands
 
 		internal bool? CloseCreatedDesktops { get; private set; }
 
+		internal string FollowForeground { get; private set; }
+
 		internal bool All { get; private set; }
 
 		internal bool DryRun { get; private set; }
@@ -164,6 +166,8 @@ namespace SylphyHorn.Commands
 					else if (option == "--create-missing-desktops") command.CreateMissingDesktops = value == "true";
 					else command.CloseCreatedDesktops = value == "true";
 				}
+				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
+					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (option == "--id" && (command.Operation == "app assignment enable" || command.Operation == "app assignment disable"
 					|| command.Operation == "app assignment set" || command.Operation == "app assignment remove" || command.Operation == "app assignment apply"))
 				{
@@ -311,12 +315,16 @@ namespace SylphyHorn.Commands
 				else if (command.Operation == "window move" && (option == "--desktop-next" || option == "--desktop-previous"
 					|| option == "--desktop-last-used" || option == "--desktop-new"))
 					command.SetTarget(option.Substring("--desktop-".Length), null);
+				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
+					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (option == "--id" && (command.Operation == "window move" || command.Operation == "window pin"
 					|| command.Operation == "window unpin"))
 				{
 					command.WindowId = ReadValue(args, ref i);
 					RequireId(command.WindowId);
 				}
+				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
+					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (option == "--id" && (command.Operation == "desktop rename" || command.Operation == "desktop reorder"
 					|| command.Operation == "desktop delete" || command.Operation == "desktop wallpaper"))
 				{
@@ -393,10 +401,11 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify exactly one of --path, --id or --all.");
 			if ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove") && command.TargetKind == null)
 				throw new ArgumentException("Specify exactly one of --name or --number.");
-			if (command.Operation == "app assignment set" && command.TargetKind == null)
+			if (command.Operation == "app assignment set" && command.TargetKind == null
+				&& (command.RuleId == null || command.FollowForeground == null))
 				throw new ArgumentException("Specify exactly one of --desktop-name or --desktop-number.");
 			if (command.Operation == "app assignment configure" && command.AssignmentEnabled == null
-				&& command.CreateMissingDesktops == null && command.CloseCreatedDesktops == null)
+				&& command.CreateMissingDesktops == null && command.CloseCreatedDesktops == null && command.FollowForeground == null)
 				throw new ArgumentException("Specify at least one assignment setting.");
 			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
 				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");

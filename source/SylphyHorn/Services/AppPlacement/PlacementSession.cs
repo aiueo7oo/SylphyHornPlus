@@ -272,7 +272,7 @@ namespace SylphyHorn.Services.AppPlacement
 					Now,
 					(delay, token) => WaitHandle.WaitAny(new[] { this._stop, this._monitor.Changed, token.WaitHandle }, delay));
 				var processor = new PlacementProcessor(this._configuration, windows,
-					this.Authorize, this.IsCurrent, Now);
+					this.Authorize, this.IsCurrent, Now, this._cancellation.Token, automatic: true);
 				var handles = new[] { this._stop, this._monitor.Changed, this._requestReady };
 				var occupancy = this._closeDesktops == null ? null : new PlacementDesktopOccupancyReader();
 				var usedDesktops = occupancy == null ? null : new HashSet<Guid>();

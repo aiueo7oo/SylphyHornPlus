@@ -9,6 +9,70 @@ namespace SylphyHorn.Tests
 	public sealed class PlacementProcessorTests
 	{
 		[Theory]
+		[InlineData(true, null, true, true)]
+		[InlineData(false, null, true, false)]
+		[InlineData(false, true, true, true)]
+		[InlineData(true, false, true, false)]
+		[InlineData(true, true, false, false)]
+		public void OnlyAutomaticConfirmedMovesFollowTheEffectivePreference(bool global, bool? rule, bool automatic, bool follows)
+		{
+			var config = new AppPlacementConfiguration(true, new[] { new AppPlacementRule(Guid.NewGuid(), true,
+				Identity(1).App, PlacementDestination.ByNumber(1), followForeground: rule) }, followForeground: global);
+			var f = new Fixture(config, automatic);
+			f.Windows.ConfirmMove = false;
+			f.Step();
+			Assert.Equal(0, f.Windows.Follows);
+			f.Windows.Location = f.Target;
+			f.Step();
+			f.Step();
+			Assert.Equal(PlacementOutcome.Moved, f.Work.Result.Outcome);
+			Assert.Equal(follows ? 1 : 0, f.Windows.Follows);
+			Assert.Equal(follows ? 1 : 0, f.Windows.FollowPreparations);
+		}
+
+		[Theory]
+		[InlineData(0)]
+		[InlineData(1)]
+		[InlineData(2)]
+		[InlineData(3)]
+		[InlineData(4)]
+		[InlineData(5)]
+		public void FollowGuardDistinguishesMoveFocusChangesFromNewInputAndDesktopChanges(int scenario)
+		{
+			var identity = Identity(1);
+			var source = Guid.NewGuid();
+			var target = Guid.NewGuid();
+			var foreground = scenario == 1 ? IntPtr.Zero : identity.Window;
+			uint? input = 10;
+			Guid? desktop = source;
+			var current = true;
+			var switches = 0;
+			var windows = new PlacementWindows(() => foreground, () => input, () => desktop,
+				id => { Assert.Equal(target, id); switches++; });
+			var follow = windows.PrepareFollow(identity, source, target, () => current);
+			foreground = IntPtr.Zero; // Moving the window can change foreground without new input.
+			if (scenario == 2) input++;
+			if (scenario == 3) desktop = Guid.NewGuid();
+			if (scenario == 4) current = false;
+			if (scenario == 5) input = null;
+			follow?.Invoke();
+			Assert.Equal(scenario == 0 ? 1 : 0, switches);
+		}
+
+		[Fact]
+		public void FailedFollowKeepsConfirmedMoveAndDoesNotRetry()
+		{
+			var f = new Fixture(automatic: true);
+			f.Windows.FollowFailure = true;
+			f.Step();
+			f.Step();
+			Assert.Equal(PlacementOutcome.Moved, f.Work.Result.Outcome);
+			Assert.StartsWith("FollowFailed:", f.Work.Result.Reason);
+			Assert.Equal(1, f.Windows.Moves);
+			Assert.Equal(1, f.Windows.Follows);
+		}
+
+		[Theory]
 		[InlineData(false)]
 		[InlineData(true)]
 		public void HostedPackageLosingChildEvidenceDoesNotMoveOrResend(bool alreadyRequested)
@@ -313,7 +377,7 @@ namespace SylphyHorn.Tests
 			internal bool Current = true;
 			internal Action BeforeAuthorization;
 
-			internal Fixture(AppPlacementConfiguration configuration = null)
+			internal Fixture(AppPlacementConfiguration configuration = null, bool automatic = false)
 			{
 				this.Map = new PlacementDesktopMap(new[] { new PlacementDesktop(this.Target, "target", true) });
 				this.Processor = new PlacementProcessor(
@@ -326,14 +390,28 @@ namespace SylphyHorn.Tests
 						return new PlacementAuthorization(this.Map.Resolve(destination), new PlacementMovePermit());
 					},
 					_ => this.Current,
-					() => this.Now);
+					() => this.Now, automatic: automatic);
 			}
 
 			internal void Step() => this.Processor.Step(this.Work);
 		}
 
-		private sealed class FakeWindows : IPlacementWindows
+		private sealed class FakeWindows : IPlacementWindows, IPlacementForeground
 		{
+			internal int Follows, FollowPreparations;
+			internal bool FollowFailure;
+
+			public Action PrepareFollow(PlacementWindowIdentity identity, Guid source, Guid target, Func<bool> current)
+			{
+				this.FollowPreparations++;
+				return () =>
+				{
+					Assert.True(current());
+					this.Follows++;
+					if (this.FollowFailure) throw new InvalidOperationException();
+				};
+			}
+
 			internal PlacementWindowIdentity Identity = PlacementProcessorTests.Identity(1);
 			internal PlacementInspectionStatus Status = PlacementInspectionStatus.Ready;
 			internal Guid Location = Guid.NewGuid();
@@ -358,11 +436,13 @@ namespace SylphyHorn.Tests
 				return this.LocationAvailable ? new PlacementWindowLocation(this.Location, this.Pinned) : null;
 			}
 
-			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target, PlacementMovePermit permit, Func<bool> current)
+			public PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target,
+				PlacementMovePermit permit, Func<bool> current, Action beforeMove = null)
 			{
 				this.BeforeMove?.Invoke(permit);
 				if (!current() || !permit.TryStart()) return PlacementMoveStatus.Cancelled;
 				if (this.Location == target) return PlacementMoveStatus.AlreadyPlaced;
+				beforeMove?.Invoke();
 				this.Moves++;
 				if (this.FailMove) throw new COMException("synthetic");
 				if (this.ConfirmMove) this.Location = target;

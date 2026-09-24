@@ -115,7 +115,13 @@ namespace SylphyHorn.Services.AppPlacement
 
 		PlacementWindowLocation Locate(IntPtr window);
 
-		PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target, PlacementMovePermit permit, Func<bool> stillCurrent);
+		PlacementMoveStatus Move(PlacementWindowIdentity expected, Guid source, Guid target,
+			PlacementMovePermit permit, Func<bool> stillCurrent, Action beforeMove = null);
+	}
+
+	internal interface IPlacementForeground
+	{
+		Action PrepareFollow(PlacementWindowIdentity identity, Guid source, Guid target, Func<bool> current);
 	}
 
 	internal sealed class PlacementWorkItem
@@ -144,6 +150,8 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal Guid? ExpectedTarget { get; set; }
 
+		internal Action Follow { get; set; }
+
 		internal bool Requested { get; set; }
 
 		internal bool MoveAttempted { get; set; }
@@ -162,6 +170,7 @@ namespace SylphyHorn.Services.AppPlacement
 		private readonly Func<PlacementCandidate, bool> _current;
 		private readonly Func<long> _now;
 		private readonly CancellationToken _cancellation;
+		private readonly bool _automatic;
 
 		internal PlacementProcessor(
 			AppPlacementConfiguration configuration,
@@ -169,7 +178,7 @@ namespace SylphyHorn.Services.AppPlacement
 			Func<PlacementDestination, long, PlacementAuthorization> authorize,
 			Func<PlacementCandidate, bool> current,
 			Func<long> now,
-			CancellationToken cancellation = default)
+			CancellationToken cancellation = default, bool automatic = false)
 		{
 			this._configuration = configuration;
 			this._windows = windows;
@@ -177,6 +186,7 @@ namespace SylphyHorn.Services.AppPlacement
 			this._current = current;
 			this._now = now;
 			this._cancellation = cancellation;
+			this._automatic = automatic;
 		}
 
 		internal void Step(PlacementWorkItem work)
@@ -277,7 +287,14 @@ namespace SylphyHorn.Services.AppPlacement
 						work.Source.Value,
 						work.Target.Value,
 						authorization.Permit,
-						() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline);
+						() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline,
+						() =>
+						{
+							if (this._automatic && (work.Rule.FollowForeground ?? this._configuration.FollowForeground)
+								&& this._windows is IPlacementForeground foreground)
+								work.Follow = foreground.PrepareFollow(work.Identity, work.Source.Value, work.Target.Value,
+									() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline);
+						});
 				switch (moved)
 				{
 					case PlacementMoveStatus.Requested:
@@ -338,7 +355,16 @@ namespace SylphyHorn.Services.AppPlacement
 				return;
 			}
 			var location = this._windows.Locate(work.Candidate.Window);
-			if (location != null && !location.Pinned && location.Desktop == work.Target) work.Finish(PlacementOutcome.Moved);
+			if (location != null && !location.Pinned && location.Desktop == work.Target)
+			{
+				// A failed follow must not turn a confirmed move into a failed placement or resend it.
+				try
+				{
+					work.Follow?.Invoke();
+					work.Finish(PlacementOutcome.Moved);
+				}
+				catch (Exception ex) { work.Finish(PlacementOutcome.Moved, "FollowFailed:" + ex.GetType().Name); }
+			}
 			else if (location != null && (location.Pinned || (location.Desktop != work.Source && location.Desktop != work.Target))) work.Finish(PlacementOutcome.Unconfirmed, "DesktopChanged");
 			else work.NextAt = Math.Min(work.Deadline, this._now() + 100);
 		}

@@ -97,6 +97,24 @@ namespace SylphyHorn.UI
 			else if (args.Key == Key.Enter) { await row.Group.Owner.CommitClosingAsync(row); args.Handled = true; }
 		}
 
+		private void OpenFollowMenu(object sender, RoutedEventArgs args)
+		{
+			var button = (Button)sender;
+			button.ContextMenu.PlacementTarget = button;
+			button.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+			button.ContextMenu.IsOpen = true;
+		}
+
+		private async void FollowSelected(object sender, RoutedEventArgs args)
+		{
+			if (sender is MenuItem item && item.DataContext is PlacementRuleRow row)
+			{
+				row.FollowForeground = (string)item.Tag == "default" ? (bool?)null : (string)item.Tag == "true";
+				await row.Group.Owner.CommitAsync(row);
+				args.Handled = true;
+			}
+		}
+
 		private void Add(object sender, RoutedEventArgs args)
 		{
 			if ((sender as FrameworkElement)?.DataContext is PlacementRuleGroup group) this.FocusRow(group.Owner.AddRow(group));

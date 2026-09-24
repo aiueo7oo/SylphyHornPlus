@@ -867,4 +867,22 @@
   <data name="Placement_CloseByNumber" xml:space="preserve">
     <value>個別に閉じるデスクトップ番号</value>
   </data>
+  <data name="Placement_FollowForeground" xml:space="preserve">
+    <value>前面アプリの配置先へ切り替える（個別指定のないアプリ）</value>
+  </data>
+  <data name="Placement_FollowLabel" xml:space="preserve">
+    <value>切替：{0}</value>
+  </data>
+  <data name="Placement_FollowDefault" xml:space="preserve">
+    <value>全体設定に従う</value>
+  </data>
+  <data name="Placement_FollowDefaultState" xml:space="preserve">
+    <value>全体設定（{0}）</value>
+  </data>
+  <data name="Placement_FollowYes" xml:space="preserve">
+    <value>切り替える</value>
+  </data>
+  <data name="Placement_FollowNo" xml:space="preserve">
+    <value>切り替えない</value>
+  </data>
 </root>

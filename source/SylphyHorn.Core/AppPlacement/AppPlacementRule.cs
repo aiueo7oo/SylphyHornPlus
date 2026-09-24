@@ -139,13 +139,17 @@ namespace SylphyHorn.AppPlacement
 		[DataMember(Order = 5)]
 		public string DisplayExecutablePath { get; private set; }
 
+		[DataMember(Order = 6, EmitDefaultValue = false)]
+		public bool? FollowForeground { get; private set; }
+
 		public AppPlacementRule(
 			Guid id,
 			bool enabled,
 			PlacementAppIdentity app,
 			PlacementDestination destination,
 			string displayName = null,
-			string displayExecutablePath = null)
+			string displayExecutablePath = null,
+			bool? followForeground = null)
 		{
 			this.Id = id;
 			this.Enabled = enabled;
@@ -153,6 +157,7 @@ namespace SylphyHorn.AppPlacement
 			this.Destination = destination;
 			this.DisplayName = displayName;
 			this.DisplayExecutablePath = displayExecutablePath;
+			this.FollowForeground = followForeground;
 			this.Validate();
 		}
 

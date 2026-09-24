@@ -58,6 +58,7 @@ namespace SylphyHorn.Serialization
 			if (value is AppPlacementConfiguration placement)
 			{
 				AppendValue(builder, placement.Enabled);
+				AppendValue(builder, placement.FollowForeground);
 				AppendValue(builder, placement.CreateMissingDesktops);
 				AppendValue(builder, placement.CloseCreatedDesktops);
 				AppendValue(builder, placement.ClosingTargets);
@@ -66,6 +67,7 @@ namespace SylphyHorn.Serialization
 				{
 					AppendValue(builder, rule.Id);
 					AppendValue(builder, rule.Enabled);
+					AppendValue(builder, rule.FollowForeground);
 					AppendValue(builder, rule.App.Kind);
 					AppendValue(builder, rule.App.Value);
 					AppendValue(builder, rule.Destination.Kind);

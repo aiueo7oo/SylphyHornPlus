@@ -867,4 +867,22 @@
   <data name="Placement_CloseByNumber" xml:space="preserve">
     <value>Also close these desktop numbers</value>
   </data>
+  <data name="Placement_FollowForeground" xml:space="preserve">
+    <value>Switch to the foreground app’s destination unless overridden below</value>
+  </data>
+  <data name="Placement_FollowLabel" xml:space="preserve">
+    <value>Switch: {0}</value>
+  </data>
+  <data name="Placement_FollowDefault" xml:space="preserve">
+    <value>Use global setting</value>
+  </data>
+  <data name="Placement_FollowDefaultState" xml:space="preserve">
+    <value>Global ({0})</value>
+  </data>
+  <data name="Placement_FollowYes" xml:space="preserve">
+    <value>Switch</value>
+  </data>
+  <data name="Placement_FollowNo" xml:space="preserve">
+    <value>Do not switch</value>
+  </data>
 </root>
