@@ -67,6 +67,42 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "monitor", EmitDefaultValue = false)]
+		public string Monitor;
+
+		[DataMember(Name = "placement", EmitDefaultValue = false)]
+		public string Placement;
+
+		[DataMember(Name = "offsetX", EmitDefaultValue = false)]
+		public int? OffsetX;
+
+		[DataMember(Name = "offsetY", EmitDefaultValue = false)]
+		public int? OffsetY;
+
+		[DataMember(Name = "minWidth", EmitDefaultValue = false)]
+		public int? MinWidth;
+
+		[DataMember(Name = "simpleMinWidth", EmitDefaultValue = false)]
+		public int? SimpleMinWidth;
+
+		[DataMember(Name = "minHeight", EmitDefaultValue = false)]
+		public int? MinHeight;
+
+		[DataMember(Name = "pinMinWidth", EmitDefaultValue = false)]
+		public int? PinMinWidth;
+
+		[DataMember(Name = "pinOffsetX", EmitDefaultValue = false)]
+		public int? PinOffsetX;
+
+		[DataMember(Name = "pinOffsetY", EmitDefaultValue = false)]
+		public int? PinOffsetY;
+
+		[DataMember(Name = "monitorAvailable", EmitDefaultValue = false)]
+		public bool? MonitorAvailable;
+
+		[DataMember(Name = "monitors", EmitDefaultValue = false)]
+		public CliMonitor[] Monitors;
+
 		[DataMember(Name = "simple", EmitDefaultValue = false)]
 		public bool? Simple;
 
@@ -177,6 +213,38 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliMonitor
+	{
+		[DataMember(Name = "number")]
+		public int Number;
+
+		[DataMember(Name = "name")]
+		public string Name;
+
+		[DataMember(Name = "bounds")]
+		public CliRectangle Bounds;
+
+		[DataMember(Name = "workArea")]
+		public CliRectangle WorkArea;
+	}
+
+	[DataContract]
+	internal sealed class CliRectangle
+	{
+		[DataMember(Name = "x")]
+		public double X;
+
+		[DataMember(Name = "y")]
+		public double Y;
+
+		[DataMember(Name = "width")]
+		public double Width;
+
+		[DataMember(Name = "height")]
+		public double Height;
 	}
 
 	[DataContract]

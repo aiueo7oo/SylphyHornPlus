@@ -32,8 +32,8 @@ namespace SylphyHorn.UI
 				var width = this.ActualWidth * this._geometry.DpiScaleX;
 				var height = this.ActualHeight * this._geometry.DpiScaleY;
 
-				this.Left = (this._geometry.Left + (this._geometry.Width - width) / 2) / this._geometry.DpiScaleX + this._visual.OffsetX;
-				this.Top = (this._geometry.Top + (this._geometry.Height - height) / 2) / this._geometry.DpiScaleY - this._visual.OffsetY;
+				this.Left = (this._geometry.Left + (this._geometry.Width - width) / 2) / this._geometry.DpiScaleX + this._visual.PinOffsetX;
+				this.Top = (this._geometry.Top + (this._geometry.Height - height) / 2) / this._geometry.DpiScaleY - this._visual.PinOffsetY;
 			}
 		}
 	}

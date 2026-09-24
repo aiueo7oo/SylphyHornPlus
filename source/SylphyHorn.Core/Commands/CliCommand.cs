@@ -6,6 +6,26 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal string Monitor { get; private set; }
+
+		internal string Placement { get; private set; }
+
+		internal int? OffsetX { get; private set; }
+
+		internal int? OffsetY { get; private set; }
+
+		internal int? MinWidth { get; private set; }
+
+		internal int? SimpleMinWidth { get; private set; }
+
+		internal int? MinHeight { get; private set; }
+
+		internal int? PinMinWidth { get; private set; }
+
+		internal int? PinOffsetX { get; private set; }
+
+		internal int? PinOffsetY { get; private set; }
+
 		internal bool? Simple { get; private set; }
 
 		internal bool? UseDesktopName { get; private set; }
@@ -39,6 +59,11 @@ namespace SylphyHorn.Commands
 		internal bool? ShowDesktop { get; private set; }
 
 		internal bool? CurrentNumberOnly { get; private set; }
+
+		internal bool HasNotificationGeometry
+			=> this.Monitor != null || this.Placement != null || this.OffsetX != null || this.OffsetY != null
+				|| this.MinWidth != null || this.SimpleMinWidth != null || this.MinHeight != null
+				|| this.PinMinWidth != null || this.PinOffsetX != null || this.PinOffsetY != null;
 
 		internal bool HasNotificationAppearance
 			=> this.Simple != null || this.UseDesktopName != null || this.Theme != null || this.Corners != null || this.FontFamily != null
@@ -137,6 +162,40 @@ namespace SylphyHorn.Commands
 					command.ShowDesktop = ReadBoolean(args, ref i);
 				else if (command.Operation == "tray configure" && option == "--current-number-only")
 					command.CurrentNumberOnly = ReadBoolean(args, ref i);
+				else if (command.Operation == "notification configure" && option == "--monitor")
+				{
+					command.Monitor = ReadValue(args, ref i);
+					if (command.Monitor != "current" && command.Monitor != "all"
+						&& (!uint.TryParse(command.Monitor, NumberStyles.None, CultureInfo.InvariantCulture, out var monitor)
+							|| monitor == 0 || monitor == uint.MaxValue))
+						throw new ArgumentException("--monitor requires current, all or a positive monitor number.");
+				}
+				else if (command.Operation == "notification configure" && option == "--placement")
+					command.Placement = ReadChoice(args, ref i,
+						"top-left", "top-center", "top-right", "center-left", "center", "center-right",
+						"bottom-left", "bottom-center", "bottom-right");
+				else if (command.Operation == "notification configure"
+					&& (option == "--offset-x"
+						|| option == "--offset-y"
+						|| option == "--min-width"
+						|| option == "--simple-min-width"
+						|| option == "--min-height"
+						|| option == "--pin-min-width"
+						|| option == "--pin-offset-x"
+						|| option == "--pin-offset-y"))
+				{
+					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
+						|| (option.Contains("min-") && value < 1))
+						throw new ArgumentException("Minimum sizes must be positive integers; offsets must be signed integers.");
+					if (option == "--offset-x") command.OffsetX = value;
+					else if (option == "--offset-y") command.OffsetY = value;
+					else if (option == "--min-width") command.MinWidth = value;
+					else if (option == "--simple-min-width") command.SimpleMinWidth = value;
+					else if (option == "--min-height") command.MinHeight = value;
+					else if (option == "--pin-min-width") command.PinMinWidth = value;
+					else if (option == "--pin-offset-x") command.PinOffsetX = value;
+					else if (option == "--pin-offset-y") command.PinOffsetY = value;
+				}
 				else if (command.Operation == "notification configure" && option == "--simple")
 					command.Simple = ReadBoolean(args, ref i);
 				else if (command.Operation == "notification configure" && option == "--use-desktop-name")
@@ -298,7 +357,7 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
 			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null)
 				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null
-					&& command.DurationMs == null && !command.HasNotificationAppearance)
+					&& command.DurationMs == null && !command.HasNotificationAppearance && !command.HasNotificationGeometry)
 				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)
 				|| (command.Operation == "settings configure" && command.Language == null))
 				throw new ArgumentException("Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.");
@@ -306,7 +365,7 @@ namespace SylphyHorn.Commands
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "desktop settings" || operation == "desktop configure"
+			=> operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
 				|| operation == "notification settings" || operation == "notification configure"
 				|| operation == "tray settings" || operation == "tray configure"
 				|| operation == "settings get" || operation == "settings configure" || operation == "app list"

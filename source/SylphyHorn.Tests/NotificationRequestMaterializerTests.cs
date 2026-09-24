@@ -13,6 +13,25 @@ namespace SylphyHorn.Tests
 	public sealed class NotificationRequestMaterializerTests
 	{
 		[Fact]
+		public void MonitorSelectionFallsBackOnlyWhenNeededAndHandlesAnEmptyTopology()
+		{
+			var left = new Rect(-1920, 0, 1920, 1040);
+			var right = new Rect(0, 0, 1920, 1040);
+			var monitors = new[] { new Monitor("Left", left, left), new Monitor("Right", right, right) };
+			var cursorReads = 0;
+			Func<Rect> current = () => { cursorReads++; return left; };
+
+			Assert.Equal(right, Assert.Single(NotificationWindowFactory.ResolveSwitchAreas(2, monitors, current)));
+			Assert.Equal(new[] { left, right }, NotificationWindowFactory.ResolveSwitchAreas(uint.MaxValue, monitors, current));
+			Assert.Equal(0, cursorReads);
+			Assert.Equal(left, Assert.Single(NotificationWindowFactory.ResolveSwitchAreas(0, monitors, current)));
+			Assert.Equal(left, Assert.Single(NotificationWindowFactory.ResolveSwitchAreas(3, monitors, current)));
+			Assert.Equal(2, cursorReads);
+			Assert.Empty(NotificationWindowFactory.ResolveSwitchAreas(1, Array.Empty<Monitor>(), current));
+			Assert.Equal(2, cursorReads);
+		}
+
+		[Fact]
 		public void SwitchedRequestMaterializesTextLifetimeAndEveryVisualSetting()
 		{
 			var settings = CreateSettings(alwaysShow: true, simple: false, useDesktopName: true);

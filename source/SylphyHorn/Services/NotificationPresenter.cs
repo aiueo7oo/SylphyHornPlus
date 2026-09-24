@@ -142,16 +142,19 @@ namespace SylphyHorn.Services
 	internal sealed class NotificationWindowFactory : INotificationWindowFactory
 	{
 		public IReadOnlyList<Rect> GetSwitchAreas(uint display)
+			=> ResolveSwitchAreas(display, MonitorService.GetAreas(), () => MonitorService.GetCurrentArea().WorkArea);
+
+		internal static IReadOnlyList<Rect> ResolveSwitchAreas(uint display, IReadOnlyList<Monitor> monitors, Func<Rect> currentArea)
 		{
-			if (display == 0) return new[] { MonitorService.GetCurrentArea().WorkArea };
-			var monitors = MonitorService.GetAreas();
+			if (monitors.Count == 0) return Array.Empty<Rect>();
 			if (display == uint.MaxValue)
 			{
-				var areas = new Rect[monitors.Length];
-				for (var index = 0; index < monitors.Length; index++) areas[index] = monitors[index].WorkArea;
+				var areas = new Rect[monitors.Count];
+				for (var index = 0; index < monitors.Count; index++) areas[index] = monitors[index].WorkArea;
 				return areas;
 			}
-			return new[] { monitors[display - 1].WorkArea };
+			if (display == 0 || display > monitors.Count) return new[] { currentArea() };
+			return new[] { monitors[(int)display - 1].WorkArea };
 		}
 
 		public INotificationWindowHandle CreateSwitch(Rect area, NotificationVisualSettings visual)

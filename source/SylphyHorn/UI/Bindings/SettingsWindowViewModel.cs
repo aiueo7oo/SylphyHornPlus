@@ -918,6 +918,16 @@ namespace SylphyHorn.UI.Bindings
 
 			SettingsService.ObserveNotificationAppearance(Settings.General, () =>
 			{
+				this.OnPropertyChanged(nameof(this.Display));
+				this.OnPropertyChanged(nameof(this.Placement));
+				this.OnPropertyChanged(nameof(this.NotificationOffsetX));
+				this.OnPropertyChanged(nameof(this.NotificationOffsetY));
+				this.OnPropertyChanged(nameof(this.NotificationMinWidth));
+				this.OnPropertyChanged(nameof(this.SimpleNotificationMinWidth));
+				this.OnPropertyChanged(nameof(this.NotificationMinHeight));
+				this.OnPropertyChanged(nameof(this.PinWindowMinWidth));
+				this.OnPropertyChanged(nameof(this.PinWindowOffsetX));
+				this.OnPropertyChanged(nameof(this.PinWindowOffsetY));
 				this.OnPropertyChanged(nameof(this.PreviewNotificationText));
 				this.OnPropertyChanged(nameof(this.PreviewNotificationHeaderVisibility));
 				this.OnPropertyChanged(nameof(this.NotificationWindowStyle));

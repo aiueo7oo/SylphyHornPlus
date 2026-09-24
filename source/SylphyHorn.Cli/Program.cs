@@ -16,13 +16,18 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
+				Console.WriteLine("sylphyhorn-cli monitor list");
 				Console.WriteLine("sylphyhorn-cli desktop settings");
 				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false]");
 				Console.WriteLine("sylphyhorn-cli notification settings");
 				Console.WriteLine("sylphyhorn-cli notification configure [--on-switch true|false] [--always-show true|false] [--duration-ms N] " +
 					"[--simple true|false] [--use-desktop-name true|false] [--theme (apps | system | light | dark | accent)] " +
 					"[--corners (square | rounded | small-rounded)] [--font-family FAMILY] [--header-font-size N] [--body-font-size N] " +
-					"[--header-align (left | center | right)] [--body-align (left | center | right)] [--line-spacing N]");
+					"[--header-align (left | center | right)] [--body-align (left | center | right)] [--line-spacing N] " +
+					"[--monitor (current | all | N)] [--placement (top-left | top-center | top-right | center-left | center | center-right | " +
+					"bottom-left | bottom-center | bottom-right)] " +
+					"[--offset-x N] [--offset-y N] [--min-width N] [--simple-min-width N] [--min-height N] " +
+					"[--pin-min-width N] [--pin-offset-x N] [--pin-offset-y N]");
 				Console.WriteLine("sylphyhorn-cli tray settings");
 				Console.WriteLine("sylphyhorn-cli tray configure [--show-desktop true|false] [--current-number-only true|false]");
 				Console.WriteLine("sylphyhorn-cli settings get");

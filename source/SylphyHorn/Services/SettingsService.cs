@@ -26,6 +26,16 @@ namespace SylphyHorn.Services
 		internal static IDisposable ObserveNotificationAppearance(GeneralSettings settings, Action changed)
 		{
 			var subscriptions = new SylphyHorn.Lifetime.DisposableCollection();
+			subscriptions.Add(ObserveChange(settings.Display, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.Placement, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationOffsetX, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationOffsetY, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationMinWidth, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.SimpleNotificationMinWidth, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.NotificationMinHeight, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.PinWindowMinWidth, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.PinWindowOffsetX, _ => changed()));
+			subscriptions.Add(ObserveChange(settings.PinWindowOffsetY, _ => changed()));
 			subscriptions.Add(ObserveChange(settings.SimpleNotification, _ => changed()));
 			subscriptions.Add(ObserveChange(settings.UseDesktopName, _ => changed()));
 			subscriptions.Add(ObserveChange(settings.NotificationWindowStyle, _ => changed()));

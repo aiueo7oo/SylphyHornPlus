@@ -28,10 +28,14 @@ namespace SylphyHorn.Services
 			int notificationMinWidth,
 			int simpleNotificationMinWidth,
 			int pinWindowMinWidth,
-			int notificationMinHeight)
+			int notificationMinHeight,
+			int pinOffsetX = 0,
+			int pinOffsetY = 0)
 		{
 			this.Display = display;
 			this.Placement = placement;
+			this.PinOffsetX = pinOffsetX;
+			this.PinOffsetY = pinOffsetY;
 			this.OffsetX = offsetX;
 			this.OffsetY = offsetY;
 			this.WindowStyle = windowStyle;
@@ -52,6 +56,8 @@ namespace SylphyHorn.Services
 
 		internal uint Display { get; }
 		internal WindowPlacement Placement { get; }
+		internal int PinOffsetX { get; }
+		internal int PinOffsetY { get; }
 		internal int OffsetX { get; }
 		internal int OffsetY { get; }
 		internal uint WindowStyle { get; }
@@ -95,7 +101,9 @@ namespace SylphyHorn.Services
 				settings.NotificationMinWidth,
 				settings.SimpleNotificationMinWidth,
 				settings.PinWindowMinWidth,
-				settings.NotificationMinHeight);
+				settings.NotificationMinHeight,
+				settings.PinWindowOffsetX,
+				settings.PinWindowOffsetY);
 		}
 
 		private static string CreateHeaderMargin(HorizontalAlignment alignment, int lineSpacing)

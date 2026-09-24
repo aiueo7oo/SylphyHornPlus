@@ -37,7 +37,7 @@ namespace SylphyHorn.UI
 			var area = this._area;
 
 			var offsetLeft = this._visual.OffsetX;
-			var offsetTop = -this._visual.OffsetY;
+			var offsetTop = -(double)this._visual.OffsetY;
 
 			switch (this._visual.Placement)
 			{
