@@ -175,11 +175,11 @@ jobs:
               $locale.PackageLocale -ceq 'en-US' -and
               $locale.Publisher -ceq 'hwtnb' -and
               $locale.PublisherUrl -ceq 'https://github.com/hwtnb' -and
-              $locale.PublisherSupportUrl -ceq 'https://github.com/hwtnb/SylphyHornPlusWin11/issues' -and
+              $locale.PublisherSupportUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus/issues' -and
               $locale.PackageName -ceq 'SylphyHornPlus' -and
-              $locale.PackageUrl -ceq 'https://github.com/hwtnb/SylphyHornPlusWin11' -and
+              $locale.PackageUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus' -and
               $locale.License -ceq 'MIT' -and
-              $locale.LicenseUrl -ceq 'https://github.com/hwtnb/SylphyHornPlusWin11/blob/HEAD/LICENSE.txt' -and
+              $locale.LicenseUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus/blob/HEAD/LICENSE.txt' -and
               $locale.ShortDescription -ceq 'Virtual Desktop Tools for Windows 11 and 10.' -and
               @(Compare-Object $expectedTags $actualTags).Count -eq 0
             if (-not $localeContractMatches) {

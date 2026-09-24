@@ -739,6 +739,7 @@ function Assert-AllowList {
 			".exe" { $true; break }
 			".json" { $approvedJson -ccontains $relativePath; break }
 			".config" { $approvedConfig -ccontains $relativePath; break }
+			".md" { $relativePath -ceq "skills/sylphyhorn/SKILL.md"; break }
 			".png" { $relativePath.StartsWith(
 				".assets/",
 				[System.StringComparison]::Ordinal); break }
@@ -851,6 +852,10 @@ $schedulerLock = Join-Path `
 	$repositoryRoot `
 	"source/SylphyHorn.SchedulerManager/packages.lock.json"
 $readmePath = Join-Path $repositoryRoot "README.md"
+$agentSkillPath = Join-Path $repositoryRoot "skills/sylphyhorn/SKILL.md"
+
+Assert-Condition (Test-Path -LiteralPath $agentSkillPath -PathType Leaf) `
+	"Agent skill is missing: $agentSkillPath"
 
 Assert-Condition (Test-Path -LiteralPath $applicationLock -PathType Leaf) `
 	"Application lock file is missing: $applicationLock"
@@ -895,6 +900,7 @@ $buildInputPaths = @(
 	$scriptPath,
 	(Join-Path $repositoryRoot "global.json"),
 	$readmePath,
+	$agentSkillPath,
 	$applicationProject,
 	$schedulerProject,
 	$cliProject,
@@ -1320,6 +1326,13 @@ Add-StagingFile `
 	-StagingRoot $wrapperRoot `
 	-Provenance $provenance
 
+Add-StagingFile `
+	-SourcePath $agentSkillPath `
+	-RelativePath "skills/sylphyhorn/SKILL.md" `
+	-Origin "source:skills/sylphyhorn/SKILL.md" `
+	-StagingRoot $wrapperRoot `
+	-Provenance $provenance
+
 $dependencyInventory = Get-LockDependencyInventory `
 	-LockPaths @($applicationLock, $schedulerLock, $cliLock)
 $releaseDependencyInventory = @(
@@ -1356,7 +1369,8 @@ foreach ($requiredFile in @(
 	"sylphyhorn-cli.exe",
 	"sylphyhorn-cli.dll",
 	"sylphyhorn-cli.deps.json",
-	"sylphyhorn-cli.runtimeconfig.json"
+	"sylphyhorn-cli.runtimeconfig.json",
+	"skills/sylphyhorn/SKILL.md"
 )) {
 	Assert-Condition `
 		(Test-Path -LiteralPath (Join-Path $wrapperRoot $requiredFile) -PathType Leaf) `

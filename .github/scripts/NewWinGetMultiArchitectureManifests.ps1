@@ -135,11 +135,11 @@ PackageVersion: $(ConvertTo-YamlString $Version)
 PackageLocale: en-US
 Publisher: hwtnb
 PublisherUrl: https://github.com/hwtnb
-PublisherSupportUrl: https://github.com/hwtnb/SylphyHornPlusWin11/issues
+PublisherSupportUrl: https://github.com/hwtnb/SylphyHornPlus/issues
 PackageName: SylphyHornPlus
-PackageUrl: https://github.com/hwtnb/SylphyHornPlusWin11
+PackageUrl: https://github.com/hwtnb/SylphyHornPlus
 License: MIT
-LicenseUrl: https://github.com/hwtnb/SylphyHornPlusWin11/blob/HEAD/LICENSE.txt
+LicenseUrl: https://github.com/hwtnb/SylphyHornPlus/blob/HEAD/LICENSE.txt
 ShortDescription: Virtual Desktop Tools for Windows 11 and 10.
 Tags:
 - desktop-app
