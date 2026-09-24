@@ -16,6 +16,10 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
+				Console.WriteLine("sylphyhorn-cli shortcut list [--device keyboard|mouse]");
+				Console.WriteLine("sylphyhorn-cli shortcut keys --device keyboard|mouse");
+				Console.WriteLine("sylphyhorn-cli shortcut set --device keyboard|mouse --action ACTION [--number N] --trigger TRIGGER");
+				Console.WriteLine("sylphyhorn-cli shortcut clear --device keyboard|mouse --action ACTION [--number N]");
 				Console.WriteLine("sylphyhorn-cli monitor list");
 				Console.WriteLine("sylphyhorn-cli desktop settings");
 				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false] " +

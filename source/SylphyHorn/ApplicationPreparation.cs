@@ -31,6 +31,7 @@ namespace SylphyHorn
 		private Services.Commands.CliServer _cliServer;
 		private Services.Commands.CliAssignmentService _cliAssignments;
 		private Services.Commands.CliSettingsService _cliSettings;
+		private Services.Commands.CliShortcutService _cliShortcuts;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -132,6 +133,8 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
+				return this._cliShortcuts.ExecuteAsync(command, cancellation);
 			if (Services.Commands.CliSettingsService.Handles(command.Operation))
 				return this._cliSettings.ExecuteAsync(command, cancellation);
 			if (command.Operation == "app assignment apply")
@@ -239,6 +242,10 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
+					this._cliShortcuts = new Services.Commands.CliShortcutService(Settings.ShortcutKey, Settings.MouseShortcut,
+						Settings.General, () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
+						() => runtime.CliAvailable && !this._hookService.IsSuspended,
+						() => this._hookService.Reload(), () => runtime.State.Order.Count);
 					this._cliSettings = new Services.Commands.CliSettingsService(Settings.General,
 						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable,
 						ResourceService.Current.StartupCulture);

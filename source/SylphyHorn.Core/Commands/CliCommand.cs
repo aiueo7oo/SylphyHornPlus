@@ -6,6 +6,12 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal string Device { get; private set; }
+
+		internal string Action { get; private set; }
+
+		internal string Trigger { get; private set; }
+
 		internal bool? PerDesktopWallpaper { get; private set; }
 
 		internal bool? OverrideOnStartup { get; private set; }
@@ -153,6 +159,19 @@ namespace SylphyHorn.Commands
 				{
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
+				}
+				else if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal) && option == "--device")
+					command.Device = ReadChoice(args, ref i, "keyboard", "mouse");
+				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--action")
+					command.Action = ReadTextValue(args, ref i, "Specify an action returned by shortcut list.");
+				else if (command.Operation == "shortcut set" && option == "--trigger")
+					command.Trigger = ReadTextValue(args, ref i, "Specify a trigger using names from shortcut keys.");
+				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--number")
+				{
+					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+						|| number < 1 || number > 1000)
+						throw new ArgumentException("Shortcut desktop numbers must be between 1 and 1000.");
+					command.Number = number;
 				}
 				else if (command.Operation == "desktop configure" && option == "--per-desktop-wallpaper")
 					command.PerDesktopWallpaper = ReadBoolean(args, ref i);
@@ -370,11 +389,21 @@ namespace SylphyHorn.Commands
 				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)
 				|| (command.Operation == "settings configure" && command.Language == null))
 				throw new ArgumentException("Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.");
+			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
+			{
+				if (command.Operation != "shortcut list" && command.Device == null)
+					throw new ArgumentException("Specify --device keyboard or mouse.");
+				if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && command.Action == null)
+					throw new ArgumentException("Specify --action using shortcut list.");
+				if (command.Operation == "shortcut set" && command.Trigger == null)
+					throw new ArgumentException("Specify --trigger using shortcut keys.");
+			}
 			return command;
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
+			=> operation == "shortcut list" || operation == "shortcut keys" || operation == "shortcut set" || operation == "shortcut clear"
+				|| operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
 				|| operation == "notification settings" || operation == "notification configure"
 				|| operation == "tray settings" || operation == "tray configure"
 				|| operation == "settings get" || operation == "settings configure" || operation == "app list"

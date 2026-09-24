@@ -51,6 +51,9 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliError
 	{
+		[DataMember(Name = "conflicts", EmitDefaultValue = false)]
+		public CliShortcut[] Conflicts;
+
 		[DataMember(Name = "results", Order = 3, EmitDefaultValue = false)]
 		public CliAssignmentResult[] Results;
 
@@ -67,6 +70,12 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "shortcuts", EmitDefaultValue = false)]
+		public CliShortcut[] Shortcuts;
+
+		[DataMember(Name = "keys", EmitDefaultValue = false)]
+		public CliInputKey[] Keys;
+
 		[DataMember(Name = "perDesktopWallpaper", EmitDefaultValue = false)]
 		public bool? PerDesktopWallpaper;
 
@@ -225,6 +234,41 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliShortcut
+	{
+		[DataMember(Name = "device")]
+		public string Device;
+
+		[DataMember(Name = "action")]
+		public string Action;
+
+		[DataMember(Name = "number", EmitDefaultValue = false)]
+		public int? Number;
+
+		[DataMember(Name = "numberRequired")]
+		public bool NumberRequired;
+
+		[DataMember(Name = "trigger")]
+		public string Trigger;
+
+		[DataMember(Name = "supported")]
+		public bool Supported;
+	}
+
+	[DataContract]
+	internal sealed class CliInputKey
+	{
+		[DataMember(Name = "name")]
+		public string Name;
+
+		[DataMember(Name = "canTrigger")]
+		public bool CanTrigger;
+
+		[DataMember(Name = "canHold")]
+		public bool CanHold;
 	}
 
 	[DataContract]

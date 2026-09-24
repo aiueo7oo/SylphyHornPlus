@@ -21,6 +21,8 @@ namespace SylphyHorn.Services
 		private bool _disposed;
 		private bool _started;
 
+		internal bool IsSuspended => this._suspendRequestCount > 0;
+
 		public Action Reload
 		{
 			get
