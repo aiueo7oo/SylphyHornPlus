@@ -67,6 +67,18 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "perDesktopWallpaper", EmitDefaultValue = false)]
+		public bool? PerDesktopWallpaper;
+
+		[DataMember(Name = "overrideOnStartup", EmitDefaultValue = false)]
+		public bool? OverrideOnStartup;
+
+		[DataMember(Name = "nativeWallpaperSupported", EmitDefaultValue = false)]
+		public bool? NativeWallpaperSupported;
+
+		[DataMember(Name = "wallpaperEnabled", EmitDefaultValue = false)]
+		public bool? WallpaperEnabled;
+
 		[DataMember(Name = "monitor", EmitDefaultValue = false)]
 		public string Monitor;
 

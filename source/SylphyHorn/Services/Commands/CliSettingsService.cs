@@ -54,6 +54,8 @@ namespace SylphyHorn.Services.Commands
 			{ "bottom-right", (uint)WindowPlacement.BottomRight },
 		};
 
+		private readonly bool _nativeWallpaperSupported;
+		private readonly bool _nameSupported;
 		private readonly Func<Monitor[]> _monitors;
 		private readonly GeneralSettings _settings;
 		private readonly Func<Task<SettingsSaveResult>> _save;
@@ -61,8 +63,10 @@ namespace SylphyHorn.Services.Commands
 		private readonly string _startupCulture;
 
 		internal CliSettingsService(GeneralSettings settings, Func<Task<SettingsSaveResult>> save, Func<bool> available, string startupCulture,
-			Func<Monitor[]> monitors = null)
+			Func<Monitor[]> monitors = null, bool? nativeWallpaperSupported = null, bool? nameSupported = null)
 		{
+			this._nativeWallpaperSupported = nativeWallpaperSupported ?? ProductInfo.IsWallpaperSupportBuild;
+			this._nameSupported = nameSupported ?? ProductInfo.IsNameSupportBuild;
 			this._monitors = monitors ?? MonitorService.GetMonitors;
 			this._settings = settings;
 			this._save = save;
@@ -98,6 +102,10 @@ namespace SylphyHorn.Services.Commands
 					return CliResponse.Ok(command.Operation, this.Describe(command.Operation, monitors.Length));
 				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
 
+				if ((command.PerDesktopWallpaper.HasValue && this._nativeWallpaperSupported)
+					|| (command.OverrideOnStartup.HasValue && !this._nameSupported))
+					return CliResponse.Fail(command.Operation, "unsupported", "This setting is not available on this Windows build.");
+
 				uint? display = command.Monitor == null ? (uint?)null : command.Monitor == "current" ? 0u
 					: command.Monitor == "all" ? uint.MaxValue : uint.Parse(command.Monitor, CultureInfo.InvariantCulture);
 				if (display.HasValue && display != 0 && display != uint.MaxValue && display > monitors.Length)
@@ -128,6 +136,8 @@ namespace SylphyHorn.Services.Commands
 				Set(this._settings.PinWindowMinWidth, command.PinMinWidth, ref changed);
 				Set(this._settings.PinWindowOffsetX, command.PinOffsetX, ref changed);
 				Set(this._settings.PinWindowOffsetY, command.PinOffsetY, ref changed);
+				Set(this._settings.ChangeBackgroundEachDesktop, command.PerDesktopWallpaper, ref changed);
+				Set(this._settings.OverrideDesktopsOnStartup, command.OverrideOnStartup, ref changed);
 				Set(this._settings.LoopDesktop, command.Loop, ref changed);
 				Set(this._settings.OverrideWindowsDefaultKeyCombination, command.OverrideWindowsShortcuts, ref changed);
 				Set(this._settings.NotificationWhenSwitchedDesktop, command.OnSwitch, ref changed);
@@ -202,6 +212,10 @@ namespace SylphyHorn.Services.Commands
 			var data = new CliData { RestartRequired = this._settings.Culture.Value != this._startupCulture };
 			if (operation.StartsWith("desktop ", StringComparison.Ordinal))
 			{
+				data.PerDesktopWallpaper = this._settings.ChangeBackgroundEachDesktop.Value;
+				data.OverrideOnStartup = this._settings.OverrideDesktopsOnStartup.Value;
+				data.NativeWallpaperSupported = this._nativeWallpaperSupported;
+				data.WallpaperEnabled = this._nativeWallpaperSupported || this._settings.ChangeBackgroundEachDesktop.Value;
 				data.Loop = this._settings.LoopDesktop.Value;
 				data.OverrideWindowsShortcuts = this._settings.OverrideWindowsDefaultKeyCombination.Value;
 			}

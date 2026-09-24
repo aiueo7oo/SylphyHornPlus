@@ -916,6 +916,11 @@ namespace SylphyHorn.UI.Bindings
 				this.OnPropertyChanged(nameof(this.RestartRequired));
 			}).AddTo(this);
 
+			SettingsService.ObserveWallpaperSettings(Settings.General, () =>
+			{
+				foreach (var desktop in this._Desktops) desktop.RefreshWallpaperEnabled();
+			}).AddTo(this);
+
 			SettingsService.ObserveNotificationAppearance(Settings.General, () =>
 			{
 				this.OnPropertyChanged(nameof(this.Display));

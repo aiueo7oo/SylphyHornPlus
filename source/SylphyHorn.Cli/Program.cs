@@ -18,7 +18,8 @@ namespace SylphyHorn.Cli
 			{
 				Console.WriteLine("sylphyhorn-cli monitor list");
 				Console.WriteLine("sylphyhorn-cli desktop settings");
-				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false]");
+				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false] " +
+					"[--per-desktop-wallpaper true|false] [--override-on-startup true|false]");
 				Console.WriteLine("sylphyhorn-cli notification settings");
 				Console.WriteLine("sylphyhorn-cli notification configure [--on-switch true|false] [--always-show true|false] [--duration-ms N] " +
 					"[--simple true|false] [--use-desktop-name true|false] [--theme (apps | system | light | dark | accent)] " +

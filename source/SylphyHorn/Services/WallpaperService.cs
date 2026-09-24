@@ -33,6 +33,8 @@ namespace SylphyHorn.Services
 
 		private readonly WallpaperApplyQueue _applyQueue;
 		private DesktopTransitionRuntime _runtime;
+		private IDisposable _settingsSubscription;
+
 		private WallpaperService()
 		{
 			this._applyQueue = new WallpaperApplyQueue(
@@ -51,6 +53,8 @@ namespace SylphyHorn.Services
 			}
 			this._runtime = runtime;
 			runtime.StateChanged += this.OnDesktopStateChanged;
+			this._settingsSubscription = SettingsService.ObserveWallpaperSettings(Settings.General,
+				() => this.ApplyCurrent(runtime.State));
 			this.ApplyCurrent(runtime.State);
 		}
 
@@ -86,6 +90,8 @@ namespace SylphyHorn.Services
 		public void Dispose()
 		{
 			if (this._runtime != null) this._runtime.StateChanged -= this.OnDesktopStateChanged;
+			this._settingsSubscription?.Dispose();
+			this._settingsSubscription = null;
 			this._runtime = null;
 			this._applyQueue.Dispose();
 		}

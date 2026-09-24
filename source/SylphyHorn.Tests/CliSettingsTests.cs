@@ -13,6 +13,49 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliSettingsTests
 	{
+		[Theory]
+		[InlineData(false, true)]
+		[InlineData(true, true)]
+		[InlineData(false, false)]
+		public async Task BackgroundSettingsRespectCapabilitiesAndDoNotPartiallyApply(bool nativeWallpaper, bool names)
+		{
+			var provider = new TestDictionaryProvider();
+			await provider.InitializeAsync();
+			var settings = new GeneralSettings(provider);
+			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
+				() => Array.Empty<SylphyHorn.Services.Monitor>(), nativeWallpaper, names);
+			var changes = 0;
+			using (SettingsService.ObserveWallpaperSettings(settings, () => changes++))
+			{
+				var response = await Run(service, "desktop configure --per-desktop-wallpaper true --override-on-startup true");
+				if (nativeWallpaper || !names)
+				{
+					Assert.Equal("unsupported", response.Error.Code);
+					Assert.False(settings.ChangeBackgroundEachDesktop.Value);
+					Assert.False(settings.OverrideDesktopsOnStartup.Value);
+					Assert.Empty(provider.SavedDictionaries);
+					Assert.Equal(0, changes);
+				}
+				else
+				{
+					Assert.True(response.Success);
+					Assert.True(response.Data.PerDesktopWallpaper);
+					Assert.True(response.Data.OverrideOnStartup);
+					Assert.True(response.Data.WallpaperEnabled);
+					Assert.False(response.Data.NativeWallpaperSupported);
+					Assert.False(response.Data.RestartRequired);
+					Assert.Equal(1, changes);
+					Assert.False((await Run(service, "desktop configure --per-desktop-wallpaper true")).Data.Changed);
+					Assert.Equal(1, changes);
+					Assert.True((await Run(service, "desktop configure --per-desktop-wallpaper false")).Success);
+					Assert.Equal(2, changes);
+				}
+			}
+			var before = changes;
+			settings.ChangeBackgroundEachDesktop.Value = !settings.ChangeBackgroundEachDesktop.Value;
+			Assert.Equal(before, changes);
+		}
+
 		[Fact]
 		public async Task GeometryUsesSharedSettingsAndKeepsPinOffsetsSeparate()
 		{

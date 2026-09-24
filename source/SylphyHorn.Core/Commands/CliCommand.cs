@@ -6,6 +6,10 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal bool? PerDesktopWallpaper { get; private set; }
+
+		internal bool? OverrideOnStartup { get; private set; }
+
 		internal string Monitor { get; private set; }
 
 		internal string Placement { get; private set; }
@@ -150,6 +154,10 @@ namespace SylphyHorn.Commands
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
 				}
+				else if (command.Operation == "desktop configure" && option == "--per-desktop-wallpaper")
+					command.PerDesktopWallpaper = ReadBoolean(args, ref i);
+				else if (command.Operation == "desktop configure" && option == "--override-on-startup")
+					command.OverrideOnStartup = ReadBoolean(args, ref i);
 				else if (command.Operation == "desktop configure" && option == "--loop")
 					command.Loop = ReadBoolean(args, ref i);
 				else if (command.Operation == "desktop configure" && option == "--override-windows-shortcuts")
@@ -355,7 +363,8 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify at least one assignment setting.");
 			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
 				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
-			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null)
+			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null
+					&& command.PerDesktopWallpaper == null && command.OverrideOnStartup == null)
 				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null
 					&& command.DurationMs == null && !command.HasNotificationAppearance && !command.HasNotificationGeometry)
 				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)

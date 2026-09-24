@@ -49,6 +49,9 @@ namespace SylphyHorn.Services
 			return subscriptions;
 		}
 
+		internal static IDisposable ObserveWallpaperSettings(GeneralSettings settings, Action changed)
+			=> ObserveChange(settings.ChangeBackgroundEachDesktop, _ => changed());
+
 		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action<T> changed)
 		{
 			var previous = property.Value;

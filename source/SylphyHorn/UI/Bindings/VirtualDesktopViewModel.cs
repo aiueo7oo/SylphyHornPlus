@@ -56,6 +56,8 @@ namespace SylphyHorn.UI.Bindings
 				this._runtime.EditName(this.Id, value);
 			}
 		}
+		internal void RefreshWallpaperEnabled() => this.OnPropertyChanged(nameof(this.IsWallpaperEnabled));
+
 		public bool IsWallpaperEnabled => ProductInfo.IsWallpaperSupportBuild || Settings.General.ChangeBackgroundEachDesktop;
 		public string WallpaperPath
 		{
