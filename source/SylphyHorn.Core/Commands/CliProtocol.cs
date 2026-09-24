@@ -79,6 +79,9 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "applyDesktops", EmitDefaultValue = false)]
 		public bool? ApplyDesktops;
 
+		[DataMember(Name = "reset", EmitDefaultValue = false)]
+		public bool? Reset;
+
 		[DataMember(Name = "startup", EmitDefaultValue = false)]
 		public CliStartup Startup;
 

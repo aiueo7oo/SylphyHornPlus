@@ -18,6 +18,7 @@ namespace SylphyHorn.Cli
 			{
 				Console.WriteLine("sylphyhorn-cli settings export --path PATH [--overwrite]");
 				Console.WriteLine("sylphyhorn-cli settings import --path PATH --apply-desktops true|false");
+				Console.WriteLine("sylphyhorn-cli settings reset --yes");
 				Console.WriteLine("sylphyhorn-cli startup status");
 				Console.WriteLine("sylphyhorn-cli startup configure --mode disabled|normal|elevated");
 				Console.WriteLine("sylphyhorn-cli shortcut list [--device keyboard|mouse]");
@@ -102,7 +103,7 @@ namespace SylphyHorn.Cli
 			var product = assembly.GetCustomAttribute<AssemblyProductAttribute>().Product;
 			using (var pipe = new NamedPipeClientStream(".", CliProtocol.PipeName(company, product), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
 			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(
-				operation == "app assignment apply" || operation == "settings import"
+				operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
 				|| operation.StartsWith("startup ", StringComparison.Ordinal) ? 45 : 15)))
 			{
 				var submitted = false;

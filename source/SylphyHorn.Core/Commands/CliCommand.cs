@@ -6,6 +6,8 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal bool ConfirmReset { get; private set; }
+
 		internal string FilePath { get; private set; }
 
 		internal bool Overwrite { get; private set; }
@@ -170,6 +172,8 @@ namespace SylphyHorn.Commands
 				}
 				else if ((command.Operation == "settings export" || command.Operation == "settings import") && option == "--path")
 					command.FilePath = ReadTextValue(args, ref i, "Specify a settings file path.");
+				else if (command.Operation == "settings reset" && option == "--yes")
+					command.ConfirmReset = true;
 				else if (command.Operation == "settings export" && option == "--overwrite")
 					command.Overwrite = true;
 				else if (command.Operation == "settings import" && option == "--apply-desktops")
@@ -418,13 +422,16 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --path.");
 			if (command.Operation == "settings import" && command.ApplyDesktops == null)
 				throw new ArgumentException("Specify --apply-desktops true or false.");
+			if (command.Operation == "settings reset" && !command.ConfirmReset)
+				throw new ArgumentException("Specify --yes to reset application settings.");
 			if (command.Operation == "startup configure" && command.StartupMode == null)
 				throw new ArgumentException("Specify --mode disabled, normal or elevated.");
 			return command;
 		}
 
 		private static bool IsKnown(string operation)
-			=> operation == "settings export" || operation == "settings import" || operation == "startup status" || operation == "startup configure"
+			=> operation == "settings reset" || operation == "settings export" || operation == "settings import"
+				|| operation == "startup status" || operation == "startup configure"
 				|| operation == "shortcut list" || operation == "shortcut keys" || operation == "shortcut set" || operation == "shortcut clear"
 				|| operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
 				|| operation == "notification settings" || operation == "notification configure"

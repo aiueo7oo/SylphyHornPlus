@@ -34,6 +34,7 @@ namespace SylphyHorn
 		private Services.Commands.CliShortcutService _cliShortcuts;
 		private Services.Commands.CliSettingsFileService _cliSettingsFiles;
 		private Services.Commands.CliStartupService _cliStartup;
+		private Services.Commands.CliSettingsResetService _cliSettingsReset;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -135,6 +136,8 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "settings reset")
+				return this._cliSettingsReset.ExecuteAsync(command, cancellation);
 			if (command.Operation == "settings export" || command.Operation == "settings import")
 				return this._cliSettingsFiles.ExecuteAsync(command, cancellation);
 			if (command.Operation.StartsWith("startup ", StringComparison.Ordinal))
@@ -248,6 +251,10 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
+					this._cliSettingsReset = new Services.Commands.CliSettingsResetService(
+						runtime.ResetSettingsAsync, () => runtime.CliAvailable && !this._hookService.IsSuspended,
+						() => this._hookService.Suspend(),
+						() => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalSettings());
 					this._cliSettingsFiles = new Services.Commands.CliSettingsFileService(
 						LocalSettingsProvider.Instance, LocalSettingsProvider.Instance.FilePath,
 						() => runtime.CliAvailable && !this._hookService.IsSuspended, () => this._hookService.Suspend(),
