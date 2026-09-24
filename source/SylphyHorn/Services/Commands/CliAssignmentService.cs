@@ -17,14 +17,16 @@ namespace SylphyHorn.Services.Commands
 		private readonly IPlacementAppCatalog _catalog;
 		private readonly Func<Task<SettingsSaveResult>> _save;
 		private readonly Func<bool> _available;
+		private readonly Func<string> _status;
 
 		internal CliAssignmentService(AppPlacementSettings settings, IPlacementAppCatalog catalog,
-			Func<Task<SettingsSaveResult>> save, Func<bool> available)
+			Func<Task<SettingsSaveResult>> save, Func<bool> available, Func<string> status)
 		{
 			this._settings = settings;
 			this._catalog = catalog;
 			this._save = save;
 			this._available = available;
+			this._status = status;
 		}
 
 		internal async Task<CliResponse> ExecuteAsync(CliCommand command, CancellationToken cancellation)
@@ -33,47 +35,75 @@ namespace SylphyHorn.Services.Commands
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
+				if (command.Operation == "app assignment status")
+					return CliResponse.Ok(command.Operation, this.Describe(this._settings.Configuration.Value, false));
 				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
 				var current = this._settings.Configuration.Value;
-				if (command.Operation == "app assignment list") return CliResponse.Ok(command.Operation, Describe(current));
-				var identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath);
-				PlacementAppChoice choice = null;
-				if (command.Operation == "app assignment set")
+				if (command.Operation == "app assignment list") return CliResponse.Ok(command.Operation, this.Describe(current));
+				AppPlacementConfiguration updated;
+				if (command.Operation == "app assignment configure")
 				{
-					choice = await this._catalog.ReadExecutableAsync(identity.Value, cancellation).WaitAsync(cancellation);
-					if (choice?.Identity == null)
-						return CliResponse.Fail(command.Operation, "app_unavailable", "The executable could not be identified.");
-					identity = choice.Identity;
+					var enabled = command.AssignmentEnabled ?? current.Enabled;
+					var create = command.CreateMissingDesktops ?? current.CreateMissingDesktops;
+					var close = command.CloseCreatedDesktops ?? current.CloseCreatedDesktops;
+					updated = enabled == current.Enabled && create == current.CreateMissingDesktops && close == current.CloseCreatedDesktops
+						? current : new AppPlacementConfiguration(enabled, current.Rules, create, close, current.ClosingTargets);
 				}
-				cancellation.ThrowIfCancellationRequested();
-				if (!this._available() || !ReferenceEquals(current, this._settings.Configuration.Value))
-					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while identifying the application.", true);
-				var matches = current.Rules.Where(rule => rule.App.Equals(identity)).ToArray();
-				if (matches.Length > 1)
-					return CliResponse.Fail(command.Operation, "ambiguous_assignment", "Multiple rules match this application. Resolve them in settings first.");
-				var rules = current.Rules.ToList();
-				var previous = matches.SingleOrDefault();
-				var changed = false;
-				if (command.Operation == "app assignment remove")
+				else if (command.Operation == "app assignment enable" || command.Operation == "app assignment disable")
 				{
-					if (previous != null) changed = rules.Remove(previous);
+					var id = Guid.Parse(command.RuleId);
+					var rule = current.Rules.SingleOrDefault(item => item.Id == id);
+					if (rule == null) return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+					var enabled = command.Operation == "app assignment enable";
+					if (enabled && current.Rules.Any(item => item.Id != id && item.Enabled && item.App.Equals(rule.App)))
+						return CliResponse.Fail(command.Operation, "assignment_conflict", "Another rule for this application is enabled. Disable it first.");
+					var rules = current.Rules.Select(item => item.Id != id ? item : new AppPlacementRule(item.Id, enabled,
+						item.App, item.Destination, item.DisplayName, item.DisplayExecutablePath));
+					updated = rule.Enabled == enabled ? current : new AppPlacementConfiguration(current.Enabled, rules,
+						current.CreateMissingDesktops, current.CloseCreatedDesktops, current.ClosingTargets);
 				}
 				else
 				{
-					var destination = command.TargetKind == "name" ? PlacementDestination.ByName(command.TargetValue)
-						: PlacementDestination.ByNumber(int.Parse(command.TargetValue, CultureInfo.InvariantCulture));
-					changed = previous == null || previous.Destination.Kind != destination.Kind
-						|| previous.Destination.Name != destination.Name || previous.Destination.Number != destination.Number;
-					if (changed)
+					var identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath);
+					PlacementAppChoice choice = null;
+					if (command.Operation == "app assignment set")
 					{
-						var rule = new AppPlacementRule(previous?.Id ?? Guid.NewGuid(), previous?.Enabled ?? true,
-							identity, destination, choice.Name, choice.Path);
-						if (previous == null) rules.Add(rule); else rules[rules.IndexOf(previous)] = rule;
+						choice = await this._catalog.ReadExecutableAsync(identity.Value, cancellation).WaitAsync(cancellation);
+						if (choice?.Identity == null)
+							return CliResponse.Fail(command.Operation, "app_unavailable", "The executable could not be identified.");
+						identity = choice.Identity;
 					}
+					cancellation.ThrowIfCancellationRequested();
+					if (!this._available() || !ReferenceEquals(current, this._settings.Configuration.Value))
+						return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while identifying the application.", true);
+					var matches = current.Rules.Where(rule => rule.App.Equals(identity)).ToArray();
+					if (matches.Length > 1)
+						return CliResponse.Fail(command.Operation, "ambiguous_assignment", "Multiple rules match this application. Resolve them in settings first.");
+					var rules = current.Rules.ToList();
+					var previous = matches.SingleOrDefault();
+					var changed = false;
+					if (command.Operation == "app assignment remove")
+					{
+						if (previous != null) changed = rules.Remove(previous);
+					}
+					else
+					{
+						var destination = command.TargetKind == "name" ? PlacementDestination.ByName(command.TargetValue)
+							: PlacementDestination.ByNumber(int.Parse(command.TargetValue, CultureInfo.InvariantCulture));
+						changed = previous == null || previous.Destination.Kind != destination.Kind
+							|| previous.Destination.Name != destination.Name || previous.Destination.Number != destination.Number;
+						if (changed)
+						{
+							var rule = new AppPlacementRule(previous?.Id ?? Guid.NewGuid(), previous?.Enabled ?? true,
+								identity, destination, choice.Name, choice.Path);
+							if (previous == null) rules.Add(rule); else rules[rules.IndexOf(previous)] = rule;
+						}
+					}
+					updated = changed ? new AppPlacementConfiguration(current.Enabled, rules, current.CreateMissingDesktops,
+						current.CloseCreatedDesktops, current.ClosingTargets) : current;
 				}
-				var updated = changed ? new AppPlacementConfiguration(current.Enabled, rules, current.CreateMissingDesktops,
-					current.CloseCreatedDesktops, current.ClosingTargets) : current;
-				if (changed)
+				var configurationChanged = !ReferenceEquals(updated, current);
+				if (configurationChanged)
 				{
 					published = true;
 					this._settings.Configuration.Value = updated;
@@ -84,8 +114,8 @@ namespace SylphyHorn.Services.Commands
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
 				if (!ReferenceEquals(updated, this._settings.Configuration.Value))
 					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while saving. Query current assignments.");
-				var data = Describe(updated);
-				data.Changed = changed;
+				var data = this.Describe(updated);
+				data.Changed = configurationChanged;
 				return CliResponse.Ok(command.Operation, data);
 			}
 			catch (OperationCanceledException)
@@ -105,10 +135,18 @@ namespace SylphyHorn.Services.Commands
 			}
 		}
 
-		private static CliData Describe(AppPlacementConfiguration configuration) => new CliData
+		private CliData Describe(AppPlacementConfiguration configuration, bool includeRules = true) => new CliData
 		{
 			AssignmentEnabled = configuration.Enabled,
-			Assignments = configuration.Rules.Select(rule => new CliAssignment
+			AssignmentStatus = this._status() == "NoRules" ? "no_rules" : this._status().ToLowerInvariant(),
+			CreateMissingDesktops = configuration.CreateMissingDesktops,
+			CloseCreatedDesktops = configuration.CloseCreatedDesktops,
+			ClosingTargets = configuration.ClosingTargets.Select(target => new CliAssignmentTarget
+			{
+				DesktopName = target.Kind == PlacementDestinationKind.Name ? target.Name : null,
+				DesktopNumber = target.Kind == PlacementDestinationKind.Number ? (int?)target.Number : null,
+			}).ToArray(),
+			Assignments = !includeRules ? null : configuration.Rules.Select(rule => new CliAssignment
 			{
 				Id = rule.Id.ToString(),
 				Enabled = rule.Enabled,

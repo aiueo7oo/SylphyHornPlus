@@ -11,6 +11,31 @@ namespace SylphyHorn.Tests
 	public sealed class CliProtocolTests
 	{
 		[Fact]
+		public void AssignmentStatusPreservesDisabledSettingsAndBothClosingTargetKinds()
+		{
+			var response = CliResponse.Ok("app assignment status", new CliData
+			{
+				AssignmentStatus = "preparing",
+				AssignmentEnabled = true,
+				CreateMissingDesktops = false,
+				CloseCreatedDesktops = false,
+				ClosingTargets = new[]
+				{
+					new CliAssignmentTarget { DesktopName = "work" },
+					new CliAssignmentTarget { DesktopNumber = 3 },
+				},
+			});
+			var result = CliProtocol.Deserialize<CliResponse>(CliProtocol.Serialize(response));
+			Assert.Equal("preparing", result.Data.AssignmentStatus);
+			Assert.True(result.Data.AssignmentEnabled);
+			Assert.False(result.Data.CreateMissingDesktops);
+			Assert.False(result.Data.CloseCreatedDesktops);
+			Assert.Equal("work", result.Data.ClosingTargets[0].DesktopName);
+			Assert.Equal(3, result.Data.ClosingTargets[1].DesktopNumber);
+			Assert.Null(result.Data.Assignments);
+		}
+
+		[Fact]
 		public void PartialAssignmentResultsKeepConfirmedMovesInsideTheErrorEnvelope()
 		{
 			var response = CliResponse.Fail("app assignment apply", "result_unconfirmed", "Inspect results.");

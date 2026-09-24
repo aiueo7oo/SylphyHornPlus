@@ -230,7 +230,7 @@ namespace SylphyHorn
 				{
 					this._cliAssignments = new Services.Commands.CliAssignmentService(Settings.AppPlacement,
 						new Services.AppPlacement.PlacementAppCatalog(), () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
-						() => runtime.CliAvailable);
+						() => runtime.CliAvailable, () => runtime.PlacementStatus);
 					this._cliServer = new Services.Commands.CliServer(
 						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
 						(command, token) => Application.Current.Dispatcher.InvokeAsync(

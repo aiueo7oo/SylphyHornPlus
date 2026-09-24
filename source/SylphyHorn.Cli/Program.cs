@@ -35,6 +35,11 @@ namespace SylphyHorn.Cli
 				Console.WriteLine("sylphyhorn-cli ui settings");
 				Console.WriteLine("sylphyhorn-cli ui notification-toggle");
 				Console.WriteLine("sylphyhorn-cli app assignment list");
+				Console.WriteLine("sylphyhorn-cli app assignment status");
+				Console.WriteLine("sylphyhorn-cli app assignment configure [--enabled true|false] " +
+					"[--create-missing-desktops true|false] [--close-created-desktops true|false]");
+				Console.WriteLine("sylphyhorn-cli app assignment enable --id RULE_ID");
+				Console.WriteLine("sylphyhorn-cli app assignment disable --id RULE_ID");
 				Console.WriteLine("sylphyhorn-cli app assignment set --path PATH (--desktop-name NAME | --desktop-number N)");
 				Console.WriteLine("sylphyhorn-cli app assignment remove --path PATH");
 				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --all) [--dry-run]");

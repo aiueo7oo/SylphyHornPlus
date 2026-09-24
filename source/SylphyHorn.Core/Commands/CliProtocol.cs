@@ -67,6 +67,18 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "assignmentStatus", EmitDefaultValue = false)]
+		public string AssignmentStatus;
+
+		[DataMember(Name = "createMissingDesktops", EmitDefaultValue = false)]
+		public bool? CreateMissingDesktops;
+
+		[DataMember(Name = "closeCreatedDesktops", EmitDefaultValue = false)]
+		public bool? CloseCreatedDesktops;
+
+		[DataMember(Name = "closingTargets", EmitDefaultValue = false)]
+		public CliAssignmentTarget[] ClosingTargets;
+
 		[DataMember(Name = "results", EmitDefaultValue = false)]
 		public CliAssignmentResult[] Results;
 
@@ -99,6 +111,16 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "unavailableCount", EmitDefaultValue = false)]
 		public int? UnavailableCount;
+	}
+
+	[DataContract]
+	internal sealed class CliAssignmentTarget
+	{
+		[DataMember(Name = "desktopName", EmitDefaultValue = false)]
+		public string DesktopName;
+
+		[DataMember(Name = "desktopNumber", EmitDefaultValue = false)]
+		public int? DesktopNumber;
 	}
 
 	[DataContract]

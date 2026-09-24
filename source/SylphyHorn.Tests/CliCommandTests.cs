@@ -7,6 +7,30 @@ namespace SylphyHorn.Tests
 	public sealed class CliCommandTests
 	{
 		[Fact]
+		public void AssignmentConfigurationDistinguishesOmittedValuesFromFalse()
+		{
+			var command = CliCommand.Parse(new[] { "app", "assignment", "configure", "--enabled", "true", "--close-created-desktops", "false" });
+			Assert.True(command.AssignmentEnabled);
+			Assert.False(command.CloseCreatedDesktops);
+			Assert.Null(command.CreateMissingDesktops);
+			var id = Guid.NewGuid().ToString();
+			Assert.Equal(id, CliCommand.Parse(new[] { "app", "assignment", "disable", "--id", id }).RuleId);
+		}
+
+		[Theory]
+		[InlineData("app assignment configure")]
+		[InlineData("app assignment configure --enabled")]
+		[InlineData("app assignment configure --enabled 1")]
+		[InlineData("app assignment configure --enabled true --enabled false")]
+		[InlineData("app assignment configure --create-missing-desktops yes")]
+		[InlineData("app assignment enable")]
+		[InlineData("app assignment disable --id invalid")]
+		[InlineData("app assignment enable --path C:\\App.exe")]
+		[InlineData("app assignment status --enabled true")]
+		public void AssignmentConfigurationRejectsInvalidOrUnrelatedOptions(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
+		[Fact]
 		public void AssignmentCommandsRecognizeThreeWordsAndPreservePaths()
 		{
 			var args = new[] { "app", "assignment", "set", "--path", @"C:\My Apps\Editor.exe", "--desktop-name", "Development" };

@@ -16,6 +16,101 @@ namespace SylphyHorn.Tests
 	public sealed class CliAssignmentTests
 	{
 		[Fact]
+		public async Task ConfigurePreservesRulesAndClosingTargetsAndReportsPreparationSeparately()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var row = await f.Add(@"C:\Apps\Editor.exe");
+				var current = f.Settings.Configuration.Value;
+				f.Settings.Configuration.Value = new AppPlacementConfiguration(false, current.Rules, true, true,
+					new[] { PlacementDestination.ByName("work"), PlacementDestination.ByNumber(3) });
+				var service = new CliAssignmentService(f.Settings, f.Catalog,
+					() => f.Harness.Settings.Provider.SaveWithResultAsync(), () => true, () => "Preparing");
+				var response = await service.ExecuteAsync(CliCommand.Parse(new[]
+				{
+					"app", "assignment", "configure", "--enabled", "true", "--close-created-desktops", "false",
+				}), CancellationToken.None);
+				Assert.True(response.Success);
+				Assert.True(response.Data.AssignmentEnabled);
+				Assert.Equal("preparing", response.Data.AssignmentStatus);
+				Assert.True(response.Data.CreateMissingDesktops);
+				Assert.False(response.Data.CloseCreatedDesktops);
+				Assert.Equal(row.Id.ToString(), Assert.Single(response.Data.Assignments).Id);
+				Assert.Equal("work", response.Data.ClosingTargets[0].DesktopName);
+				Assert.Equal(3, response.Data.ClosingTargets[1].DesktopNumber);
+				Assert.True(f.Model.IsEnabled);
+				Assert.False(f.Model.CloseCreatedDesktops);
+			}
+		}
+
+		[Fact]
+		public async Task EnableUsesThePersistedPackageRuleIdAndRejectsConflictingRules()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				var first = new AppPlacementRule(Guid.NewGuid(), true, app, PlacementDestination.ByNumber(1));
+				var second = new AppPlacementRule(Guid.NewGuid(), false, app, PlacementDestination.ByName("work"), "Example", @"C:\Package\Example.exe");
+				var original = new AppPlacementConfiguration(false, new[] { first, second });
+				f.Settings.Configuration.Value = original;
+				var service = Service(f);
+				var enable = CliCommand.Parse(new[] { "app", "assignment", "enable", "--id", second.Id.ToString() });
+				Assert.Equal("assignment_conflict", (await service.ExecuteAsync(enable, CancellationToken.None)).Error.Code);
+				Assert.Same(original, f.Settings.Configuration.Value);
+				Assert.True((await service.ExecuteAsync(CliCommand.Parse(new[]
+				{
+					"app", "assignment", "disable", "--id", first.Id.ToString(),
+				}), CancellationToken.None)).Success);
+				var result = await service.ExecuteAsync(enable, CancellationToken.None);
+				Assert.True(result.Success);
+				var updated = f.Settings.Configuration.Value.Rules[1];
+				Assert.True(updated.Enabled);
+				Assert.Equal(second.Id, updated.Id);
+				Assert.Same(second.App, updated.App);
+				Assert.Same(second.Destination, updated.Destination);
+				Assert.Equal(second.DisplayExecutablePath, updated.DisplayExecutablePath);
+				Assert.Equal(second.DisplayName, updated.DisplayName);
+				Assert.False(result.Data.AssignmentEnabled);
+				Assert.False((await service.ExecuteAsync(enable, CancellationToken.None)).Data.Changed);
+			}
+		}
+
+		[Fact]
+		public async Task StatusRemainsReadableWhileBusyWithoutSavingOrStartingMonitoring()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var original = f.Settings.Configuration.Value;
+				var service = new CliAssignmentService(f.Settings, f.Catalog,
+					() => throw new InvalidOperationException("Read-only status must not save."), () => false, () => "Suspended");
+				var response = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "status" }), CancellationToken.None);
+				Assert.True(response.Success);
+				Assert.Equal("suspended", response.Data.AssignmentStatus);
+				Assert.False(response.Data.AssignmentEnabled);
+				Assert.Null(response.Data.Assignments);
+				Assert.Same(original, f.Settings.Configuration.Value);
+				var refused = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "configure", "--enabled", "true" }), CancellationToken.None);
+				Assert.Equal("host_busy", refused.Error.Code);
+				Assert.Same(original, f.Settings.Configuration.Value);
+			}
+		}
+
+		[Fact]
+		public async Task MissingRuleAndCancelledConfigurationDoNotChangeSettings()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var original = f.Settings.Configuration.Value;
+				var service = Service(f);
+				var missing = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "enable", "--id", Guid.NewGuid().ToString() }), CancellationToken.None);
+				Assert.Equal("assignment_not_found", missing.Error.Code);
+				var cancelled = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "configure", "--enabled", "true" }), new CancellationToken(true));
+				Assert.Equal("request_cancelled", cancelled.Error.Code);
+				Assert.Same(original, f.Settings.Configuration.Value);
+			}
+		}
+
+		[Fact]
 		public async Task DryRunWindowIdsRemainStableAndPartialApplyPreservesConfirmedResults()
 		{
 			var factory = new Factory();
@@ -125,7 +220,7 @@ namespace SylphyHorn.Tests
 		}
 
 		private static CliAssignmentService Service(PlacementUiFixture f) => new CliAssignmentService(
-			f.Settings, f.Catalog, () => f.Harness.Settings.Provider.SaveWithResultAsync(), () => true);
+			f.Settings, f.Catalog, () => f.Harness.Settings.Provider.SaveWithResultAsync(), () => true, () => "Disabled");
 
 		private static CliCommand Set(string path, string selector, string value)
 			=> CliCommand.Parse(new[] { "app", "assignment", "set", "--path", path, selector, value });

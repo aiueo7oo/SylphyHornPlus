@@ -26,6 +26,14 @@ namespace SylphyHorn.Commands
 
 		internal string AppPath { get; private set; }
 
+		internal string RuleId { get; private set; }
+
+		internal bool? AssignmentEnabled { get; private set; }
+
+		internal bool? CreateMissingDesktops { get; private set; }
+
+		internal bool? CloseCreatedDesktops { get; private set; }
+
 		internal bool All { get; private set; }
 
 		internal bool DryRun { get; private set; }
@@ -57,7 +65,21 @@ namespace SylphyHorn.Commands
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
-				if (option == "--all" && command.Operation == "app assignment apply") command.All = true;
+				if (command.Operation == "app assignment configure"
+					&& (option == "--enabled" || option == "--create-missing-desktops" || option == "--close-created-desktops"))
+				{
+					var value = ReadValue(args, ref i);
+					if (value != "true" && value != "false") throw new ArgumentException(option + " requires true or false.");
+					if (option == "--enabled") command.AssignmentEnabled = value == "true";
+					else if (option == "--create-missing-desktops") command.CreateMissingDesktops = value == "true";
+					else command.CloseCreatedDesktops = value == "true";
+				}
+				else if (option == "--id" && (command.Operation == "app assignment enable" || command.Operation == "app assignment disable"))
+				{
+					command.RuleId = ReadValue(args, ref i);
+					RequireId(command.RuleId);
+				}
+				else if (option == "--all" && command.Operation == "app assignment apply") command.All = true;
 				else if (option == "--dry-run" && command.Operation == "app assignment apply") command.DryRun = true;
 				else if (option == "--path" && (command.Operation == "app assignment set" || command.Operation == "app assignment remove"
 					|| command.Operation == "app assignment apply"))
@@ -160,6 +182,11 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify exactly one of --path or --all.");
 			if (command.Operation == "app assignment set" && command.TargetKind == null)
 				throw new ArgumentException("Specify exactly one of --desktop-name or --desktop-number.");
+			if (command.Operation == "app assignment configure" && command.AssignmentEnabled == null
+				&& command.CreateMissingDesktops == null && command.CloseCreatedDesktops == null)
+				throw new ArgumentException("Specify at least one assignment setting.");
+			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
+				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
 			return command;
 		}
 
@@ -170,7 +197,9 @@ namespace SylphyHorn.Commands
 				|| operation == "window move" || operation == "window pin" || operation == "window unpin"
 				|| operation == "ui task-view" || operation == "ui window-switch" || operation == "ui settings"
 				|| operation == "ui notification-toggle" || operation == "app assignment list"
-				|| operation == "app assignment set" || operation == "app assignment remove" || operation == "app assignment apply";
+				|| operation == "app assignment set" || operation == "app assignment remove" || operation == "app assignment apply"
+				|| operation == "app assignment status" || operation == "app assignment configure"
+				|| operation == "app assignment enable" || operation == "app assignment disable";
 
 		private void SetTarget(string kind, string value)
 		{
