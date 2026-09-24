@@ -48,7 +48,7 @@ namespace SylphyHorn.Commands
 		{
 			if (args == null || args.Length < 2) return null;
 			var operation = args[0] + " " + args[1];
-			if (operation == "app assignment" && args.Length >= 3) operation += " " + args[2];
+			if ((operation == "app assignment" || operation == "desktop autoclose") && args.Length >= 3) operation += " " + args[2];
 			return IsKnown(operation) ? operation : null;
 		}
 
@@ -59,9 +59,10 @@ namespace SylphyHorn.Commands
 			var command = new CliCommand { Operation = Recognize(args) };
 			if (command.Operation == null) throw new ArgumentException("Unknown command.");
 			var assignment = command.Operation.StartsWith("app assignment ", StringComparison.Ordinal);
+			var autoclose = command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal);
 
 			var options = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = assignment ? 3 : 2; i < args.Length; i++)
+			for (var i = assignment || autoclose ? 3 : 2; i < args.Length; i++)
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
@@ -74,7 +75,8 @@ namespace SylphyHorn.Commands
 					else if (option == "--create-missing-desktops") command.CreateMissingDesktops = value == "true";
 					else command.CloseCreatedDesktops = value == "true";
 				}
-				else if (option == "--id" && (command.Operation == "app assignment enable" || command.Operation == "app assignment disable"))
+				else if (option == "--id" && (command.Operation == "app assignment enable" || command.Operation == "app assignment disable"
+					|| command.Operation == "app assignment set" || command.Operation == "app assignment remove" || command.Operation == "app assignment apply"))
 				{
 					command.RuleId = ReadValue(args, ref i);
 					RequireId(command.RuleId);
@@ -84,12 +86,15 @@ namespace SylphyHorn.Commands
 				else if (option == "--path" && (command.Operation == "app assignment set" || command.Operation == "app assignment remove"
 					|| command.Operation == "app assignment apply"))
 					command.AppPath = ReadValue(args, ref i);
-				else if (command.Operation == "app assignment set" && (option == "--desktop-name" || option == "--desktop-number"))
+				else if ((command.Operation == "app assignment set" && (option == "--desktop-name" || option == "--desktop-number"))
+					|| ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove")
+						&& (option == "--name" || option == "--number")))
 				{
+					var kind = option.Substring(autoclose ? "--".Length : "--desktop-".Length);
 					var value = ReadValue(args, ref i);
-					if (option == "--desktop-number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
+					if (kind == "number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
 						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					command.SetTarget(option.Substring("--desktop-".Length), value);
+					command.SetTarget(kind, value);
 				}
 				else if (option == "--wrap" && (command.Operation == "desktop switch" || command.Operation == "window move"))
 					command.Wrap = true;
@@ -176,10 +181,13 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
 				throw new ArgumentException("--wrap requires a next or previous destination.");
-			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && command.AppPath == null)
-				throw new ArgumentException("Specify --path with an absolute executable path.");
-			if (command.Operation == "app assignment apply" && command.All == (command.AppPath != null))
-				throw new ArgumentException("Specify exactly one of --path or --all.");
+			var assignmentSelectors = (command.AppPath != null ? 1 : 0) + (command.RuleId != null ? 1 : 0) + (command.All ? 1 : 0);
+			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && assignmentSelectors != 1)
+				throw new ArgumentException("Specify exactly one of --path or --id.");
+			if (command.Operation == "app assignment apply" && assignmentSelectors != 1)
+				throw new ArgumentException("Specify exactly one of --path, --id or --all.");
+			if ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove") && command.TargetKind == null)
+				throw new ArgumentException("Specify exactly one of --name or --number.");
 			if (command.Operation == "app assignment set" && command.TargetKind == null)
 				throw new ArgumentException("Specify exactly one of --desktop-name or --desktop-number.");
 			if (command.Operation == "app assignment configure" && command.AssignmentEnabled == null
@@ -199,7 +207,8 @@ namespace SylphyHorn.Commands
 				|| operation == "ui notification-toggle" || operation == "app assignment list"
 				|| operation == "app assignment set" || operation == "app assignment remove" || operation == "app assignment apply"
 				|| operation == "app assignment status" || operation == "app assignment configure"
-				|| operation == "app assignment enable" || operation == "app assignment disable";
+				|| operation == "app assignment enable" || operation == "app assignment disable"
+				|| operation == "desktop autoclose list" || operation == "desktop autoclose add" || operation == "desktop autoclose remove";
 
 		private void SetTarget(string kind, string value)
 		{

@@ -16,6 +16,91 @@ namespace SylphyHorn.Tests
 	public sealed class CliAssignmentTests
 	{
 		[Fact]
+		public async Task AutocloseEditsPreserveRulesAndFlagsAndKeepNamesSeparateFromNumbers()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var row = await f.Add(@"C:\Apps\Editor.exe");
+				f.Settings.Configuration.Value = new AppPlacementConfiguration(false, f.Settings.Configuration.Value.Rules, true, true,
+					new[] { PlacementDestination.ByName("3"), PlacementDestination.ByNumber(3), PlacementDestination.ByNumber(3) });
+				var service = Service(f);
+				var remove = CliCommand.Parse(new[] { "desktop", "autoclose", "remove", "--number", "3" });
+				var removed = await service.ExecuteAsync(remove, CancellationToken.None);
+				Assert.True(removed.Success);
+				Assert.Equal("3", Assert.Single(removed.Data.ClosingTargets).DesktopName);
+				Assert.False(removed.Data.AssignmentEnabled);
+				Assert.True(removed.Data.CloseCreatedDesktops);
+				Assert.True(removed.Data.CreateMissingDesktops);
+				Assert.Equal(row.Id, Assert.Single(f.Settings.Configuration.Value.Rules).Id);
+				Assert.False((await service.ExecuteAsync(remove, CancellationToken.None)).Data.Changed);
+				var add = CliCommand.Parse(new[] { "desktop", "autoclose", "add", "--number", "99" });
+				Assert.True((await service.ExecuteAsync(add, CancellationToken.None)).Data.Changed);
+				Assert.False((await service.ExecuteAsync(add, CancellationToken.None)).Data.Changed);
+				var list = await service.ExecuteAsync(CliCommand.Parse(new[] { "desktop", "autoclose", "list" }), CancellationToken.None);
+				Assert.Equal(2, list.Data.ClosingTargets.Length);
+				Assert.Equal(99, list.Data.ClosingTargets[1].DesktopNumber);
+				Assert.Null(list.Data.Assignments);
+				Assert.Single(f.Model.ClosingGroups[0].Rows);
+				Assert.Single(f.Model.ClosingGroups[1].Rows);
+				Assert.Empty(f.Harness.Operations.DesktopOperationIds);
+			}
+		}
+
+		[Fact]
+		public async Task EditingPackageRulesByIdPreservesIdentityAndDoesNotReadExecutableFiles()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				var first = new AppPlacementRule(Guid.NewGuid(), true, app, PlacementDestination.ByNumber(1));
+				var second = new AppPlacementRule(Guid.NewGuid(), false, app, PlacementDestination.ByNumber(2), "Example", @"C:\Package\Example.exe");
+				f.Settings.Configuration.Value = new AppPlacementConfiguration(false, new[] { first, second });
+				f.Catalog.ExecutablePending = Task.FromException<PlacementAppChoice>(new FileNotFoundException());
+				var service = Service(f);
+				var set = CliCommand.Parse(new[] { "app", "assignment", "set", "--id", second.Id.ToString(), "--desktop-name", "work" });
+				Assert.True((await service.ExecuteAsync(set, CancellationToken.None)).Success);
+				var updated = f.Settings.Configuration.Value.Rules[1];
+				Assert.Equal(second.Id, updated.Id);
+				Assert.Same(second.App, updated.App);
+				Assert.False(updated.Enabled);
+				Assert.Equal(second.DisplayName, updated.DisplayName);
+				Assert.Equal(second.DisplayExecutablePath, updated.DisplayExecutablePath);
+				Assert.Equal("work", updated.Destination.Name);
+				Assert.Same(first, f.Settings.Configuration.Value.Rules[0]);
+				var remove = CliCommand.Parse(new[] { "app", "assignment", "remove", "--id", second.Id.ToString() });
+				Assert.True((await service.ExecuteAsync(remove, CancellationToken.None)).Success);
+				Assert.Same(first, Assert.Single(f.Settings.Configuration.Value.Rules));
+				Assert.Equal("assignment_not_found", (await service.ExecuteAsync(remove, CancellationToken.None)).Error.Code);
+				Assert.Equal("assignment_not_found", (await service.ExecuteAsync(set, CancellationToken.None)).Error.Code);
+			}
+		}
+
+		[Fact]
+		public async Task ApplyByRuleIdResolvesPackageIdentityAndRejectsDisabledOrUnknownRules()
+		{
+			var factory = new Factory();
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "work", "")), factory);
+			await harness.Runtime.InitializeAsync(false, CancellationToken.None);
+			var app = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+			var rule = new AppPlacementRule(Guid.NewGuid(), true, app, PlacementDestination.ByName("work"));
+			var disabled = new AppPlacementRule(Guid.NewGuid(), false, app, PlacementDestination.ByNumber(2));
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, new[] { rule, disabled }));
+			factory.Session.RuleApplication = dryRun => new PlacementRuleApplication(
+				new PlacementPreview(Array.Empty<PlacementPreviewItem>(), long.MaxValue), Array.Empty<PlacementResult>());
+			harness.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "work", "")));
+			var command = CliCommand.Parse(new[] { "app", "assignment", "apply", "--id", rule.Id.ToString(), "--dry-run" });
+			Assert.True((await harness.Runtime.ApplyCliAssignmentsAsync(command, CancellationToken.None)).Success);
+			Assert.Same(app, factory.Session.RequestedApp);
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", "")));
+			command = CliCommand.Parse(new[] { "app", "assignment", "apply", "--id", disabled.Id.ToString() });
+			Assert.Equal("assignment_disabled", (await harness.Runtime.ApplyCliAssignmentsAsync(command, CancellationToken.None)).Error.Code);
+			harness.Provider.EnqueueResult(Batch(1, 4, A, Entry(A, 0, "work", "")));
+			command = CliCommand.Parse(new[] { "app", "assignment", "apply", "--id", Guid.NewGuid().ToString() });
+			Assert.Equal("assignment_not_found", (await harness.Runtime.ApplyCliAssignmentsAsync(command, CancellationToken.None)).Error.Code);
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
 		public async Task ConfigurePreservesRulesAndClosingTargetsAndReportsPreparationSeparately()
 		{
 			using (var f = await PlacementUiFixture.Create())

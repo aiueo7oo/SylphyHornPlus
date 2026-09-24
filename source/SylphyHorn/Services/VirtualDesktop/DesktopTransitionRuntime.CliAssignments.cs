@@ -27,6 +27,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					}
 				}
 				await this.RefreshCliStateAsync(cancellation);
+				if (command.RuleId != null)
+				{
+					var id = Guid.Parse(command.RuleId);
+					var rule = this._placementConfiguration.Rules.SingleOrDefault(item => item.Id == id);
+					if (rule == null) return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+					if (!rule.Enabled) return CliResponse.Fail(command.Operation, "assignment_disabled", "The selected rule is disabled.");
+					app = rule.App;
+				}
 				if (this.PlacementStatus != "Active")
 					return CliResponse.Fail(command.Operation, "assignment_unavailable", "Automatic app placement must be enabled and monitoring.");
 				if (app != null && this._placementConfiguration.FindEnabledRule(app) == null)

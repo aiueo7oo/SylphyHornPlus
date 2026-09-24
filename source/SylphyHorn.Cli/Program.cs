@@ -17,6 +17,9 @@ namespace SylphyHorn.Cli
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
 				Console.WriteLine("sylphyhorn-cli desktop list");
+				Console.WriteLine("sylphyhorn-cli desktop autoclose list");
+				Console.WriteLine("sylphyhorn-cli desktop autoclose add (--name NAME | --number N)");
+				Console.WriteLine("sylphyhorn-cli desktop autoclose remove (--name NAME | --number N)");
 				Console.WriteLine("sylphyhorn-cli desktop switch " +
 					"(--number N | --name NAME | --id ID | --next | --previous | --last-used) [--wrap]");
 				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME] [--switch]");
@@ -40,9 +43,9 @@ namespace SylphyHorn.Cli
 					"[--create-missing-desktops true|false] [--close-created-desktops true|false]");
 				Console.WriteLine("sylphyhorn-cli app assignment enable --id RULE_ID");
 				Console.WriteLine("sylphyhorn-cli app assignment disable --id RULE_ID");
-				Console.WriteLine("sylphyhorn-cli app assignment set --path PATH (--desktop-name NAME | --desktop-number N)");
-				Console.WriteLine("sylphyhorn-cli app assignment remove --path PATH");
-				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --all) [--dry-run]");
+				Console.WriteLine("sylphyhorn-cli app assignment set (--path PATH | --id RULE_ID) (--desktop-name NAME | --desktop-number N)");
+				Console.WriteLine("sylphyhorn-cli app assignment remove (--path PATH | --id RULE_ID)");
+				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --id RULE_ID | --all) [--dry-run]");
 				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
 				return 0;
 			}

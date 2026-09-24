@@ -133,7 +133,8 @@ namespace SylphyHorn
 		{
 			if (command.Operation == "app assignment apply")
 				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
-			if (command.Operation.StartsWith("app assignment ", StringComparison.Ordinal))
+			if (command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)
+				|| command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal))
 				return this._cliAssignments.ExecuteAsync(command, cancellation);
 			if (!command.Operation.StartsWith("ui ", StringComparison.Ordinal))
 				return this._desktopRuntime.ExecuteCliAsync(command, cancellation);

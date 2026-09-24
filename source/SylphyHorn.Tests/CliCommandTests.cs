@@ -6,6 +6,48 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Theory]
+		[InlineData("add", "--name", "Development", "name")]
+		[InlineData("remove", "--number", "12", "number")]
+		public void AutocloseKeepsTheConfiguredSelector(string action, string option, string value, string kind)
+		{
+			var args = new[] { "desktop", "autoclose", action, option, value };
+			var command = CliCommand.Parse(args);
+			Assert.Equal("desktop autoclose " + action, CliCommand.Recognize(args));
+			Assert.Equal(kind, command.TargetKind);
+			Assert.Equal(value, command.TargetValue);
+		}
+
+		[Theory]
+		[InlineData("desktop autoclose")]
+		[InlineData("desktop autoclose add")]
+		[InlineData("desktop autoclose add --number 0")]
+		[InlineData("desktop autoclose remove --name work --number 2")]
+		[InlineData("desktop autoclose list --number 2")]
+		[InlineData("desktop autoclose add --all")]
+		[InlineData("desktop autoclose add --id aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
+		[InlineData("app assignment set --id aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa --path C:\\App.exe --desktop-number 2")]
+		[InlineData("app assignment apply --id aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa --all")]
+		[InlineData("app assignment remove --id invalid")]
+		public void AutocloseAndRuleIdsRejectAmbiguousOrMissingSelectors(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
+		[Theory]
+		[InlineData("set")]
+		[InlineData("remove")]
+		[InlineData("apply")]
+		public void ExistingAssignmentOperationsAcceptPersistedRuleIds(string action)
+		{
+			var id = Guid.NewGuid().ToString();
+			var args = action == "set"
+				? new[] { "app", "assignment", action, "--id", id, "--desktop-number", "2" }
+				: new[] { "app", "assignment", action, "--id", id };
+			var command = CliCommand.Parse(args);
+			Assert.Equal(id, command.RuleId);
+			Assert.Null(command.AppPath);
+			Assert.False(command.All);
+		}
+
 		[Fact]
 		public void AssignmentConfigurationDistinguishesOmittedValuesFromFalse()
 		{

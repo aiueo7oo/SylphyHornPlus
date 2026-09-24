@@ -217,6 +217,7 @@ namespace SylphyHorn.Tests
 		internal int ApplyCalls;
 		internal CancellationToken Token;
 		internal Func<bool, PlacementRuleApplication> RuleApplication { get; set; }
+		internal PlacementAppIdentity RequestedApp { get; private set; }
 
 		internal PlacementApplySession()
 		{
@@ -236,7 +237,10 @@ namespace SylphyHorn.Tests
 		}
 
 		public Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation)
-			=> Task.FromResult(this.RuleApplication?.Invoke(dryRun) ?? throw new NotSupportedException());
+		{
+			this.RequestedApp = app;
+			return Task.FromResult(this.RuleApplication?.Invoke(dryRun) ?? throw new NotSupportedException());
+		}
 
 		public bool IsReady => true;
 
