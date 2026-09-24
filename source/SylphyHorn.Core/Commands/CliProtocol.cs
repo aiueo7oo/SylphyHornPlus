@@ -73,6 +73,27 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "specVersion", EmitDefaultValue = false)]
+		public int? SpecVersion;
+
+		[DataMember(Name = "target", EmitDefaultValue = false)]
+		public string Target;
+
+		[DataMember(Name = "commands", EmitDefaultValue = false)]
+		public CliCommandSpec[] Commands;
+
+		[DataMember(Name = "specification", EmitDefaultValue = false)]
+		public CliCommandSpec Specification;
+
+		[DataMember(Name = "resultSchema", EmitDefaultValue = false)]
+		public CliSpecType[] ResultSchema;
+
+		[DataMember(Name = "errors", EmitDefaultValue = false)]
+		public CliSpecError[] Errors;
+
+		[DataMember(Name = "resolution", EmitDefaultValue = false)]
+		public CliSpecResolution Resolution;
+
 		[DataMember(Name = "path", EmitDefaultValue = false)]
 		public string Path;
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -14,68 +15,30 @@ namespace SylphyHorn.Cli
 		private static async Task<int> Main(string[] args)
 		{
 			Console.OutputEncoding = new UTF8Encoding(false);
+			if (args.Length > 0 && args[0] == "spec")
+				return Print(await CliSpecService.ExecuteAsync(args, SendAsync));
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
-				Console.WriteLine("sylphyhorn-cli settings export --path PATH [--overwrite]");
-				Console.WriteLine("sylphyhorn-cli settings import --path PATH --apply-desktops true|false");
-				Console.WriteLine("sylphyhorn-cli settings reset --yes");
-				Console.WriteLine("sylphyhorn-cli startup status");
-				Console.WriteLine("sylphyhorn-cli startup configure --mode disabled|normal|elevated");
-				Console.WriteLine("sylphyhorn-cli shortcut list [--device keyboard|mouse]");
-				Console.WriteLine("sylphyhorn-cli shortcut keys --device keyboard|mouse");
-				Console.WriteLine("sylphyhorn-cli shortcut set --device keyboard|mouse --action ACTION [--number N] --trigger TRIGGER");
-				Console.WriteLine("sylphyhorn-cli shortcut clear --device keyboard|mouse --action ACTION [--number N]");
-				Console.WriteLine("sylphyhorn-cli monitor list");
-				Console.WriteLine("sylphyhorn-cli desktop settings");
-				Console.WriteLine("sylphyhorn-cli desktop configure [--loop true|false] [--override-windows-shortcuts true|false] " +
-					"[--per-desktop-wallpaper true|false] [--override-on-startup true|false]");
-				Console.WriteLine("sylphyhorn-cli notification settings");
-				Console.WriteLine("sylphyhorn-cli notification configure [--on-switch true|false] [--always-show true|false] [--duration-ms N] " +
-					"[--simple true|false] [--use-desktop-name true|false] [--theme (apps | system | light | dark | accent)] " +
-					"[--corners (square | rounded | small-rounded)] [--font-family FAMILY] [--header-font-size N] [--body-font-size N] " +
-					"[--header-align (left | center | right)] [--body-align (left | center | right)] [--line-spacing N] " +
-					"[--monitor (current | all | N)] [--placement (top-left | top-center | top-right | center-left | center | center-right | " +
-					"bottom-left | bottom-center | bottom-right)] " +
-					"[--offset-x N] [--offset-y N] [--min-width N] [--simple-min-width N] [--min-height N] " +
-					"[--pin-min-width N] [--pin-offset-x N] [--pin-offset-y N]");
-				Console.WriteLine("sylphyhorn-cli tray settings");
-				Console.WriteLine("sylphyhorn-cli tray configure [--show-desktop true|false] [--current-number-only true|false]");
-				Console.WriteLine("sylphyhorn-cli settings get");
-				Console.WriteLine("sylphyhorn-cli settings configure --language (auto | en | ja)");
-				Console.WriteLine("sylphyhorn-cli desktop list");
-				Console.WriteLine("sylphyhorn-cli desktop autoclose list");
-				Console.WriteLine("sylphyhorn-cli desktop autoclose add (--name NAME | --number N)");
-				Console.WriteLine("sylphyhorn-cli desktop autoclose remove (--name NAME | --number N)");
-				Console.WriteLine("sylphyhorn-cli desktop switch " +
-					"(--number N | --name NAME | --id ID | --next | --previous | --last-used) [--wrap]");
-				Console.WriteLine("sylphyhorn-cli desktop create [--name NAME] [--switch]");
-				Console.WriteLine("sylphyhorn-cli desktop rename --id ID --name NAME");
-				Console.WriteLine("sylphyhorn-cli desktop reorder --id ID --number N");
-				Console.WriteLine("sylphyhorn-cli desktop delete (--id ID | --number N)");
-				Console.WriteLine("sylphyhorn-cli desktop wallpaper (--id ID | --number N) (--path PATH | --position POSITION)");
-				Console.WriteLine("sylphyhorn-cli window list");
-				Console.WriteLine("sylphyhorn-cli window move --id ID " +
-					"(--desktop-number N | --desktop-name NAME | --desktop-id ID | --desktop-next | " +
-					"--desktop-previous | --desktop-last-used | --desktop-new) [--wrap] [--follow]");
-				Console.WriteLine("sylphyhorn-cli window pin --id ID --scope (window | app)");
-				Console.WriteLine("sylphyhorn-cli window unpin --id ID --scope (window | app)");
-				Console.WriteLine("sylphyhorn-cli ui task-view");
-				Console.WriteLine("sylphyhorn-cli ui window-switch");
-				Console.WriteLine("sylphyhorn-cli ui settings");
-				Console.WriteLine("sylphyhorn-cli ui notification-toggle");
-				Console.WriteLine("sylphyhorn-cli app list [--source (registered | windows)]");
-				Console.WriteLine("sylphyhorn-cli app assignment list");
-				Console.WriteLine("sylphyhorn-cli app assignment status");
-				Console.WriteLine("sylphyhorn-cli app assignment configure [--enabled true|false] " +
-					"[--create-missing-desktops true|false] [--close-created-desktops true|false]");
-				Console.WriteLine("sylphyhorn-cli app assignment enable --id RULE_ID");
-				Console.WriteLine("sylphyhorn-cli app assignment disable --id RULE_ID");
-				Console.WriteLine("sylphyhorn-cli app assignment set (--path PATH | --app-id APP_ID | --id RULE_ID) (--desktop-name NAME | --desktop-number N)");
-				Console.WriteLine("sylphyhorn-cli app assignment remove (--path PATH | --id RULE_ID)");
-				Console.WriteLine("sylphyhorn-cli app assignment apply (--path PATH | --id RULE_ID | --all) [--dry-run]");
-				Console.WriteLine("Results are JSON. Desktop numbers start at 1. Start SylphyHorn in the same user session first.");
+				Console.WriteLine("sylphyhorn-cli spec [COMMAND...] [--resolve]");
+				foreach (var item in CliSpecCatalog.All)
+				{
+					var usage = item.Arguments.Select(argument =>
+					{
+						var text = argument.Name + (argument.Type == "flag" ? "" : " " +
+							(argument.Values == null ? argument.Type.ToUpperInvariant() : "(" + string.Join("|", argument.Values) + ")"));
+						return argument.Required ? text : "[" + text + "]";
+					});
+					Console.WriteLine("sylphyhorn-cli " + item.Name + " " + string.Join(" ", usage));
+					Console.WriteLine("  " + item.Summary);
+				}
+				Console.WriteLine("Use spec COMMAND for arguments, constraints, result fields and examples; add --resolve for current values.");
 				return 0;
 			}
+			return Print(await SendAsync(args));
+		}
+
+		private static async Task<CliResponse> SendAsync(string[] args)
+		{
 			string operation = CliCommand.Recognize(args);
 			CliResponse response;
 			try
@@ -95,7 +58,7 @@ namespace SylphyHorn.Cli
 			}
 			catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
 			{
-				return Print(CliResponse.Fail(operation, "invalid_arguments", ex.Message));
+				return CliResponse.Fail(operation, "invalid_arguments", ex.Message);
 			}
 
 			var assembly = Assembly.GetExecutingAssembly();
@@ -125,7 +88,7 @@ namespace SylphyHorn.Cli
 						: CliResponse.Fail(operation, "host_unavailable", "Cannot connect to SylphyHorn in this user session and elevation level.", true);
 				}
 			}
-			return Print(response);
+			return response;
 		}
 
 		private static int Print(CliResponse response)

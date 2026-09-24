@@ -179,9 +179,9 @@ namespace SylphyHorn.Commands
 				else if (command.Operation == "settings import" && option == "--apply-desktops")
 					command.ApplyDesktops = ReadBoolean(args, ref i);
 				else if (command.Operation == "startup configure" && option == "--mode")
-					command.StartupMode = ReadChoice(args, ref i, "disabled", "normal", "elevated");
+					command.StartupMode = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal) && option == "--device")
-					command.Device = ReadChoice(args, ref i, "keyboard", "mouse");
+					command.Device = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--action")
 					command.Action = ReadTextValue(args, ref i, "Specify an action returned by shortcut list.");
 				else if (command.Operation == "shortcut set" && option == "--trigger")
@@ -218,9 +218,7 @@ namespace SylphyHorn.Commands
 						throw new ArgumentException("--monitor requires current, all or a positive monitor number.");
 				}
 				else if (command.Operation == "notification configure" && option == "--placement")
-					command.Placement = ReadChoice(args, ref i,
-						"top-left", "top-center", "top-right", "center-left", "center", "center-right",
-						"bottom-left", "bottom-center", "bottom-right");
+					command.Placement = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation == "notification configure"
 					&& (option == "--offset-x"
 						|| option == "--offset-y"
@@ -248,13 +246,13 @@ namespace SylphyHorn.Commands
 				else if (command.Operation == "notification configure" && option == "--use-desktop-name")
 					command.UseDesktopName = ReadBoolean(args, ref i);
 				else if (command.Operation == "notification configure" && option == "--theme")
-					command.Theme = ReadChoice(args, ref i, "apps", "system", "light", "dark", "accent");
+					command.Theme = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation == "notification configure" && option == "--corners")
-					command.Corners = ReadChoice(args, ref i, "square", "rounded", "small-rounded");
+					command.Corners = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation == "notification configure" && option == "--header-align")
-					command.HeaderAlign = ReadChoice(args, ref i, "left", "center", "right");
+					command.HeaderAlign = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation == "notification configure" && option == "--body-align")
-					command.BodyAlign = ReadChoice(args, ref i, "left", "center", "right");
+					command.BodyAlign = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
 				else if (command.Operation == "notification configure" && option == "--font-family")
 					command.FontFamily = ReadTextValue(args, ref i, "A font family is missing; use an empty string to restore the default.");
 				else if (command.Operation == "notification configure"
@@ -429,24 +427,7 @@ namespace SylphyHorn.Commands
 			return command;
 		}
 
-		private static bool IsKnown(string operation)
-			=> operation == "settings reset" || operation == "settings export" || operation == "settings import"
-				|| operation == "startup status" || operation == "startup configure"
-				|| operation == "shortcut list" || operation == "shortcut keys" || operation == "shortcut set" || operation == "shortcut clear"
-				|| operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
-				|| operation == "notification settings" || operation == "notification configure"
-				|| operation == "tray settings" || operation == "tray configure"
-				|| operation == "settings get" || operation == "settings configure" || operation == "app list"
-				|| operation == "desktop list" || operation == "desktop switch" || operation == "desktop create"
-				|| operation == "desktop rename" || operation == "desktop reorder" || operation == "desktop delete"
-				|| operation == "desktop wallpaper" || operation == "window list"
-				|| operation == "window move" || operation == "window pin" || operation == "window unpin"
-				|| operation == "ui task-view" || operation == "ui window-switch" || operation == "ui settings"
-				|| operation == "ui notification-toggle" || operation == "app assignment list"
-				|| operation == "app assignment set" || operation == "app assignment remove" || operation == "app assignment apply"
-				|| operation == "app assignment status" || operation == "app assignment configure"
-				|| operation == "app assignment enable" || operation == "app assignment disable"
-				|| operation == "desktop autoclose list" || operation == "desktop autoclose add" || operation == "desktop autoclose remove";
+		private static bool IsKnown(string operation) => CliSpecCatalog.Find(operation) != null;
 
 		private void SetTarget(string kind, string value)
 		{
