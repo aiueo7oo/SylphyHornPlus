@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
+using SylphyHorn.Services;
 using SylphyHorn.Services.AppPlacement;
 using WindowsDesktop;
 using Xunit;
@@ -101,6 +102,72 @@ namespace SylphyHorn.WindowsIntegrationTests
 			}
 		}
 
+		[WpfFact(Timeout = 60000)]
+		[Trait(IntegrationTestExecutionEnvironment.TraitName, IntegrationTestExecutionEnvironment.InteractiveDesktop)]
+		public async Task AutomaticPlacementFollowsOnlyForegroundWindowsUnlessOverridden()
+		{
+			Assert.SkipUnless(
+				System.Environment.GetEnvironmentVariable("SYLPHYHORN_PLACEMENT_FOLLOW_TESTS") == "1",
+				"Opt in to foreground activation and desktop switching with SYLPHYHORN_PLACEMENT_FOLLOW_TESTS=1.");
+			using (var fixture = await Fixture.Create(this._output))
+			{
+				try
+				{
+					await this.VerifyFollowing(fixture, active: true, follow: null);
+					await this.VerifyFollowing(fixture, active: true, follow: false);
+					await this.VerifyFollowing(fixture, active: false, follow: null);
+				}
+				finally
+				{
+					await fixture.Stop();
+					// Restore only a switch to the fixture's destination, not an unrelated user switch.
+					if (VirtualDesktop.Current?.Id == fixture.Environment.Target)
+					{
+						VirtualDesktop.FromId(fixture.Environment.Source)?.Switch();
+						await Until(() => VirtualDesktop.Current?.Id == fixture.Environment.Source, "restore original desktop");
+					}
+				}
+				fixture.Environment.AssertDesktopUnchanged();
+			}
+		}
+
+		private async Task VerifyFollowing(Fixture fixture, bool active, bool? follow)
+		{
+			var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+			fixture.Authorize = async (destination, cancellation) =>
+			{
+				await ready.Task;
+				cancellation.ThrowIfCancellationRequested();
+				return new PlacementAuthorization(fixture.Environment.Map.Resolve(destination), new PlacementMovePermit());
+			};
+			await fixture.Start(fixture.Environment.Configuration(follow));
+			try
+			{
+				var window = await fixture.Environment.Show(active);
+				Assert.True(active == (InteropHelper.GetForegroundWindowEx() == window),
+					"Fixture foreground activation did not match the requested state. Run from a foreground interactive console without other input.");
+				ready.TrySetResult(true);
+				await Until(() => fixture.History.Snapshot().Any(entry => entry.Window == window), "automatic placement with foreground policy");
+				var result = fixture.History.Snapshot().Last(entry => entry.Window == window);
+				Assert.Equal(PlacementOutcome.Moved, result.Outcome);
+				Assert.DoesNotContain("FollowFailed", result.Reason ?? string.Empty);
+				Assert.Equal(fixture.Environment.Target, fixture.Environment.Location(window));
+				var expected = active && follow != false ? fixture.Environment.Target : fixture.Environment.Source;
+				await Until(() => VirtualDesktop.Current?.Id == expected, "foreground follow destination");
+				this._output.WriteLine("Active={0}, override={1}: moved=True, followed={2}", active, follow?.ToString() ?? "default", expected == fixture.Environment.Target);
+			}
+			finally
+			{
+				ready.TrySetCanceled();
+				await fixture.Stop();
+			}
+			if (VirtualDesktop.Current?.Id == fixture.Environment.Target)
+			{
+				VirtualDesktop.FromId(fixture.Environment.Source).Switch();
+				await Until(() => VirtualDesktop.Current?.Id == fixture.Environment.Source, "return before next case");
+			}
+		}
+
 		private sealed class Fixture : IDisposable
 		{
 			internal PlacementTestEnvironment Environment;
@@ -115,10 +182,13 @@ namespace SylphyHorn.WindowsIntegrationTests
 				return fixture;
 			}
 
-			internal async Task Start()
+			internal async Task Start(AppPlacementConfiguration configuration = null)
 			{
 				Assert.Null(this.Session);
-				this.Session = new PlacementSessionFactory().Start(this.Environment.Configuration(), (destination, allowCreation, cancellation) => this.Authorize(destination, cancellation), this.History);
+				this.Session = new PlacementSessionFactory().Start(
+					configuration ?? this.Environment.Configuration(),
+					(destination, allowCreation, cancellation) => this.Authorize(destination, cancellation),
+					this.History);
 				await Until(() => this.Session.IsReady || this.Session.Completion.IsCompleted, "placement session startup");
 				Assert.True(this.Session.IsReady && !this.Session.Completion.IsCompleted);
 			}

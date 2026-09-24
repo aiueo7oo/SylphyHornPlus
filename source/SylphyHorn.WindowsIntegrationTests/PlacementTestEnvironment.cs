@@ -79,18 +79,19 @@ namespace SylphyHorn.WindowsIntegrationTests
 			}
 		}
 
-		internal AppPlacementConfiguration Configuration() => new AppPlacementConfiguration(
+		internal AppPlacementConfiguration Configuration(bool? followForeground = null) => new AppPlacementConfiguration(
 			true,
 			new[] { new AppPlacementRule(
 				Guid.NewGuid(),
 				true,
 				new PlacementAppIdentity(PlacementAppKind.ExecutablePath, this.HostPath),
-				PlacementDestination.ByNumber(Array.IndexOf(this._order, this.Target) + 1)) });
+				PlacementDestination.ByNumber(Array.IndexOf(this._order, this.Target) + 1),
+				followForeground: followForeground) });
 
-		internal async Task<IntPtr> Show()
+		internal async Task<IntPtr> Show(bool active = false)
 		{
 			Assert.Equal(this.Source, VirtualDesktop.Current.Id);
-			await this._host.StandardInput.WriteLineAsync("show");
+			await this._host.StandardInput.WriteLineAsync(active ? "show-active" : "show");
 			await this._host.StandardInput.FlushAsync();
 			var line = await Bounded(this._host.StandardOutput.ReadLineAsync(), "fixture window creation");
 			Assert.False(string.IsNullOrWhiteSpace(line), "Fixture process exited before creating a window.");

@@ -49,13 +49,14 @@ namespace SylphyHorn.PlacementTestHost
 						var command = Console.ReadLine();
 						dispatcher.BeginInvoke(new Action(() =>
 						{
-							if (command != "show")
+							if (command != "show" && command != "show-active")
 							{
 								close();
 								return;
 							}
 							var window = new FixtureWindow
 							{
+								ActivateOnShow = command == "show-active",
 								Text = "SylphyHorn placement test " + (windows.Count + 1),
 								Size = new Size(300, 90),
 								StartPosition = FormStartPosition.Manual,
@@ -63,10 +64,11 @@ namespace SylphyHorn.PlacementTestHost
 							};
 							windows.Add(window);
 							window.Show();
+							if (window.ActivateOnShow) window.Activate();
 							Console.WriteLine(window.Handle.ToInt64().ToString(CultureInfo.InvariantCulture));
 							Console.Out.Flush();
 						}));
-						if (command != "show") return;
+						if (command != "show" && command != "show-active") return;
 					}
 				})
 				{ IsBackground = true };
@@ -77,7 +79,9 @@ namespace SylphyHorn.PlacementTestHost
 
 		private sealed class FixtureWindow : Form
 		{
-			protected override bool ShowWithoutActivation => true;
+			internal bool ActivateOnShow;
+
+			protected override bool ShowWithoutActivation => !this.ActivateOnShow;
 		}
 	}
 }
