@@ -23,6 +23,7 @@ namespace SylphyHorn.Tests
 				Scalar("SimpleNotification", false),
 				Scalar("NotificationDuration", 2500),
 				Scalar("ChangeBackgroundEachDesktop", false),
+				Scalar("DesktopWallpapersOnCreation", Array.Empty<DesktopWallpaperOnCreation>()),
 				Scalar<string>("DesktopBackgroundFolderPath", null),
 				Scalar("OverrideWindowsDefaultKeyCombination", false),
 				Scalar("SuspendKeyDetection", false),

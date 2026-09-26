@@ -47,6 +47,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private readonly LocalSettingsProvider _provider;
 		internal ApplicationDesktopSettingsTransactions(LocalSettingsProvider provider) => this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
 		public DesktopStartupSeed CaptureStartupSeed() => SettingsService.CaptureDesktopStartupSeed();
+		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => new GeneralSettings(this._provider).DesktopWallpapersOnCreation.Value;
+		public bool PerDesktopWallpaperEnabled => new GeneralSettings(this._provider).ChangeBackgroundEachDesktop.Value;
 		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value;
 		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value = groups;
 		public void ApplyProjection(DesktopSettingsProjection projection) => SettingsService.ApplyDesktopProjection(projection);

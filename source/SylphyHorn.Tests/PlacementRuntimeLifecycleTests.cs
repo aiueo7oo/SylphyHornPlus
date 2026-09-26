@@ -12,6 +12,43 @@ namespace SylphyHorn.Tests
 	public sealed class PlacementRuntimeLifecycleTests
 	{
 		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public async Task CreationImageFailureDoesNotBlockPlacementAndFillersAreExcluded(bool reentrant)
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			var missing = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".bmp");
+			harness.Settings.WallpapersOnCreation = new[]
+			{
+				new SylphyHorn.Serialization.DesktopWallpaperOnCreation(null, 2, missing),
+				new SylphyHorn.Serialization.DesktopWallpaperOnCreation(null, 3, missing),
+			};
+			var faults = 0;
+			harness.Runtime.Faulted += (_, __) => faults++;
+			var intermediate = Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", ""));
+			var final = Batch(1, 5, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", ""), Entry(C, 2, "", ""));
+			harness.Operations.Creating = () =>
+			{
+				var first = harness.Operations.CreateCalls == 1;
+				if (reentrant) harness.Provider.PublishStable(first ? intermediate : final);
+				return first ? B : C;
+			};
+			harness.Provider.EnqueueResult(intermediate);
+			harness.Provider.EnqueueResult(final);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByNumber(3), session.Cancellation.Token);
+			harness.Owner.Drain();
+			var result = await request;
+			Assert.Equal(C, result.Resolution.DesktopId);
+			Assert.True(result.Permit.TryStart());
+			Assert.Equal(1, faults);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Theory]
 		[InlineData("unchanged")]
 		[InlineData("wallpaper")]
 		[InlineData("position")]

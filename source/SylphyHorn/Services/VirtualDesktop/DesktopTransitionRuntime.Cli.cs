@@ -36,8 +36,12 @@ namespace SylphyHorn.Services.DesktopTransitions
 						throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
 					this.EnsureCliAvailable(cancellation);
 					submitted = true;
-					var created = this._operations.Create();
-					if (command.Name != null) this._operations.SetName(created, command.Name);
+					var created = this.WithCreationWallpapersHeld(() =>
+					{
+						var id = this._operations.Create();
+						if (command.Name != null) this._operations.SetName(id, command.Name);
+						return id;
+					}, command.Name);
 					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(created)
 						&& (command.Name == null || this.CliDesktopInfo(created).Name == command.Name), cancellation);
 					if (command.SwitchAfterCreate)

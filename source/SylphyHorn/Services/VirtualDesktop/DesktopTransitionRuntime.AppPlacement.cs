@@ -259,12 +259,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 						}
 						// Bound this request to its initial deficit, even if another actor removes desktops.
 						remaining--;
-						created = this._operations.Create();
-						this.RecordPlacementCreatedDesktop(request, created);
-						this.CheckPlacementCreation(request);
-						if (request.Destination.Kind == PlacementDestinationKind.Name)
-							this._operations.SetName(created, request.Destination.Name);
-						this.CheckPlacementCreation(request);
+						created = this.WithCreationWallpapersHeld(() =>
+						{
+							var id = this._operations.Create();
+							if (remaining > 0) this._creationWallpaperSkipped.Add(id);
+							this.RecordPlacementCreatedDesktop(request, id);
+							this.CheckPlacementCreation(request);
+							if (request.Destination.Kind == PlacementDestinationKind.Name)
+								this._operations.SetName(id, request.Destination.Name);
+							this.CheckPlacementCreation(request);
+							return id;
+						}, request.Destination.Kind == PlacementDestinationKind.Name ? request.Destination.Name : null);
 						refresh = this.RequestProviderWithBudgetAsync(VirtualDesktopStableReason.ExplicitReconciliation, request.Cancellation);
 					}).ConfigureAwait(false);
 					if (refresh == null) return;

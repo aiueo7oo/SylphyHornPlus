@@ -109,6 +109,9 @@ namespace SylphyHorn.Tests
 	internal sealed class FakeSettings : IDesktopSettingsTransactions
 	{
 		internal SylphyHorn.AppPlacement.PlacementCreatedGroup[] CreatedGroups = Array.Empty<SylphyHorn.AppPlacement.PlacementCreatedGroup>();
+		public DesktopWallpaperOnCreation[] WallpapersOnCreation = Array.Empty<DesktopWallpaperOnCreation>();
+		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => this.WallpapersOnCreation;
+		public bool PerDesktopWallpaperEnabled { get; set; } = true;
 		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this.CreatedGroups;
 		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => this.CreatedGroups = groups;
 		internal FakeSettings(DesktopStartupSeed seed)

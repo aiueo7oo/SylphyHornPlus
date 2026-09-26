@@ -74,6 +74,22 @@ namespace SylphyHorn.Commands
 			foreach (var page in new[] { "task-view", "window-switch", "settings", "notification-toggle" })
 				yield return C("ui " + page, page == "notification-toggle" ? "Toggle the desktop notification display." : "Show the " + page + " interface.",
 					"", effects: "change-visible-ui", notes: "Requires an interactive GUI host. Does not automate input inside the displayed interface.");
+			foreach (var verb in new[] { "list", "set", "remove" })
+			{
+				var arguments = new List<CliSpecArgument>();
+				if (verb != "list")
+				{
+					arguments.Add(Desktop("--name"));
+					arguments.Add(Desktop("--number"));
+				}
+				if (verb == "set") arguments.Add(A("--path", "string", true, description: "Absolute readable image path."));
+				yield return C("desktop creation wallpaper " + verb, verb + " wallpaper settings applied to newly created desktops.",
+					"wallpapersOnCreation changed", arguments.ToArray(), verb == "list" ? null : new[] { One("--name --number") },
+					notes: "Names take priority over numbers. Destinations may be absent. Does not change existing wallpapers. " +
+						"set replaces the same target; remove of an absent target succeeds unchanged. Import restoration and intermediate filler desktops are excluded.",
+					effects: verb == "list" ? "read-settings" : "persist-settings", example: verb == "list" ? null : "--number 3" + (verb == "set" ? " --path C:\\Wallpapers\\work.jpg" : ""),
+					queries: Q("desktop creation wallpaper list", "desktop list"));
+			}
 			yield return C("app list", "List registered applications or applications with open windows.", "apps source",
 				new[] { A("--source", "string", values: "registered windows", omission: "registered") },
 				notes: "Use canAssign and reason. A launcher or unknown identity is not a safe assignment target.", queries: Q("app list"));

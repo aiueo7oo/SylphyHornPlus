@@ -33,16 +33,32 @@ namespace SylphyHorn.Serialization
 
 		public bool IsLoaded { get; private set; }
 		public virtual string Filename { get; } = "Settings.xml";
-		public virtual Type[] KnownTypes { get; } = { typeof(bool), typeof(int[]), typeof(AppPlacement.AppPlacementConfiguration), typeof(AppPlacement.PlacementCreatedGroup[]), };
+		public virtual Type[] KnownTypes { get; } =
+		{
+			typeof(bool), typeof(int[]), typeof(AppPlacement.AppPlacementConfiguration),
+			typeof(AppPlacement.PlacementCreatedGroup[]), typeof(DesktopWallpaperOnCreation[]),
+		};
 		public long SettingsRevision { get { lock (this._sync) return this._settingsRevision; } }
 		public bool ImportTransactionActive { get { lock (this._sync) return this._importActive; } }
 
 		public event EventHandler Reloaded;
 
+		private static void ValidateEntry(string key, object value)
+		{
+			AppPlacementSettings.ValidateEntry(key, value);
+			DesktopWallpaperOnCreation.ValidateEntry(key, value);
+		}
+
+		private static void ValidateDictionary(IEnumerable<KeyValuePair<string, object>> values)
+		{
+			if (values == null) return;
+			foreach (var pair in values) ValidateEntry(pair.Key, pair.Value);
+		}
+
 		public void SetValue<T>(string key, T value)
 		{
 			if (key == null) throw new ArgumentNullException(nameof(key));
-			AppPlacementSettings.ValidateEntry(key, value);
+			ValidateEntry(key, value);
 			this.ApplyOrDefer(dic => dic[key] = CloneValue(value));
 		}
 
@@ -165,7 +181,7 @@ namespace SylphyHorn.Serialization
 			{
 				var diskHash = await this.GetContentHashAsyncCore().ConfigureAwait(false);
 				var imported = await this.LoadAsyncCore(path).ConfigureAwait(false) ?? new Dictionary<string, object>();
-				AppPlacementSettings.ValidateDictionary(imported);
+				ValidateDictionary(imported);
 				var stage = new StagedSettingsImport(this._stageOwnerToken, imported, revision, fingerprint, diskHash);
 				lock (this._sync)
 				{
@@ -245,7 +261,7 @@ namespace SylphyHorn.Serialization
 				SettingsSaveResult saveResult;
 				try
 				{
-					AppPlacementSettings.ValidateDictionary(snapshot);
+					ValidateDictionary(snapshot);
 					await this.SaveAsyncCore(snapshot).ConfigureAwait(false);
 					lock (this._sync) saveResult = SettingsSaveResult.Success(checked(++this._completedSaveRevision), this._settingsRevision + 1);
 				}
@@ -324,7 +340,7 @@ namespace SylphyHorn.Serialization
 		public async Task LoadAsync()
 		{
 			var dic = await this.LoadAsyncCore().ConfigureAwait(false);
-			AppPlacementSettings.ValidateDictionary(dic);
+			ValidateDictionary(dic);
 			lock (this._sync)
 			{
 				this._settings = dic != null ? CloneDictionary(dic) : new Dictionary<string, object>(StringComparer.Ordinal);

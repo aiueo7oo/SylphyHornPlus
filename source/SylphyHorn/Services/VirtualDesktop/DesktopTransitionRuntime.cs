@@ -279,7 +279,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			for (var index = 0; index < plan.CreateCount; index++)
 			{
 				if (failed) { journal.RecordTopology(DesktopStartupTopologyMutationKind.Create, null, DesktopOverrideOperationStatus.Skipped); continue; }
-				try { this._operations.Create(); journal.RecordTopology(DesktopStartupTopologyMutationKind.Create, null, DesktopOverrideOperationStatus.Succeeded); }
+				try { this._creationWallpaperSkipped.Add(this._operations.Create()); journal.RecordTopology(DesktopStartupTopologyMutationKind.Create, null, DesktopOverrideOperationStatus.Succeeded); }
 				catch { journal.RecordTopology(DesktopStartupTopologyMutationKind.Create, null, DesktopOverrideOperationStatus.Failed); failed = true; }
 			}
 			foreach (var id in plan.RemoveIds)
@@ -369,19 +369,21 @@ namespace SylphyHorn.Services.DesktopTransitions
 			=> this.EnqueueOrRun(() => this.CommitLocalEdit(DesktopLocalEdit.Name(desktopId, value, this.State), () => this._operations.SetName(desktopId, value)));
 
 		internal void EditWallpaperPath(Guid desktopId, string value)
-			=> this.EnqueueOrRun(() =>
-			{
-				var record = this.GetRecord(desktopId);
-				var unsupported = record.WallpaperPath.ReadStatus == VirtualDesktopReadStatus.Unsupported;
-				if (!unsupported && string.IsNullOrEmpty(value)) return;
-				this.CommitLocalEdit(
-					DesktopLocalEdit.WallpaperPath(desktopId, value, this.State),
-					() =>
-					{
-						if (!unsupported) this._operations.SetWallpaperPath(desktopId, value);
-						else if (this.State.CurrentDesktopId == desktopId) this._operations.ApplyWallpaper(desktopId, value, record.WallpaperPosition);
-					});
-			});
+			=> this.EnqueueOrRun(() => this.SetWallpaperPath(desktopId, value));
+
+		private void SetWallpaperPath(Guid desktopId, string value)
+		{
+			if (!this.State.Records.TryGetValue(desktopId, out var record)) return;
+			var unsupported = record.WallpaperPath.ReadStatus == VirtualDesktopReadStatus.Unsupported;
+			if (!unsupported && string.IsNullOrEmpty(value)) return;
+			this.CommitLocalEdit(
+				DesktopLocalEdit.WallpaperPath(desktopId, value, this.State),
+				() =>
+				{
+					if (!unsupported) this._operations.SetWallpaperPath(desktopId, value);
+					else if (this.State.CurrentDesktopId == desktopId) this._operations.ApplyWallpaper(desktopId, value, record.WallpaperPosition);
+				});
+		}
 
 		internal void EditWallpaperPosition(Guid desktopId, WallpaperPosition value)
 			=> this.EnqueueOrRun(() =>
@@ -694,7 +696,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 					this._suppressedTransition = applied;
 					if (providerPublication && applied?.Accepted == true) this.ReserveProviderPublication(batch);
 				}
-				else this.ApplyTransition(applied, transitionCommitted: providerPublication ? (Action)(() => this.ReserveProviderPublication(batch)) : null);
+				else
+				{
+					this.ApplyTransition(applied, transitionCommitted: providerPublication ? (Action)(() => this.ReserveProviderPublication(batch)) : null);
+					this.ApplyCreationWallpapers(applied);
+				}
 			}
 			if (providerPublication) this.CompleteReservedProviderPublications();
 		}

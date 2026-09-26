@@ -83,6 +83,8 @@ namespace SylphyHorn.Serialization
 
 		public DesktopNamePropertyList DesktopNames => this.Cache(key => new DesktopNamePropertyList(key, this._provider));
 
+		public SerializableProperty<DesktopWallpaperOnCreation[]> DesktopWallpapersOnCreation => this.Cache(key => new SerializableProperty<DesktopWallpaperOnCreation[]>(key, this._provider, Array.Empty<DesktopWallpaperOnCreation>()));
+
 		public WallpaperPathPropertyList DesktopBackgroundImagePaths => this.Cache(key => new WallpaperPathPropertyList(key, this._provider));
 
 		public WallpaperPositionsPropertyList DesktopBackgroundPositions => this.Cache(key => new WallpaperPositionsPropertyList(key, this._provider));

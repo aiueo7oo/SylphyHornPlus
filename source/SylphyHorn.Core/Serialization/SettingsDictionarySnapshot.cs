@@ -80,6 +80,13 @@ namespace SylphyHorn.Serialization
 				builder.Append(']');
 				return;
 			}
+			if (value is DesktopWallpaperOnCreation wallpaper)
+			{
+				AppendValue(builder, wallpaper.Name);
+				AppendValue(builder, wallpaper.Number);
+				AppendValue(builder, wallpaper.WallpaperPath);
+				return;
+			}
 			if (value is PlacementDestination destination)
 			{
 				AppendValue(builder, destination.Kind);

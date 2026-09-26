@@ -76,6 +76,15 @@ namespace SylphyHorn.Services
 			this._applyQueue.Enqueue(path, record.WallpaperPosition);
 		}
 
+		internal static void ValidateImage(string path)
+		{
+			using (var stream = System.IO.File.OpenRead(path))
+			{
+				System.Windows.Media.Imaging.BitmapDecoder.Create(stream,
+					System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+			}
+		}
+
 		internal static void ApplyDesktopWallpaper(string path, WallpaperPosition position)
 		{
 			var wallpaper = DesktopWallpaperFactory.Create();

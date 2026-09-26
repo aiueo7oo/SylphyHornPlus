@@ -271,6 +271,8 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 			public DesktopStartupSeed CaptureStartupSeed() => DesktopStartupSeed.Empty;
 
+			public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => new GeneralSettings(this.Provider).DesktopWallpapersOnCreation.Value;
+			public bool PerDesktopWallpaperEnabled => new GeneralSettings(this.Provider).ChangeBackgroundEachDesktop.Value;
 			public PlacementCreatedGroup[] ReadCreatedDesktopGroups() => new AppPlacementSettings(this.Provider).CreatedDesktopGroups.Value;
 
 			public void WriteCreatedDesktopGroups(PlacementCreatedGroup[] groups) => new AppPlacementSettings(this.Provider).CreatedDesktopGroups.Value = groups;

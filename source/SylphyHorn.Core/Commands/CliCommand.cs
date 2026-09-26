@@ -140,6 +140,7 @@ namespace SylphyHorn.Commands
 			if (args == null || args.Length < 2) return null;
 			var operation = args[0] + " " + args[1];
 			if ((operation == "app assignment" || operation == "desktop autoclose") && args.Length >= 3) operation += " " + args[2];
+			if (operation == "desktop creation" && args.Length >= 4 && args[2] == "wallpaper") operation += " wallpaper " + args[3];
 			return IsKnown(operation) ? operation : null;
 		}
 
@@ -151,13 +152,22 @@ namespace SylphyHorn.Commands
 			if (command.Operation == null) throw new ArgumentException("Unknown command.");
 			var assignment = command.Operation.StartsWith("app assignment ", StringComparison.Ordinal);
 			var autoclose = command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal);
+			var creationWallpaper = command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal);
 
 			var options = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = assignment || autoclose ? 3 : 2; i < args.Length; i++)
+			for (var i = creationWallpaper ? 4 : assignment || autoclose ? 3 : 2; i < args.Length; i++)
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
-				if (command.Operation == "app assignment configure"
+				if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && (option == "--name" || option == "--number"))
+				{
+					var value = ReadValue(args, ref i);
+					if (option == "--number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
+						throw new ArgumentException("Desktop numbers must be positive integers.");
+					command.SetTarget(option.Substring(2), value);
+				}
+				else if (command.Operation == "desktop creation wallpaper set" && option == "--path") command.WallpaperPath = ReadValue(args, ref i);
+				else if (command.Operation == "app assignment configure"
 					&& (option == "--enabled" || option == "--create-missing-desktops" || option == "--close-created-desktops"))
 				{
 					var value = ReadValue(args, ref i);
@@ -393,6 +403,10 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
 				throw new ArgumentException("--wrap requires a next or previous destination.");
+			if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && command.TargetKind == null)
+				throw new ArgumentException("Specify --name or --number.");
+			if (command.Operation == "desktop creation wallpaper set" && command.WallpaperPath == null)
+				throw new ArgumentException("Specify --path.");
 			var assignmentSelectors = (command.AppPath != null ? 1 : 0) + (command.RuleId != null ? 1 : 0) + (command.All ? 1 : 0) + (command.AppId != null ? 1 : 0);
 			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && assignmentSelectors != 1)
 				throw new ArgumentException(command.Operation == "app assignment set"

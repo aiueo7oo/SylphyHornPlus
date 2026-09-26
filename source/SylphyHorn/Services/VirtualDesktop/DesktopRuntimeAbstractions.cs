@@ -20,6 +20,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 	internal interface IDesktopSettingsTransactions
 	{
 		DesktopStartupSeed CaptureStartupSeed();
+		DesktopWallpaperOnCreation[] ReadWallpapersOnCreation();
+		bool PerDesktopWallpaperEnabled { get; }
 		SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups();
 		void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups);
 		void ApplyProjection(DesktopSettingsProjection projection);

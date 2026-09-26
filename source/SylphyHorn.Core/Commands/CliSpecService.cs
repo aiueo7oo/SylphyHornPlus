@@ -134,7 +134,8 @@ namespace SylphyHorn.Commands
 			if (command.StartsWith("shortcut ", StringComparison.Ordinal)) codes.Add("shortcut_conflict");
 			if (command.StartsWith("notification ", StringComparison.Ordinal)) codes.Add("monitor_unavailable");
 			if (command.EndsWith(" configure", StringComparison.Ordinal) || command.StartsWith("app ", StringComparison.Ordinal)
-				|| command.StartsWith("shortcut ", StringComparison.Ordinal) || command.StartsWith("desktop autoclose ", StringComparison.Ordinal))
+				|| command.StartsWith("shortcut ", StringComparison.Ordinal) || command.StartsWith("desktop autoclose ", StringComparison.Ordinal)
+				|| command.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
 				codes.Add("settings_save_failed");
 			return CommonErrors.Where(error => codes.Contains(error.Code)).ToArray();
 		}

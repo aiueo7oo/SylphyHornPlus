@@ -30,6 +30,7 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 		private Services.Commands.CliServer _cliServer;
 		private Services.Commands.CliAssignmentService _cliAssignments;
+		private Services.Commands.CliCreationWallpaperService _cliCreationWallpapers;
 		private Services.Commands.CliSettingsService _cliSettings;
 		private Services.Commands.CliShortcutService _cliShortcuts;
 		private Services.Commands.CliSettingsFileService _cliSettingsFiles;
@@ -146,6 +147,8 @@ namespace SylphyHorn
 				return this._cliShortcuts.ExecuteAsync(command, cancellation);
 			if (Services.Commands.CliSettingsService.Handles(command.Operation))
 				return this._cliSettings.ExecuteAsync(command, cancellation);
+			if (command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
+				return this._cliCreationWallpapers.ExecuteAsync(command, cancellation);
 			if (command.Operation == "app assignment apply")
 				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
 			if (command.Operation == "app list" || command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)
@@ -272,6 +275,8 @@ namespace SylphyHorn
 					this._cliSettings = new Services.Commands.CliSettingsService(Settings.General,
 						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable,
 						ResourceService.Current.StartupCulture);
+					this._cliCreationWallpapers = new Services.Commands.CliCreationWallpaperService(Settings.General,
+						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable);
 					this._cliAssignments = new Services.Commands.CliAssignmentService(Settings.AppPlacement,
 						new Services.AppPlacement.PlacementAppCatalog(), () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
 						() => runtime.CliAvailable, () => runtime.PlacementStatus);

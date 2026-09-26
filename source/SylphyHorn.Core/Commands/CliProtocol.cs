@@ -71,8 +71,22 @@ namespace SylphyHorn.Commands
 	}
 
 	[DataContract]
+	internal sealed class CliCreationWallpaper
+	{
+		[DataMember(Name = "name", EmitDefaultValue = false)]
+		public string Name;
+		[DataMember(Name = "number", EmitDefaultValue = false)]
+		public int? Number;
+		[DataMember(Name = "path")]
+		public string Path;
+	}
+
+	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "wallpapersOnCreation", EmitDefaultValue = false)]
+		public CliCreationWallpaper[] WallpapersOnCreation;
+
 		[DataMember(Name = "specVersion", EmitDefaultValue = false)]
 		public int? SpecVersion;
 

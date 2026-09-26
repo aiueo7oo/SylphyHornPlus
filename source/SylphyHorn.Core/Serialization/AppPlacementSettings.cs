@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
 using MetroTrilithon.Serialization;
 using SylphyHorn.AppPlacement;
@@ -28,10 +27,5 @@ namespace SylphyHorn.Serialization
 				throw new SerializationException("Invalid app placement configuration.");
 		}
 
-		internal static void ValidateDictionary(IEnumerable<KeyValuePair<string, object>> values)
-		{
-			if (values == null) return;
-			foreach (var pair in values) ValidateEntry(pair.Key, pair.Value);
-		}
 	}
 }
