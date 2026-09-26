@@ -36,6 +36,9 @@ namespace SylphyHorn.Interop
 		[DllImport("user32.dll", SetLastError = true)]
 		public static extern IntPtr MonitorFromPoint(POINT pt, MonitorDefaultTo dwFlags);
 
+		[DllImport("user32.dll")]
+		public static extern IntPtr MonitorFromWindow(IntPtr hwnd, MonitorDefaultTo dwFlags);
+
 		[DllImport("User32.dll", ExactSpelling = true, CharSet = CharSet.Auto, SetLastError = true)]
 		public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, int crKey, byte bAlpha, LayeredWindowAttributes dwFlags);
 

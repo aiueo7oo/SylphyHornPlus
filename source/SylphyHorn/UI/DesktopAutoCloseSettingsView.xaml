@@ -1,0 +1,65 @@
+﻿<UserControl x:Class="SylphyHorn.UI.DesktopAutoCloseSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
+	<!-- Shares AppPlacementSettingsViewModel with the app placement tab: one settings owner and one save path. -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="Visible" />
+		<Style x:Key="InlineMessage" TargetType="TextBlock">
+			<Setter Property="TextWrapping" Value="Wrap" />
+			<Setter Property="Margin" Value="0,4" />
+			<Style.Triggers>
+				<Trigger Property="Text" Value="">
+					<Setter Property="Visibility" Value="Collapsed" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+		<Style x:Key="Section" TargetType="StackPanel">
+			<Setter Property="Margin" Value="0,16,0,0" />
+		</Style>
+	</UserControl.Resources>
+	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+		<!-- See AppPlacementSettingsView: templated text would otherwise inherit the selected tab item's accent foreground. -->
+		<StackPanel Margin="16,0,16,16" Focusable="True" TextElement.Foreground="{DynamicResource ForegroundBrushKey}">
+			<TextBlock Text="{Binding Text[CloseTitle]}" Style="{DynamicResource HeaderStyleKey}" />
+			<TextBlock Text="{Binding Text[CloseHint]}" Style="{StaticResource InlineMessage}" Margin="8,0,0,8" />
+			<CheckBox Content="{Binding Text[CloseCreated]}" IsChecked="{Binding CloseCreatedDesktops}" Margin="8,0,0,8" />
+			<ItemsControl ItemsSource="{Binding ClosingGroups}" Focusable="False">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Style="{StaticResource Section}">
+							<TextBlock Text="{Binding Title}" Style="{DynamicResource HeaderStyleKey}" />
+							<ItemsControl ItemsSource="{Binding Rows}" Margin="8,0,0,0" Focusable="False">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<StackPanel Margin="0,0,0,8" PreviewKeyDown="ClosingInputKey">
+											<DockPanel>
+												<Button DockPanel.Dock="Right" Content="{Binding Group.Owner.Text[DeleteLabel]}"
+												        ToolTip="{Binding Group.Owner.Text[Delete]}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
+												<metro:PromptComboBox Prompt="" IsEditable="True"
+												                      Text="{Binding Destination, UpdateSourceTrigger=PropertyChanged}"
+												                      DropDownOpened="ClosingDestinationOpened" DropDownClosed="ClosingDestinationClosed"
+												                      LostKeyboardFocus="ClosingCommit" AutomationProperties.Name="{Binding Group.Title}" />
+											</DockPanel>
+											<TextBlock Text="{Binding Error}" Style="{StaticResource InlineMessage}" />
+										</StackPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<Button Content="{Binding Owner.Text[AddManual]}" Click="AddClosing" Margin="8,0,0,0" />
+						</StackPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+			<StackPanel Margin="8,8,0,0">
+				<TextBlock Text="{Binding Message}"
+				           Style="{StaticResource InlineMessage}"
+				           AutomationProperties.LiveSetting="Polite" />
+				<Button Content="{Binding Text[RetrySave]}"
+				        Command="{Binding RetrySaveCommand}"
+				        HorizontalAlignment="Left"
+				        Visibility="{Binding SaveFailed, Converter={StaticResource Visible}}" />
+			</StackPanel>
+		</StackPanel>
+	</ScrollViewer>
+</UserControl>

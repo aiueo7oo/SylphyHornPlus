@@ -41,78 +41,13 @@ namespace SylphyHorn.UI
 			else this._refresh.Stop();
 		}
 
-		private void AddClosing(object sender, RoutedEventArgs args)
+		private void FollowChanged(object sender, SelectionChangedEventArgs args)
 		{
-			if ((sender as FrameworkElement)?.DataContext is PlacementClosingGroup group)
-			{
-				var row = group.Owner.AddClosingRow(group);
-				this.Dispatcher.BeginInvoke(new Action(() =>
-				{
-					this.UpdateLayout();
-					var field = FindField(this, row, "Destination");
-					field?.BringIntoView();
-					field?.Focus();
-				}), DispatcherPriority.Input);
-			}
-		}
-
-		private void ClosingDestinationOpened(object sender, EventArgs args)
-		{
+			// Only a choice made in this combo box saves; filling the items, Esc restoring the row
+			// or a reload replacing it does not.
 			var combo = (ComboBox)sender;
-			var row = (PlacementClosingRow)combo.DataContext;
-			var text = combo.Text;
-			row.Group.Owner.RefreshDestinationChoices();
-			combo.ItemsSource = row.Group.Owner.Groups[row.Group.Kind == SylphyHorn.AppPlacement.PlacementDestinationKind.Name ? 0 : 1].Choices;
-			combo.Text = text;
-			combo.Tag = text;
-		}
-
-		private void ClosingDestinationClosed(object sender, EventArgs args)
-		{
-			var combo = (ComboBox)sender;
-			if (combo.Tag == null) return;
-			combo.Tag = null;
-			this.ClosingCommit(sender, args);
-		}
-
-		private async void ClosingCommit(object sender, EventArgs args)
-		{
-			if (sender is ComboBox combo && (combo.IsDropDownOpen || (args is KeyboardFocusChangedEventArgs && combo.IsKeyboardFocusWithin))) return;
-			if ((sender as FrameworkElement)?.DataContext is PlacementClosingRow row) await row.Group.Owner.CommitClosingAsync(row);
-		}
-
-		private async void ClosingInputKey(object sender, KeyEventArgs args)
-		{
-			if (!((sender as FrameworkElement)?.DataContext is PlacementClosingRow row)) return;
-			if (args.Key == Key.Escape)
-			{
-				if (FindField(this, row, "Destination") is ComboBox combo)
-				{
-					combo.Tag = null;
-					combo.IsDropDownOpen = false;
-				}
-				row.Restore();
-				args.Handled = true;
-			}
-			else if (args.Key == Key.Enter) { await row.Group.Owner.CommitClosingAsync(row); args.Handled = true; }
-		}
-
-		private void OpenFollowMenu(object sender, RoutedEventArgs args)
-		{
-			var button = (Button)sender;
-			button.ContextMenu.PlacementTarget = button;
-			button.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-			button.ContextMenu.IsOpen = true;
-		}
-
-		private async void FollowSelected(object sender, RoutedEventArgs args)
-		{
-			if (sender is MenuItem item && item.DataContext is PlacementRuleRow row)
-			{
-				row.FollowForeground = (string)item.Tag == "default" ? (bool?)null : (string)item.Tag == "true";
-				await row.Group.Owner.CommitAsync(row);
-				args.Handled = true;
-			}
+			if (args.RemovedItems.Count == 0 || args.AddedItems.Count == 0 || !(combo.IsKeyboardFocusWithin || combo.IsDropDownOpen)) return;
+			this.Commit(sender, args);
 		}
 
 		private void Add(object sender, RoutedEventArgs args)
@@ -165,7 +100,8 @@ namespace SylphyHorn.UI
 			if (combo == null && textBox == null) return;
 			if (combo != null && combo.IsDropDownOpen)
 			{
-				if (args.Key == Key.Escape)
+				// A list-only combo box (the switch setting) closes its own list; only typed destinations are restored here.
+				if (args.Key == Key.Escape && combo.IsEditable)
 				{
 					var text = combo.Tag as string;
 					combo.Tag = null;
@@ -296,7 +232,7 @@ namespace SylphyHorn.UI
 				DispatcherPriority.Loaded);
 		}
 
-		private static Control FindField(DependencyObject parent, object row, string property)
+		internal static Control FindField(DependencyObject parent, object row, string property)
 		{
 			for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
 			{

@@ -23,6 +23,34 @@ namespace SylphyHorn.UI.Bindings
 		public string this[string key] => Resources.ResourceManager.GetString("Placement_" + key, Resources.Culture) ?? key;
 	}
 
+	// One choice of the per-rule / global switch setting. The instances are shared by every combo box and keep
+	// their identity; only Label changes with the language or the global value.
+	public sealed class PlacementFollowOption : ObservableObject
+	{
+		private readonly AppPlacementSettingsViewModel _owner;
+		private readonly bool? _assumedDefault;
+
+		internal PlacementFollowOption(AppPlacementSettingsViewModel owner, bool? value, bool? assumedDefault = null)
+		{
+			this._owner = owner;
+			this.Value = value;
+			this._assumedDefault = assumedDefault;
+		}
+
+		internal bool? Value { get; }
+
+		// "Default (On)" shows the global value it currently resolves to, without storing that value in the rule.
+		public string Label => this.Value.HasValue
+			? this._owner.Text[this.Value.Value ? "FollowYes" : "FollowNo"]
+			: string.Format(CultureInfo.CurrentCulture, this._owner.Text["FollowDefaultState"],
+				this._owner.Text[(this._assumedDefault ?? this._owner.FollowForeground) ? "FollowYes" : "FollowNo"]);
+
+		// Lets a hidden width probe show exactly this option as its selected item.
+		public IReadOnlyList<PlacementFollowOption> Alone => new[] { this };
+
+		internal void Refresh() => this.OnPropertyChanged(nameof(this.Label));
+	}
+
 	public sealed class PlacementRuleGroup : ObservableObject
 	{
 		public IReadOnlyList<string> Choices { get; internal set; } = Array.Empty<string>();
@@ -108,6 +136,7 @@ namespace SylphyHorn.UI.Bindings
 		private bool? _followForeground;
 		private PlacementAppChoice _choice;
 		private string _choiceText;
+		private PlacementAppPresence _presence;
 
 		internal PlacementRuleRow(PlacementRuleGroup group, AppPlacementRule saved = null)
 		{
@@ -164,6 +193,7 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		// null inherits the global value; choosing "Default" must never store the value it currently resolves to.
 		public bool? FollowForeground
 		{
 			get => this._followForeground;
@@ -171,20 +201,25 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this.SetProperty(ref this._followForeground, value)) return;
 				this.Revision++;
-				this.RefreshLanguage();
+				this.OnPropertyChanged(nameof(this.FollowOption));
 			}
 		}
 
-		public string FollowLabel => string.Format(CultureInfo.CurrentCulture, this.Group.Owner.Text["FollowLabel"],
-			this.FollowForeground.HasValue ? this.Group.Owner.Text[this.FollowForeground.Value ? "FollowYes" : "FollowNo"]
-				: string.Format(CultureInfo.CurrentCulture, this.Group.Owner.Text["FollowDefaultState"],
-					this.Group.Owner.Text[this.Group.Owner.FollowForeground ? "FollowYes" : "FollowNo"]));
+		public PlacementFollowOption FollowOption
+		{
+			get => this.Group.Owner.FollowOptions.First(option => option.Value == this.FollowForeground);
+			set
+			{
+				// A combo box reports null while its items are being replaced; that is not a user choice.
+				if (value != null) this.FollowForeground = value.Value;
+			}
+		}
 
-		public bool IsFollowDefault => !this.FollowForeground.HasValue;
-		public bool IsFollowYes => this.FollowForeground == true;
-		public bool IsFollowNo => this.FollowForeground == false;
+		// A saved executable that no longer exists is reported without treating the rule as unsaved.
+		public string Error => !string.IsNullOrEmpty(this._errorKey) ? this.Group.Owner.Text[this._errorKey]
+			: this.IsAppMissing ? this.Group.Owner.Text["InvalidPath"] : "";
 
-		public string Error => string.IsNullOrEmpty(this._errorKey) ? "" : this.Group.Owner.Text[this._errorKey];
+		internal bool IsAppMissing => this.Choice != null && this._presence == PlacementAppPresence.Missing;
 
 		internal void SetErrorKey(string key)
 		{
@@ -194,23 +229,21 @@ namespace SylphyHorn.UI.Bindings
 		internal void RefreshLanguage()
 		{
 			this.OnPropertyChanged(nameof(this.Error));
-			this.OnPropertyChanged(nameof(this.FollowLabel));
-			this.OnPropertyChanged(nameof(this.IsFollowDefault));
-			this.OnPropertyChanged(nameof(this.IsFollowYes));
-			this.OnPropertyChanged(nameof(this.IsFollowNo));
 		}
 
 		public string Name => this.Choice?.Name ?? "";
 
+		// null shows the empty-state glyph: no path yet, an edited path not yet confirmed, or a missing executable.
 		public BitmapSource Icon => this.Choice?.Icon;
 
 		public bool IsPackage => this.Choice?.Identity?.Kind == PlacementAppKind.PackageAppId;
 
 		internal PlacementAppChoice Choice => this.AppText == this._choiceText ? this._choice : null;
 
-		internal void Use(PlacementAppChoice choice)
+		internal void Use(PlacementAppChoice choice, PlacementAppPresence presence = PlacementAppPresence.Unknown)
 		{
 			this._choice = choice;
+			this._presence = presence;
 			this.AppText = choice?.Path ?? choice?.Name ?? "";
 			this._choiceText = this.AppText;
 			this.Revision++;
@@ -222,6 +255,7 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.Name));
 			this.OnPropertyChanged(nameof(this.Icon));
 			this.OnPropertyChanged(nameof(this.IsPackage));
+			this.OnPropertyChanged(nameof(this.Error));
 		}
 
 		internal void Accept(AppPlacementRule rule, PlacementAppChoice choice)
@@ -234,7 +268,9 @@ namespace SylphyHorn.UI.Bindings
 		internal void Restore()
 		{
 			var rule = this.Saved;
-			this.Use(rule == null ? null : new PlacementAppChoice(
+			// Keep the icon and presence already read for the same application instead of dropping them on Esc.
+			if (rule != null && this._choice?.Identity != null && this._choice.Identity.Equals(rule.App)) this.Use(this._choice, this._presence);
+			else this.Use(rule == null ? null : new PlacementAppChoice(
 				rule.DisplayName ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? System.IO.Path.GetFileNameWithoutExtension(rule.App.Value) : this.Group.Owner.Text["UnknownApplication"]),
 				"",
 				rule.DisplayExecutablePath ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : null),
@@ -298,6 +334,30 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this._disposed && value != this.FollowForeground) _ = this.PublishAsync(this.Configuration(followForeground: value));
 			}
+		}
+
+		// Per-rule choices: Default (resolved from the global value), On, Off.
+		public IReadOnlyList<PlacementFollowOption> FollowOptions { get; }
+
+		// Global choices: On, Off (the same instances as in FollowOptions).
+		public IReadOnlyList<PlacementFollowOption> DefaultFollowOptions { get; }
+
+		// Every label a switch combo box can show, including "Default (Off)" while the global value is On,
+		// so the view can size all switch combo boxes to the longest one.
+		public IReadOnlyList<PlacementFollowOption> FollowWidthSamples { get; }
+
+		public PlacementFollowOption DefaultFollowOption
+		{
+			get => this.DefaultFollowOptions[this.FollowForeground ? 0 : 1];
+			set
+			{
+				if (value?.Value != null) this.FollowForeground = value.Value.Value;
+			}
+		}
+
+		private void RefreshFollowOptions()
+		{
+			foreach (var option in this.FollowOptions.Concat(this.FollowWidthSamples)) option.Refresh();
 		}
 
 		public bool CreateMissingDesktops
@@ -380,6 +440,20 @@ namespace SylphyHorn.UI.Bindings
 			this._runtime = runtime;
 			this._catalog = catalog;
 			this._save = save;
+			this.FollowOptions = Array.AsReadOnly(new[]
+			{
+				new PlacementFollowOption(this, null),
+				new PlacementFollowOption(this, true),
+				new PlacementFollowOption(this, false)
+			});
+			this.DefaultFollowOptions = Array.AsReadOnly(new[] { this.FollowOptions[1], this.FollowOptions[2] });
+			this.FollowWidthSamples = Array.AsReadOnly(new[]
+			{
+				new PlacementFollowOption(this, null, true),
+				new PlacementFollowOption(this, null, false),
+				new PlacementFollowOption(this, true),
+				new PlacementFollowOption(this, false)
+			});
 			this.Groups = Array.AsReadOnly(new[]
 			{
 				new PlacementRuleGroup(this, PlacementDestinationKind.Name),
@@ -409,6 +483,7 @@ namespace SylphyHorn.UI.Bindings
 			if (args.PropertyName != nameof(ResourceService.Resources)) return;
 			this.OnPropertyChanged(nameof(this.Text));
 			this.OnPropertyChanged(nameof(this.Message));
+			this.RefreshFollowOptions();
 			foreach (var group in this.Groups) group.RefreshLanguage();
 			foreach (var group in this.ClosingGroups) group.RefreshLanguage();
 		}
@@ -431,7 +506,8 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.IsEnabled));
 			this.OnPropertyChanged(nameof(this.CreateMissingDesktops));
 			this.OnPropertyChanged(nameof(this.FollowForeground));
-			foreach (var row in this.Groups.SelectMany(group => group.Rows)) row.RefreshLanguage();
+			this.OnPropertyChanged(nameof(this.DefaultFollowOption));
+			this.RefreshFollowOptions();
 			this.OnPropertyChanged(nameof(this.CloseCreatedDesktops));
 			if (this._publishing) return;
 			this._generation++;
@@ -459,17 +535,16 @@ namespace SylphyHorn.UI.Bindings
 		{
 			try
 			{
-				var rows = this.Groups.SelectMany(group => group.Rows).Where(row => row.Choice != null).ToArray();
+				var rows = this.Groups.SelectMany(group => group.Rows).Where(row => row.Choice?.Identity != null).ToArray();
 				if (rows.Length == 0) return;
-				Func<PlacementRuleRow, string> path = row => row.Choice.Identity.Kind == PlacementAppKind.PackageAppId ? "shell:AppsFolder\\" + row.Choice.Identity.Value : row.Choice.Identity.Value;
 				var choices = rows.ToDictionary(row => row, row => row.Choice);
-				var keys = rows.ToDictionary(row => row, path);
-				var icons = await this._catalog.ReadIconsAsync(keys.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), this._lifetime.Token);
+				var icons = await this._catalog.ReadIconsAsync(choices.Values.Select(choice => choice.Identity).Distinct().ToArray(), this._lifetime.Token);
 				if (this._disposed || generation != this._generation) return;
-				foreach (var row in rows) if (this.Contains(row) && ReferenceEquals(row.Choice, choices[row]) && icons.TryGetValue(keys[row], out var icon))
+				// A row edited or re-chosen while the Shell was reading keeps its newer state.
+				foreach (var row in rows) if (this.Contains(row) && ReferenceEquals(row.Choice, choices[row]) && icons.TryGetValue(choices[row].Identity, out var read))
 				{
 					var choice = choices[row];
-					row.Use(new PlacementAppChoice(choice.Name, choice.Detail, choice.Path, choice.Identity, icon));
+					row.Use(new PlacementAppChoice(choice.Name, choice.Detail, choice.Path, choice.Identity, read.Icon ?? choice.Icon), read.Presence);
 				}
 			}
 			catch (Exception) { /* Missing icons do not prevent registration or editing. */ }

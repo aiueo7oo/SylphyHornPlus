@@ -51,13 +51,34 @@ namespace SylphyHorn.Services.AppPlacement
 		internal string Problem { get; }
 	}
 
+	internal enum PlacementAppPresence
+	{
+		// Not checked, or not checkable (a package that the Shell could not resolve is not proof of removal).
+		Unknown,
+		Present,
+		Missing,
+	}
+
+	internal sealed class PlacementAppIcon
+	{
+		internal PlacementAppIcon(BitmapSource icon, PlacementAppPresence presence)
+		{
+			this.Icon = icon;
+			this.Presence = presence;
+		}
+
+		internal BitmapSource Icon { get; }
+
+		internal PlacementAppPresence Presence { get; }
+	}
+
 	internal interface IPlacementAppCatalog
 	{
 		Task<IReadOnlyList<PlacementAppChoice>> ReadAsync(bool windows, CancellationToken cancellation, bool includeIcons = true);
 
 		Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation);
 
-		Task<IReadOnlyDictionary<string, BitmapSource>> ReadIconsAsync(string[] paths, CancellationToken cancellation);
+		Task<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>> ReadIconsAsync(IReadOnlyCollection<PlacementAppIdentity> apps, CancellationToken cancellation);
 	}
 
 	internal sealed class PlacementAppCatalog : IPlacementAppCatalog
@@ -71,19 +92,31 @@ namespace SylphyHorn.Services.AppPlacement
 		public Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation)
 			=> OnSta(token => Executable(path), cancellation);
 
-		public Task<IReadOnlyDictionary<string, BitmapSource>> ReadIconsAsync(string[] paths, CancellationToken cancellation)
-			=> OnSta<IReadOnlyDictionary<string, BitmapSource>>(
+		public Task<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>> ReadIconsAsync(IReadOnlyCollection<PlacementAppIdentity> apps, CancellationToken cancellation)
+			=> OnSta<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>>(
 				token =>
 				{
-					var result = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-					foreach (var path in paths)
+					var result = new Dictionary<PlacementAppIdentity, PlacementAppIcon>();
+					foreach (var app in apps)
 					{
 						token.ThrowIfCancellationRequested();
-						result[path] = Icon(path);
+						if (!result.ContainsKey(app)) result[app] = ReadIcon(app);
 					}
 					return result;
 				},
 				cancellation);
+
+		internal static PlacementAppIcon ReadIcon(PlacementAppIdentity app)
+		{
+			if (app.Kind == PlacementAppKind.PackageAppId)
+			{
+				// A package ID is not a file path; only the Shell can resolve it.
+				var logo = Icon("shell:AppsFolder\\" + app.Value);
+				return new PlacementAppIcon(logo, logo == null ? PlacementAppPresence.Unknown : PlacementAppPresence.Present);
+			}
+			if (!File.Exists(app.Value)) return new PlacementAppIcon(null, PlacementAppPresence.Missing);
+			return new PlacementAppIcon(Icon(app.Value) ?? DefaultApplicationIcon(), PlacementAppPresence.Present);
+		}
 
 		private static async Task<T> OnSta<T>(Func<CancellationToken, T> read, CancellationToken cancellation)
 		{
@@ -131,7 +164,7 @@ namespace SylphyHorn.Services.AppPlacement
 				identity.Value,
 				identity.Value,
 				identity,
-				Icon(path));
+				Icon(path) ?? DefaultApplicationIcon());
 		}
 
 		private static IReadOnlyList<PlacementAppChoice> ReadWindows(CancellationToken cancellation, bool includeIcons)
@@ -167,7 +200,7 @@ namespace SylphyHorn.Services.AppPlacement
 					title.ToString(),
 					path,
 					identity?.App,
-					!includeIcons || path == null ? null : Icon(path),
+					!includeIcons || path == null ? null : Icon(path) ?? DefaultApplicationIcon(),
 					problem: identity == null ? "IdentityUnavailable" : null));
 			}
 			return choices.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
@@ -330,6 +363,30 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
+		private static BitmapSource _defaultApplicationIcon;
+
+		// The Shell's generic application icon, for executables that exist but whose own icon is unavailable.
+		internal static BitmapSource DefaultApplicationIcon()
+		{
+			if (_defaultApplicationIcon != null) return _defaultApplicationIcon;
+			var info = new StockIconInfo { Size = (uint)Marshal.SizeOf<StockIconInfo>() };
+			if (SHGetStockIconInfo(StockIconApplication, StockIconHandle, ref info) != 0 || info.Icon == IntPtr.Zero) return null;
+			try
+			{
+				var source = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+				source.Freeze();
+				return _defaultApplicationIcon = source;
+			}
+			catch (Exception ex) when (ex is COMException || ex is ArgumentException)
+			{
+				return null;
+			}
+			finally
+			{
+				DestroyIcon(info.Icon);
+			}
+		}
+
 		private static void Release(object value)
 		{
 			if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
@@ -363,5 +420,23 @@ namespace SylphyHorn.Services.AppPlacement
 
 		[DllImport("gdi32.dll")]
 		private static extern bool DeleteObject(IntPtr value);
+
+		private const uint StockIconApplication = 2, StockIconHandle = 0x100;
+
+		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+		private struct StockIconInfo
+		{
+			internal uint Size;
+			internal IntPtr Icon;
+			internal int SystemImageIndex;
+			internal int IconIndex;
+			[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] internal string Path;
+		}
+
+		[DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+		private static extern int SHGetStockIconInfo(uint id, uint flags, ref StockIconInfo info);
+
+		[DllImport("user32.dll")]
+		private static extern bool DestroyIcon(IntPtr icon);
 	}
 }

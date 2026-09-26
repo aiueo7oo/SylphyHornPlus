@@ -17,7 +17,7 @@
 				   Icon="/SylphyHorn;component/.assets/app.white.ico"
 				   Title="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_Title}"
 				   Width="760"
-				   Height="600"
+				   Height="760"
 				   Background="{DynamicResource ThemeBrushKey}"
 				   Foreground="{DynamicResource ActiveForegroundBrushKey}"
 				   FontFamily="Segoe UI, Meiryo UI"
@@ -45,7 +45,41 @@
 		</DockPanel>
 		<!-- #endregion -->
 
-		<TabControl Style="{DynamicResource VerticalTabControlStyleKey}">
+		<TabControl>
+			<TabControl.Style>
+				<Style TargetType="{x:Type TabControl}"
+					   BasedOn="{StaticResource VerticalTabControlStyleKey}">
+					<!-- Same layout as the Metro vertical tab template, but the tab list scrolls when the window
+						 is shorter than the list, so every tab stays reachable on small work areas. -->
+					<Setter Property="Template">
+						<Setter.Value>
+							<ControlTemplate TargetType="{x:Type TabControl}">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<ScrollViewer Background="{DynamicResource BackgroundBrushKey}"
+												  HorizontalScrollBarVisibility="Disabled"
+												  VerticalScrollBarVisibility="Auto"
+												  Focusable="False">
+										<StackPanel x:Name="HeaderPanel"
+													IsItemsHost="True" />
+									</ScrollViewer>
+									<Border x:Name="ContentSize"
+											Grid.Column="1">
+										<ContentPresenter x:Name="PART_SelectedContentHost"
+														  Content="{TemplateBinding SelectedContent}"
+														  ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+														  ContentStringFormat="{TemplateBinding SelectedContentStringFormat}"
+														  ContentSource="SelectedContent" />
+									</Border>
+								</Grid>
+							</ControlTemplate>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</TabControl.Style>
 			<TabControl.Resources>
 				<Style TargetType="{x:Type TextBlock}">
 					<Setter Property="Foreground"
@@ -574,6 +608,14 @@
 							   Style="{DynamicResource TabitemStyleKey}" />
 				</TabItem.Header>
 				<ui:AppPlacementSettingsView DataContext="{Binding AppPlacement}" />
+			</TabItem>
+
+			<TabItem>
+				<TabItem.Header>
+					<TextBlock Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_Desktop, StringFormat='{}{0} 3'}"
+							   Style="{DynamicResource TabitemStyleKey}" />
+				</TabItem.Header>
+				<ui:DesktopAutoCloseSettingsView DataContext="{Binding AppPlacement}" />
 			</TabItem>
 
 			<TabItem>

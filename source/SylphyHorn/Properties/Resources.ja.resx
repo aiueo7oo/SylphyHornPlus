@@ -658,7 +658,7 @@
     <value>アプリ一覧から追加…</value>
   </data>
   <data name="Placement_AddManual" xml:space="preserve">
-    <value>行を追加</value>
+    <value>登録を追加</value>
   </data>
   <data name="Placement_AppColumn" xml:space="preserve">
     <value>アプリ</value>
@@ -674,9 +674,6 @@
   </data>
   <data name="Placement_EnterPath" xml:space="preserve">
     <value>実行ファイルのパスを入力するか、アプリを選択してください。</value>
-  </data>
-  <data name="Placement_InputHint" xml:space="preserve">
-    <value>Enter または入力欄を離れると保存。Esc でその行を元に戻します。</value>
   </data>
   <data name="Placement_Installed" xml:space="preserve">
     <value>インストール済み</value>
@@ -727,10 +724,10 @@
     <value>有効</value>
   </data>
   <data name="Placement_OpenApply" xml:space="preserve">
-    <value>開いているウィンドウに適用…</value>
+    <value>再配置するウィンドウを選択…</value>
   </data>
   <data name="Placement_ApplyTitle" xml:space="preserve">
-    <value>開いているウィンドウに配置ルールを適用</value>
+    <value>開いているウィンドウの再配置</value>
   </data>
   <data name="Placement_ApplyIntro" xml:space="preserve">
     <value>移動するウィンドウにチェックを入れてください。有効な登録に一致するウィンドウを表示します。表示中のデスクトップは切り替えません。</value>
@@ -868,21 +865,27 @@
     <value>個別に閉じるデスクトップ番号</value>
   </data>
   <data name="Placement_FollowForeground" xml:space="preserve">
-    <value>前面アプリの配置先へ切り替える（個別指定のないアプリ）</value>
-  </data>
-  <data name="Placement_FollowLabel" xml:space="preserve">
-    <value>切替：{0}</value>
-  </data>
-  <data name="Placement_FollowDefault" xml:space="preserve">
-    <value>全体設定に従う</value>
+    <value>配置後のデスクトップ切替（既定）</value>
   </data>
   <data name="Placement_FollowDefaultState" xml:space="preserve">
-    <value>全体設定（{0}）</value>
+    <value>既定（{0}）</value>
+  </data>
+  <data name="Placement_FollowColumn" xml:space="preserve">
+    <value>配置後の切替</value>
+  </data>
+  <data name="Placement_FollowHint" xml:space="preserve">
+    <value>切り替えは、配置直前に前面にあったウィンドウだけが対象です。</value>
+  </data>
+  <data name="Placement_ApplyHeading" xml:space="preserve">
+    <value>開いているウィンドウの再配置</value>
+  </data>
+  <data name="Placement_ApplyHint" xml:space="preserve">
+    <value>登録内容に従って、開いているウィンドウを再配置します。一覧で対象を選んでから移動します。</value>
   </data>
   <data name="Placement_FollowYes" xml:space="preserve">
-    <value>切り替える</value>
+    <value>する</value>
   </data>
   <data name="Placement_FollowNo" xml:space="preserve">
-    <value>切り替えない</value>
+    <value>しない</value>
   </data>
 </root>

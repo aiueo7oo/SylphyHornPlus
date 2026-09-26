@@ -142,16 +142,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Use global setting.
-        /// </summary>
-        public static string Placement_FollowDefault {
-            get {
-                return ResourceManager.GetString("Placement_FollowDefault", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Global ({0}).
+        ///   Looks up a localized string similar to Default ({0}).
         /// </summary>
         public static string Placement_FollowDefaultState {
             get {
@@ -160,7 +151,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Switch to the foreground app’s destination unless overridden below.
+        ///   Looks up a localized string similar to Default desktop switching after placement.
         /// </summary>
         public static string Placement_FollowForeground {
             get {
@@ -169,16 +160,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Switch: {0}.
-        /// </summary>
-        public static string Placement_FollowLabel {
-            get {
-                return ResourceManager.GetString("Placement_FollowLabel", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Do not switch.
+        ///   Looks up a localized string similar to Off.
         /// </summary>
         public static string Placement_FollowNo {
             get {
@@ -187,11 +169,47 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Switch.
+        ///   Looks up a localized string similar to On.
         /// </summary>
         public static string Placement_FollowYes {
             get {
                 return ResourceManager.GetString("Placement_FollowYes", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switch.
+        /// </summary>
+        public static string Placement_FollowColumn {
+            get {
+                return ResourceManager.GetString("Placement_FollowColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switching applies only to the window that was in the foreground immediately before placement..
+        /// </summary>
+        public static string Placement_FollowHint {
+            get {
+                return ResourceManager.GetString("Placement_FollowHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Rearrange existing windows.
+        /// </summary>
+        public static string Placement_ApplyHeading {
+            get {
+                return ResourceManager.GetString("Placement_ApplyHeading", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Apply these rules to windows that are already open. Choose the windows from a list before moving them..
+        /// </summary>
+        public static string Placement_ApplyHint {
+            get {
+                return ResourceManager.GetString("Placement_ApplyHint", resourceCulture);
             }
         }
 
@@ -1644,7 +1662,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Add a row.
+        ///   Looks up a localized string similar to Add entry.
         /// </summary>
         public static string Placement_AddManual {
             get {
@@ -1765,15 +1783,6 @@ namespace SylphyHorn.Properties {
         public static string Placement_IdentityUnavailable {
             get {
                 return ResourceManager.GetString("Placement_IdentityUnavailable", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Enter or leave the field to save. Esc restores the saved row..
-        /// </summary>
-        public static string Placement_InputHint {
-            get {
-                return ResourceManager.GetString("Placement_InputHint", resourceCulture);
             }
         }
 

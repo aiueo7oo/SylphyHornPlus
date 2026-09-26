@@ -352,6 +352,110 @@ namespace SylphyHorn.Tests
 				Assert.DoesNotContain(identity.Value, row.AppText);
 			}
 		}
+
+		[Fact]
+		public async Task SwitchChoicesKeepDefaultInheritedWhileShowingTheCurrentGlobalValue()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var row = await f.Add(@"C:\Apps\Editor.exe", 2);
+				Assert.Null(row.FollowForeground);
+				Assert.Same(f.Model.FollowOptions[0], row.FollowOption);
+				f.Model.DefaultFollowOption = f.Model.DefaultFollowOptions[0];
+				var defaultOn = f.Model.FollowOptions[0].Label;
+				f.Model.DefaultFollowOption = f.Model.DefaultFollowOptions[1];
+				Assert.False(f.Settings.Configuration.Value.FollowForeground);
+				Assert.NotEqual(defaultOn, f.Model.FollowOptions[0].Label);
+				Assert.Contains(f.Model.Text["FollowNo"], f.Model.FollowOptions[0].Label);
+				// Displaying "Default (Off)" must not store Off in the rule.
+				Assert.Same(row, Assert.Single(f.Model.Groups[1].Rows));
+				Assert.Null(Assert.Single(f.Settings.Configuration.Value.Rules).FollowForeground);
+				row.FollowOption = f.Model.FollowOptions[1];
+				await f.Model.CommitAsync(row);
+				Assert.True(Assert.Single(f.Settings.Configuration.Value.Rules).FollowForeground);
+				row.FollowOption = f.Model.FollowOptions[0];
+				await f.Model.CommitAsync(row);
+				Assert.Null(Assert.Single(f.Settings.Configuration.Value.Rules).FollowForeground);
+				// A combo box reports null while its items are replaced; that is not a choice.
+				row.FollowOption = null;
+				Assert.Null(row.FollowForeground);
+				// The width samples always contain both default labels, whatever the global value is.
+				Assert.Equal(4, f.Model.FollowWidthSamples.Select(sample => sample.Label).Distinct().Count());
+				Assert.Contains(defaultOn, f.Model.FollowWidthSamples.Select(sample => sample.Label));
+			}
+		}
+
+		[Fact]
+		public async Task MissingExecutableIsReportedUntilEditedAndLateIconsCannotOverwriteNewerInput()
+		{
+			using (var f = await PlacementUiFixture.Create())
+			{
+				var missing = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\Removed\old.exe");
+				var package = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "Example_abc!App");
+				var present = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\Apps\Editor.exe");
+				var gate = new TaskCompletionSource<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>>(TaskCreationOptions.RunContinuationsAsynchronously);
+				f.Catalog.IconsPending = gate.Task;
+				f.Settings.Configuration.Value = new AppPlacementConfiguration(false, new[]
+				{
+					new AppPlacementRule(Guid.NewGuid(), true, missing, PlacementDestination.ByNumber(1)),
+					new AppPlacementRule(Guid.NewGuid(), true, package, PlacementDestination.ByNumber(2)),
+					new AppPlacementRule(Guid.NewGuid(), true, present, PlacementDestination.ByNumber(3))
+				});
+				var rows = f.Model.Groups[1].Rows.ToArray();
+				rows[2].AppText = @"C:\Apps\Other.exe";
+				var icon = BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
+				icon.Freeze();
+				gate.SetResult(new Dictionary<PlacementAppIdentity, PlacementAppIcon>
+				{
+					[missing] = new PlacementAppIcon(null, PlacementAppPresence.Missing),
+					[package] = new PlacementAppIcon(null, PlacementAppPresence.Unknown),
+					[present] = new PlacementAppIcon(icon, PlacementAppPresence.Present)
+				});
+				for (var wait = 0; wait < 500 && rows[0].Error.Length == 0; wait++) await Task.Delay(10, TestContext.Current.CancellationToken);
+				Assert.Equal(f.Model.Text["InvalidPath"], rows[0].Error);
+				Assert.Null(rows[0].Icon);
+				// An unresolved package is not reported as removed.
+				Assert.Empty(rows[1].Error);
+				// The row edited while the Shell was reading keeps its newer text and gets no stale icon.
+				Assert.Equal(@"C:\Apps\Other.exe", rows[2].AppText);
+				Assert.Null(rows[2].Icon);
+				// Leaving an unchanged row or pressing Esc keeps the report; editing the path clears it.
+				await f.Model.CommitAsync(rows[0]);
+				Assert.Equal(f.Model.Text["InvalidPath"], rows[0].Error);
+				f.Model.Revert(rows[0]);
+				Assert.Equal(f.Model.Text["InvalidPath"], rows[0].Error);
+				rows[0].AppText = @"C:\Replaced\new.exe";
+				Assert.Empty(rows[0].Error);
+				Assert.Equal(3, f.Settings.Configuration.Value.Rules.Count);
+			}
+		}
+
+		[Fact]
+		public async Task IconReaderSeparatesMissingExecutablesAndNeverTreatsPackageIdsAsPaths()
+		{
+			var directory = Path.Combine(Path.GetTempPath(), "SylphyHorn.Tests." + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(directory);
+			try
+			{
+				// An executable without an icon resource of its own still exists and gets an icon.
+				var existing = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, Path.Combine(directory, "no-icon.exe"));
+				File.WriteAllBytes(existing.Value, new byte[] { 0x4D, 0x5A });
+				var missing = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, Path.Combine(directory, "missing.exe"));
+				var package = new PlacementAppIdentity(PlacementAppKind.PackageAppId, "SylphyHorn.Tests.Absent_0000000000000!App");
+				var icons = await new PlacementAppCatalog().ReadIconsAsync(new[] { existing, missing, package, existing }, TestContext.Current.CancellationToken);
+				Assert.Equal(3, icons.Count);
+				Assert.Equal(PlacementAppPresence.Present, icons[existing].Presence);
+				Assert.NotNull(icons[existing].Icon);
+				Assert.Equal(PlacementAppPresence.Missing, icons[missing].Presence);
+				Assert.Null(icons[missing].Icon);
+				Assert.Equal(PlacementAppPresence.Unknown, icons[package].Presence);
+			}
+			finally
+			{
+				try { Directory.Delete(directory, true); }
+				catch (IOException) { /* The Shell may still hold the file briefly. */ }
+			}
+		}
 	}
 
 	internal sealed class PlacementUiFixture : IDisposable
@@ -385,6 +489,7 @@ namespace SylphyHorn.Tests
 	{
 		internal Task<IReadOnlyList<PlacementAppChoice>> Pending;
 		internal Task<PlacementAppChoice> ExecutablePending;
+		internal Task<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>> IconsPending;
 		internal bool? IncludeIcons;
 		internal bool? Windows;
 
@@ -404,6 +509,7 @@ namespace SylphyHorn.Tests
 
 		public Task<PlacementAppChoice> ReadExecutableAsync(string path, CancellationToken cancellation) => this.ExecutablePending ?? Task.FromResult(Choice(path));
 
-		public Task<IReadOnlyDictionary<string, BitmapSource>> ReadIconsAsync(string[] paths, CancellationToken cancellation) => Task.FromResult<IReadOnlyDictionary<string, BitmapSource>>(new Dictionary<string, BitmapSource>());
+		public Task<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>> ReadIconsAsync(IReadOnlyCollection<PlacementAppIdentity> apps, CancellationToken cancellation)
+			=> this.IconsPending ?? Task.FromResult<IReadOnlyDictionary<PlacementAppIdentity, PlacementAppIcon>>(new Dictionary<PlacementAppIdentity, PlacementAppIcon>());
 	}
 }

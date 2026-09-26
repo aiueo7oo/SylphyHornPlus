@@ -658,7 +658,7 @@
     <value>Add from applications…</value>
   </data>
   <data name="Placement_AddManual" xml:space="preserve">
-    <value>Add a row</value>
+    <value>Add entry</value>
   </data>
   <data name="Placement_AppColumn" xml:space="preserve">
     <value>Application</value>
@@ -674,9 +674,6 @@
   </data>
   <data name="Placement_EnterPath" xml:space="preserve">
     <value>Enter an executable path or choose an application.</value>
-  </data>
-  <data name="Placement_InputHint" xml:space="preserve">
-    <value>Enter or leave the field to save. Esc restores the saved row.</value>
   </data>
   <data name="Placement_Installed" xml:space="preserve">
     <value>Installed applications</value>
@@ -727,10 +724,10 @@
     <value>Enabled</value>
   </data>
   <data name="Placement_OpenApply" xml:space="preserve">
-    <value>Apply to open windows…</value>
+    <value>Choose windows to rearrange…</value>
   </data>
   <data name="Placement_ApplyTitle" xml:space="preserve">
-    <value>Apply placement rules to open windows</value>
+    <value>Rearrange existing windows</value>
   </data>
   <data name="Placement_ApplyIntro" xml:space="preserve">
     <value>Select the windows to move. Only windows matching enabled rules are listed. The displayed desktop will not switch.</value>
@@ -868,21 +865,27 @@
     <value>Also close these desktop numbers</value>
   </data>
   <data name="Placement_FollowForeground" xml:space="preserve">
-    <value>Switch to the foreground app’s destination unless overridden below</value>
-  </data>
-  <data name="Placement_FollowLabel" xml:space="preserve">
-    <value>Switch: {0}</value>
-  </data>
-  <data name="Placement_FollowDefault" xml:space="preserve">
-    <value>Use global setting</value>
+    <value>Default desktop switching after placement</value>
   </data>
   <data name="Placement_FollowDefaultState" xml:space="preserve">
-    <value>Global ({0})</value>
+    <value>Default ({0})</value>
   </data>
-  <data name="Placement_FollowYes" xml:space="preserve">
+  <data name="Placement_FollowColumn" xml:space="preserve">
     <value>Switch</value>
   </data>
+  <data name="Placement_FollowHint" xml:space="preserve">
+    <value>Switching applies only to the window that was in the foreground immediately before placement.</value>
+  </data>
+  <data name="Placement_ApplyHeading" xml:space="preserve">
+    <value>Rearrange existing windows</value>
+  </data>
+  <data name="Placement_ApplyHint" xml:space="preserve">
+    <value>Apply these rules to windows that are already open. Choose the windows from a list before moving them.</value>
+  </data>
+  <data name="Placement_FollowYes" xml:space="preserve">
+    <value>On</value>
+  </data>
   <data name="Placement_FollowNo" xml:space="preserve">
-    <value>Do not switch</value>
+    <value>Off</value>
   </data>
 </root>
