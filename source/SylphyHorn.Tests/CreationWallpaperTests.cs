@@ -31,10 +31,49 @@ namespace SylphyHorn.Tests
 			h.Provider.EnqueueResult(Batch(1, 4, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", reentrant ? Image("named.jpg") : "")));
 			var response = await h.Runtime.ExecuteCliAsync(CliCommand.Parse(new[] { "desktop", "create", "--name", "Work" }), TestContext.Current.CancellationToken);
 			Assert.True(response.Success, response.Error?.Code);
+			h.Owner.Drain();
 			Assert.Equal(Image("named.jpg"), h.Runtime.State.Records[B].WallpaperPath.Value);
 			Assert.Equal(1, h.Operations.WallpaperCalls);
 		}
 #endif
+
+		[Fact]
+		public async Task CreationWallpaperRunsAfterProviderCallbackReturns()
+		{
+			var h = await Harness.Initialized();
+			var image = this.Image("callback.bmp");
+			h.Settings.WallpapersOnCreation = new[] { new DesktopWallpaperOnCreation(null, 2, image) };
+			var faults = new List<string>();
+			h.Runtime.Faulted += (_, fault) => faults.Add(fault.ToString());
+			h.Operations.BeforeWallpaper = () =>
+			{
+				if (h.Provider.IsPublishingStable) throw new InvalidOperationException("A setter cannot run inside a provider callback.");
+			};
+
+			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
+			Assert.Equal(0, h.Operations.WallpaperCalls);
+			h.Owner.Drain();
+			Assert.Empty(faults);
+			Assert.Equal(1, h.Operations.WallpaperCalls);
+			Assert.Equal(image, h.Runtime.State.Records[B].WallpaperPath.Value);
+		}
+
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public async Task QueuedWallpaperDoesNotApplyAfterRemovalOrReconnect(bool reconnect)
+		{
+			var h = await Harness.Initialized();
+			h.Settings.WallpapersOnCreation = new[] { new DesktopWallpaperOnCreation(null, 2, this.Image("stale.bmp")) };
+			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
+			if (reconnect)
+				h.Provider.PublishStable(Batch(2, 1, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "reconnected")));
+			else
+				h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall")));
+			h.Owner.Drain();
+			Assert.Equal(0, h.Operations.WallpaperCalls);
+			if (reconnect) Assert.Equal("reconnected", h.Runtime.State.Records[B].WallpaperPath.Value);
+		}
 
 		[Fact]
 		public async Task ExternalAdditionUsesNameBeforeNumberAndDoesNotRepeat()
@@ -44,8 +83,10 @@ namespace SylphyHorn.Tests
 			h.Settings.WallpapersOnCreation = h.Settings.WallpapersOnCreation.Concat(new[] { new DesktopWallpaperOnCreation(null, 2, Image("number.jpg")) }).ToArray();
 			var batch = Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", ""));
 			h.Provider.PublishStable(batch);
+			h.Owner.Drain();
 			Assert.Equal(Image("named.jpg"), h.Runtime.State.Records[B].WallpaperPath.Value);
 			h.Provider.PublishStable(batch);
+			h.Owner.Drain();
 			Assert.Equal(1, h.Operations.WallpaperCalls);
 #if NET10_0_OR_GREATER
 			Assert.True(h.Runtime.CliAvailable);
@@ -60,6 +101,7 @@ namespace SylphyHorn.Tests
 			h.Settings.WallpapersOnCreation = h.Settings.WallpapersOnCreation.Concat(new[] { new DesktopWallpaperOnCreation(null, 2, Image("number.jpg")) }).ToArray();
 			await h.Runtime.InitializeAsync(false, TestContext.Current.CancellationToken);
 			h.Provider.PublishStable(Batch(2, 1, A, Entry(A, 0, "Work", "original"), Entry(B, 1, "Work", "original")));
+			h.Owner.Drain();
 			Assert.Equal(0, h.Operations.WallpaperCalls);
 		}
 
@@ -73,6 +115,7 @@ namespace SylphyHorn.Tests
 			var faults = 0;
 			h.Runtime.Faulted += (_, __) => faults++;
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
+			h.Owner.Drain();
 			Assert.Equal(1, faults);
 			Assert.Equal(1, h.Operations.WallpaperCalls);
 			Assert.Equal("original", h.Runtime.State.Records[B].WallpaperPath.Value);
@@ -88,7 +131,8 @@ namespace SylphyHorn.Tests
 			h.Settings.WallpapersOnCreation = h.Settings.WallpapersOnCreation.Concat(new[] { new DesktopWallpaperOnCreation("Work", null, Image("named.jpg")) }).ToArray();
 			h.Settings.WallpapersOnCreation = h.Settings.WallpapersOnCreation.Concat(new[] { new DesktopWallpaperOnCreation(null, 2, Image("number.jpg")) }).ToArray();
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", "")));
-			h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", Image("number.jpg"))));
+			h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
+			h.Owner.Drain();
 			Assert.Equal(Image("number.jpg"), h.Runtime.State.Records[B].WallpaperPath.Value);
 			Assert.Equal(1, h.Operations.WallpaperCalls);
 		}
@@ -115,6 +159,7 @@ namespace SylphyHorn.Tests
 			Assert.Equal(1, h.Operations.CreateCalls);
 			Assert.Equal(0, h.Operations.WallpaperCalls);
 		}
+
 		[Fact]
 		public async Task MissingNamedImageLogsFailureWithoutNumberFallback()
 		{
@@ -127,6 +172,7 @@ namespace SylphyHorn.Tests
 			var faults = 0;
 			h.Runtime.Faulted += (_, __) => faults++;
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
+			h.Owner.Drain();
 			Assert.Equal(1, faults);
 			Assert.Equal(0, h.Operations.WallpaperCalls);
 			Assert.Equal("original", h.Runtime.State.Records[B].WallpaperPath.Value);
@@ -165,6 +211,7 @@ namespace SylphyHorn.Tests
 			var entry = new WindowsDesktop.VirtualDesktopStableEntry(B, 1, null, WindowsDesktop.VirtualDesktopReadStatus.Unsupported,
 				null, WindowsDesktop.VirtualDesktopReadStatus.Unsupported);
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), entry));
+			h.Owner.Drain();
 			Assert.Equal(0, h.Operations.WallpaperCalls);
 			Assert.Equal(enabled ? Image("legacy.bmp") : null, h.Runtime.State.Records[B].WallpaperPath.Value);
 		}

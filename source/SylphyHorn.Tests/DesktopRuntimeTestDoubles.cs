@@ -77,7 +77,21 @@ namespace SylphyHorn.Tests
 		internal CancellationToken LastRequestCancellationToken { get; private set; }
 		internal void EnqueueResult(VirtualDesktopStableBatch batch) => this._results.Enqueue(VirtualDesktopReconciliationResult.Succeeded(batch));
 		internal void EnqueueResult(VirtualDesktopReconciliationResult result) => this._results.Enqueue(result);
-		internal void PublishStable(VirtualDesktopStableBatch batch) { this.StablePublicationCount++; this.StableBatchPublished?.Invoke(this, batch); }
+		internal bool IsPublishingStable { get; private set; }
+		internal void PublishStable(VirtualDesktopStableBatch batch)
+		{
+			var previous = this.IsPublishingStable;
+			this.IsPublishingStable = true;
+			try
+			{
+				this.StablePublicationCount++;
+				this.StableBatchPublished?.Invoke(this, batch);
+			}
+			finally
+			{
+				this.IsPublishingStable = previous;
+			}
+		}
 		internal void PublishCurrent(VirtualDesktopCurrentTransition transition) => this.CurrentTransitioned?.Invoke(this, transition);
 		internal void PublishFault(VirtualDesktopProviderFault fault) => this.Faulted?.Invoke(this, fault);
 		public Task<VirtualDesktopReconciliationResult> RequestReconciliationAsync(VirtualDesktopStableReason reason, CancellationToken cancellationToken)
@@ -263,10 +277,11 @@ namespace SylphyHorn.Tests
 		internal List<Guid> AppliedWallpaperIds { get; } = new List<Guid>();
 		internal List<string> AppliedWallpaperValues { get; } = new List<string>();
 		internal Action BeforeName { get; set; }
+		internal Action BeforeWallpaper { get; set; }
 		internal List<string> NameValues { get; } = new List<string>();
 		public Guid Create() { this.CreateCalls++; if (this.CreateFailure != null) throw this.CreateFailure; return this.Creating?.Invoke() ?? Guid.NewGuid(); }
 		public void SetName(Guid desktopId, string value) { this.NameCalls++; this.NameValues.Add(value); this.BeforeName?.Invoke(); if (this.NameFailure != null || this.FailNameValue == value) throw this.NameFailure ?? new InvalidOperationException("synthetic"); }
-		public void SetWallpaperPath(Guid desktopId, string value) { this.WallpaperCalls++; if (this.FailWallpaperValue == value) throw new InvalidOperationException("synthetic"); }
+		public void SetWallpaperPath(Guid desktopId, string value) { this.BeforeWallpaper?.Invoke(); this.WallpaperCalls++; if (this.FailWallpaperValue == value) throw new InvalidOperationException("synthetic"); }
 		public void ApplyWallpaper(Guid desktopId, string value, WallpaperPosition position) { this.AppliedWallpaperIds.Add(desktopId); this.AppliedWallpaperValues.Add(value); }
 		public void MoveLeft(Guid desktopId) => this.RecordDesktopOperation(nameof(this.MoveLeft), desktopId);
 		public void MoveRight(Guid desktopId) => this.RecordDesktopOperation(nameof(this.MoveRight), desktopId);

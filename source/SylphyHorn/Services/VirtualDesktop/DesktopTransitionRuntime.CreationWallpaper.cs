@@ -28,7 +28,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (id != Guid.Empty)
 				{
 					foreach (var entry in held)
-						this.ApplyCreationWallpaper(entry.Key, entry.Value, entry.Key == id ? name : null);
+						this.ScheduleCreationWallpaper(entry.Key, entry.Value, entry.Key == id ? name : null);
 				}
 			}
 		}
@@ -41,14 +41,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				var number = change.Snapshot.Order.ToList().IndexOf(id) + 1;
 				if (this._heldCreationWallpapers != null) this._heldCreationWallpapers[id] = number;
-				else this.ApplyCreationWallpaper(id, number);
+				else this.ScheduleCreationWallpaper(id, number);
 			}
 			// Unobserved IDs may remain until shutdown; retaining them protects against late notifications.
 			// Observed IDs cannot be Added again without an intervening removal/reset.
 			if (this._heldCreationWallpapers == null) this._creationWallpaperSkipped.ExceptWith(change.Snapshot.Order);
 		}
 
-		private void ApplyCreationWallpaper(Guid id, int number, string assignedName = null)
+		private void ScheduleCreationWallpaper(Guid id, int number, string assignedName = null)
 		{
 			if (this._creationWallpaperSkipped.Remove(id)) return;
 			if (!this._initialized || this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null) return;
@@ -60,15 +60,24 @@ namespace SylphyHorn.Services.DesktopTransitions
 			var setting = entries.FirstOrDefault(item => name != null && item.Name == name)
 				?? entries.FirstOrDefault(item => item.Number == number);
 			if (setting == null) return;
-			try
+			var epoch = this.State.ProviderEpoch;
+			// Provider callbacks forbid setters. Keep the creation-time match, but apply it after the callback returns.
+			// Do not use the deferred command queue: it marks the CLI busy while desktop creation is completing.
+			if (!this._owner.Post(() =>
 			{
-				WallpaperService.ValidateImage(setting.WallpaperPath);
-				this.SetWallpaperPath(id, setting.WallpaperPath);
-			}
-			catch (Exception ex)
-			{
-				this.ReportFault(new DesktopRuntimeFault("WallpaperOnCreation", ex.GetType(), id));
-			}
+				if (this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null) return;
+				if (this.State.ProviderEpoch != epoch || !this.State.Records.ContainsKey(id)) return;
+				try
+				{
+					WallpaperService.ValidateImage(setting.WallpaperPath);
+					this.SetWallpaperPath(id, setting.WallpaperPath);
+				}
+				catch (Exception ex)
+				{
+					this.ReportFault(new DesktopRuntimeFault("WallpaperOnCreation", ex.GetType(), id));
+				}
+			}))
+				this.ReportFault(new DesktopRuntimeFault("OwnerPostRejected.WallpaperOnCreation", typeof(InvalidOperationException), id));
 		}
 	}
 }
