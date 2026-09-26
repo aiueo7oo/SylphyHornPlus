@@ -86,6 +86,240 @@ namespace SylphyHorn.Properties {
                 return ResourceManager.GetString("Common_Reference", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Wallpaper for new desktops.
+        /// </summary>
+        public static string CreationWallpaper_Title {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Sets the wallpaper of newly created desktops by their name or number. Adding or changing entries does not affect existing desktops..
+        /// </summary>
+        public static string CreationWallpaper_Hint {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_Hint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Not applied to desktops restored at startup or by importing settings, or to desktops that app placement creates only to fill missing numbers..
+        /// </summary>
+        public static string CreationWallpaper_Excluded {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_Excluded", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Applied when &quot;{1}&quot; is turned on in {0}..
+        /// </summary>
+        public static string CreationWallpaper_LegacyNote {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_LegacyNote", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to By desktop name.
+        /// </summary>
+        public static string CreationWallpaper_NameList {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NameList", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Matched against the name a desktop has when it is created. Name entries take priority: if the image cannot be read, number entries are not used instead. Renaming a desktop later does not change its wallpaper..
+        /// </summary>
+        public static string CreationWallpaper_NameHint {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NameHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to By desktop number.
+        /// </summary>
+        public static string CreationWallpaper_NumberList {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NumberList", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Matched against a desktop's number when it is created..
+        /// </summary>
+        public static string CreationWallpaper_NumberHint {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NumberHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Desktop name.
+        /// </summary>
+        public static string CreationWallpaper_NameColumn {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NameColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Desktop number.
+        /// </summary>
+        public static string CreationWallpaper_NumberColumn {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_NumberColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Wallpaper.
+        /// </summary>
+        public static string CreationWallpaper_ImageColumn {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_ImageColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Delete.
+        /// </summary>
+        public static string CreationWallpaper_DeleteLabel {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_DeleteLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Delete entry.
+        /// </summary>
+        public static string CreationWallpaper_Delete {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_Delete", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Choose an image.
+        /// </summary>
+        public static string CreationWallpaper_ChooseImage {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_ChooseImage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Add entry.
+        /// </summary>
+        public static string CreationWallpaper_AddManual {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_AddManual", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Save again.
+        /// </summary>
+        public static string CreationWallpaper_RetrySave {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_RetrySave", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter a desktop name. Spaces are matched exactly..
+        /// </summary>
+        public static string CreationWallpaper_InvalidName {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_InvalidName", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter a whole number of 1 or greater..
+        /// </summary>
+        public static string CreationWallpaper_InvalidNumber {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_InvalidNumber", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to An entry for this desktop name already exists..
+        /// </summary>
+        public static string CreationWallpaper_DuplicateName {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_DuplicateName", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to An entry for this desktop number already exists..
+        /// </summary>
+        public static string CreationWallpaper_DuplicateNumber {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_DuplicateNumber", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter an image file path or choose a file..
+        /// </summary>
+        public static string CreationWallpaper_EnterPath {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_EnterPath", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enter the full path of the image file..
+        /// </summary>
+        public static string CreationWallpaper_AbsolutePath {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_AbsolutePath", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The file could not be read as an image. Check the file..
+        /// </summary>
+        public static string CreationWallpaper_UnreadableImage {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_UnreadableImage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The wallpaper cannot be set because the image file was not found..
+        /// </summary>
+        public static string CreationWallpaper_MissingImage {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_MissingImage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The change is active in memory, but could not be saved to disk. Check the settings storage and save again before closing..
+        /// </summary>
+        public static string CreationWallpaper_SaveFailed {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_SaveFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Entries were changed elsewhere, and an unsaved edit to a changed entry was discarded. Review the current entries..
+        /// </summary>
+        public static string CreationWallpaper_ConfigurationChanged {
+            get {
+                return ResourceManager.GetString("CreationWallpaper_ConfigurationChanged", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Also close these desktop names.

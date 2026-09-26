@@ -782,6 +782,8 @@ namespace SylphyHorn.UI.Bindings
 		public ObservableCollection<LogViewModel> Logs { get; }
 		public AppPlacementSettingsViewModel AppPlacement { get; }
 
+		public CreationWallpaperSettingsViewModel CreationWallpapers { get; }
+
 		internal SettingsWindowViewModel(
 			HookService hookService,
 			DesktopTransitionRuntime desktopRuntime,
@@ -807,6 +809,15 @@ namespace SylphyHorn.UI.Bindings
 				new Services.AppPlacement.PlacementAppCatalog(),
 				() => LocalSettingsProvider.Instance.SaveWithResultAsync());
 			this.AppPlacement.AddTo(this);
+			this.CreationWallpapers = new CreationWallpaperSettingsViewModel(
+				Settings.General,
+				desktopRuntime,
+				new CreationWallpaperImages(),
+				() => LocalSettingsProvider.Instance.SaveWithResultAsync(),
+				this.ChooseCreationWallpaper,
+				ProductInfo.IsNameSupportBuild,
+				!ProductInfo.IsWallpaperSupportBuild);
+			this.CreationWallpapers.AddTo(this);
 			ShortcutKeyBox.HookService = hookService;
 			MouseShortcutBox.HookService = hookService;
 
@@ -1037,6 +1048,16 @@ namespace SylphyHorn.UI.Bindings
 				Settings.General.DesktopBackgroundFolderPath.Value = Path.GetDirectoryName(filePath);
 				this._Desktops[index].WallpaperPath = filePath;
 			}
+		}
+
+		private string ChooseCreationWallpaper()
+		{
+			var response = this._dialogService.ShowOpenFileDialog(
+				Resources.Settings_Background_SelectionDialog,
+				Settings.General.DesktopBackgroundFolderPath,
+				WallpaperService.SupportedFormats,
+				string.Empty);
+			return response != null && response.Length > 0 ? response[0] : null;
 		}
 
 		internal void RefreshAfterExternalSettings() => this.NotifyOfAllPropertiesChanged();

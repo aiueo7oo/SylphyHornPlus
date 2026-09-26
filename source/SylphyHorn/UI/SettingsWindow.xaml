@@ -620,6 +620,14 @@
 
 			<TabItem>
 				<TabItem.Header>
+					<TextBlock Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_Desktop, StringFormat='{}{0} 4'}"
+							   Style="{DynamicResource TabitemStyleKey}" />
+				</TabItem.Header>
+				<ui:CreationWallpaperSettingsView DataContext="{Binding CreationWallpapers}" />
+			</TabItem>
+
+			<TabItem>
+				<TabItem.Header>
 					<TextBlock Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_Notification, StringFormat='{}{0} 1'}"
 							   Style="{DynamicResource TabitemStyleKey}" />
 				</TabItem.Header>

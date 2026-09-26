@@ -204,7 +204,7 @@ namespace SylphyHorn.Tests
 			await completion.Task;
 		}
 
-		private static void AddHeaderStyle(FrameworkElement view)
+		internal static void AddHeaderStyle(FrameworkElement view)
 		{
 			var header = new Style(typeof(TextBlock));
 			header.Setters.Add(new Setter(TextBlock.FontSizeProperty, 18.0));
@@ -248,7 +248,7 @@ namespace SylphyHorn.Tests
 			}
 		}
 
-		private static void Theme(Control view, string theme)
+		internal static void Theme(Control view, string theme)
 		{
 			foreach (var resource in new[]
 			{
@@ -264,7 +264,7 @@ namespace SylphyHorn.Tests
 			view.SetResourceReference(Control.ForegroundProperty, "ActiveForegroundBrushKey");
 		}
 
-		private static void Render(FrameworkElement view, double scale)
+		internal static void Render(FrameworkElement view, double scale)
 		{
 			view.Measure(new Size(view.Width, view.Height));
 			view.Arrange(new Rect(0, 0, view.Width, view.Height));
@@ -279,7 +279,7 @@ namespace SylphyHorn.Tests
 			bitmap.Render(view);
 		}
 
-		private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+		internal static IEnumerable<DependencyObject> Descendants(DependencyObject root)
 		{
 			for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
 			{
@@ -289,7 +289,7 @@ namespace SylphyHorn.Tests
 			}
 		}
 
-		private sealed class BindingErrors : TraceListener
+		internal sealed class BindingErrors : TraceListener
 		{
 			internal readonly List<string> Messages = new List<string>();
 

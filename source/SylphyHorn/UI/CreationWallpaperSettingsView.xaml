@@ -1,0 +1,139 @@
+﻿<UserControl x:Class="SylphyHorn.UI.CreationWallpaperSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="Visible" />
+		<Style x:Key="InlineMessage" TargetType="TextBlock">
+			<Setter Property="TextWrapping" Value="Wrap" />
+			<Setter Property="Margin" Value="0,4" />
+			<Style.Triggers>
+				<Trigger Property="Text" Value="">
+					<Setter Property="Visibility" Value="Collapsed" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+		<Style x:Key="Section" TargetType="StackPanel">
+			<Setter Property="Margin" Value="0,16,0,0" />
+		</Style>
+		<Style x:Key="Captions" TargetType="Grid">
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding Rows.Count}" Value="0">
+					<Setter Property="Visibility" Value="Collapsed" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+		<Style x:Key="EntryList" TargetType="Border">
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrushKey}" />
+			<Setter Property="BorderThickness" Value="0,.99,0,0" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding Rows.Count}" Value="0">
+					<Setter Property="BorderThickness" Value="0" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+	</UserControl.Resources>
+	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+		<!-- See AppPlacementSettingsView: templated text would otherwise inherit the selected tab item's accent foreground. -->
+		<StackPanel Margin="16,0,16,16" Focusable="True" TextElement.Foreground="{DynamicResource ForegroundBrushKey}">
+			<TextBlock Text="{Binding Text[Title]}" Style="{DynamicResource HeaderStyleKey}" />
+			<TextBlock Text="{Binding Text[Hint]}" Style="{StaticResource InlineMessage}" Margin="8,0,0,0" />
+			<TextBlock Text="{Binding Text[Excluded]}" Style="{StaticResource InlineMessage}" Margin="8,4,0,0" />
+			<TextBlock Text="{Binding LegacyNote}" Style="{StaticResource InlineMessage}" Margin="8,4,0,0" />
+			<ItemsControl ItemsSource="{Binding Groups}" Focusable="False">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Style="{StaticResource Section}">
+							<TextBlock Text="{Binding Title}" Style="{DynamicResource HeaderStyleKey}" />
+							<TextBlock Text="{Binding Description}" Style="{StaticResource InlineMessage}" Margin="8,0,0,8" />
+							<Grid Style="{StaticResource Captions}" Margin="8,0,0,4">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="110" />
+									<ColumnDefinition Width="8" />
+									<ColumnDefinition />
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="{Binding DestinationLabel}" Foreground="{DynamicResource InactiveForegroundBrushKey}" />
+								<TextBlock Grid.Column="2" Text="{Binding Owner.Text[ImageColumn]}" Foreground="{DynamicResource InactiveForegroundBrushKey}" />
+							</Grid>
+							<Border Style="{StaticResource EntryList}" Margin="8,0,0,0">
+								<ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border BorderBrush="{DynamicResource BorderBrushKey}" BorderThickness="0,0,0,.99" Padding="0,6">
+												<Grid PreviewKeyDown="InputKey">
+													<Grid.ColumnDefinitions>
+														<ColumnDefinition Width="110" />
+														<ColumnDefinition Width="8" />
+														<ColumnDefinition />
+														<ColumnDefinition Width="Auto" />
+														<ColumnDefinition Width="Auto" />
+													</Grid.ColumnDefinitions>
+													<Grid.RowDefinitions>
+														<RowDefinition Height="Auto" />
+														<RowDefinition Height="Auto" />
+													</Grid.RowDefinitions>
+													<metro:PromptComboBox Prompt=""
+													                      IsEditable="True"
+													                      IsTextSearchEnabled="False"
+													                      ItemsSource="{Binding Group.Choices, Mode=OneTime}"
+													                      Text="{Binding Destination, UpdateSourceTrigger=PropertyChanged}"
+													                      VerticalAlignment="Center"
+													                      LostKeyboardFocus="Commit"
+													                      DropDownOpened="DestinationOpened"
+													                      DropDownClosed="DestinationClosed"
+													                      AutomationProperties.Name="{Binding Group.DestinationLabel}" />
+													<metro:PromptTextBox Grid.Column="2"
+													                     Prompt=""
+													                     Text="{Binding WallpaperPath, UpdateSourceTrigger=PropertyChanged}"
+													                     VerticalAlignment="Center"
+													                     LostKeyboardFocus="Commit"
+													                     ToolTip="{Binding WallpaperPath}"
+													                     AutomationProperties.Name="{Binding Group.Owner.Text[ImageColumn]}" />
+													<Button Grid.Column="3"
+													        Content="…"
+													        Width="26"
+													        Margin="4,0,0,0"
+													        VerticalAlignment="Center"
+													        Click="ChooseImage"
+													        ToolTip="{Binding Group.Owner.Text[ChooseImage]}"
+													        AutomationProperties.Name="{Binding Group.Owner.Text[ChooseImage]}" />
+													<Button Grid.Column="4"
+													        Content="{Binding Group.Owner.Text[DeleteLabel]}"
+													        Margin="8,0,0,0"
+													        VerticalAlignment="Center"
+													        Command="{Binding RemoveCommand}"
+													        ToolTip="{Binding Group.Owner.Text[Delete]}"
+													        AutomationProperties.Name="{Binding Group.Owner.Text[Delete]}" />
+													<TextBlock Grid.Row="1"
+													           Grid.ColumnSpan="5"
+													           Text="{Binding Error}"
+													           Style="{StaticResource InlineMessage}"
+													           Foreground="{DynamicResource AccentBrushKey}"
+													           AutomationProperties.LiveSetting="Polite" />
+												</Grid>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</Border>
+							<Button Content="{Binding Owner.Text[AddManual]}" Click="Add" Margin="8,12,0,0" />
+						</StackPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+			<StackPanel Margin="8,8,0,0">
+				<TextBlock Text="{Binding EditDiscardedMessage}"
+				           Style="{StaticResource InlineMessage}"
+				           AutomationProperties.LiveSetting="Polite" />
+				<StackPanel Visibility="{Binding SaveFailed, Converter={StaticResource Visible}}">
+					<TextBlock Text="{Binding SaveMessage}"
+					           Style="{StaticResource InlineMessage}"
+					           AutomationProperties.LiveSetting="Polite" />
+					<Button Content="{Binding Text[RetrySave]}"
+					        Command="{Binding RetrySaveCommand}"
+					        HorizontalAlignment="Left" />
+				</StackPanel>
+			</StackPanel>
+		</StackPanel>
+	</ScrollViewer>
+</UserControl>

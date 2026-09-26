@@ -888,4 +888,82 @@
   <data name="Placement_FollowNo" xml:space="preserve">
     <value>しない</value>
   </data>
+  <data name="CreationWallpaper_Title" xml:space="preserve">
+    <value>新しいデスクトップの背景画像</value>
+  </data>
+  <data name="CreationWallpaper_Hint" xml:space="preserve">
+    <value>新しく作成したデスクトップに、名前または番号に応じた背景画像を設定します。登録の追加や変更は、既存のデスクトップには反映されません。</value>
+  </data>
+  <data name="CreationWallpaper_Excluded" xml:space="preserve">
+    <value>起動時や設定の読み込みで復元したデスクトップと、自動配置が番号の不足を埋めるために作成したデスクトップは対象外です。</value>
+  </data>
+  <data name="CreationWallpaper_LegacyNote" xml:space="preserve">
+    <value>「{0}」の「{1}」が有効な場合に適用します。</value>
+  </data>
+  <data name="CreationWallpaper_NameList" xml:space="preserve">
+    <value>デスクトップ名で指定</value>
+  </data>
+  <data name="CreationWallpaper_NameHint" xml:space="preserve">
+    <value>作成時の名前で照合し、名前の登録を優先します。画像を読み込めない場合も、番号の登録には切り替えません。作成後に名前を変えても、背景画像は変わりません。</value>
+  </data>
+  <data name="CreationWallpaper_NumberList" xml:space="preserve">
+    <value>デスクトップ番号で指定</value>
+  </data>
+  <data name="CreationWallpaper_NumberHint" xml:space="preserve">
+    <value>作成時の番号で照合します。</value>
+  </data>
+  <data name="CreationWallpaper_NameColumn" xml:space="preserve">
+    <value>デスクトップ名</value>
+  </data>
+  <data name="CreationWallpaper_NumberColumn" xml:space="preserve">
+    <value>デスクトップ番号</value>
+  </data>
+  <data name="CreationWallpaper_ImageColumn" xml:space="preserve">
+    <value>背景画像</value>
+  </data>
+  <data name="CreationWallpaper_DeleteLabel" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="CreationWallpaper_Delete" xml:space="preserve">
+    <value>この登録を削除</value>
+  </data>
+  <data name="CreationWallpaper_ChooseImage" xml:space="preserve">
+    <value>背景画像を選択</value>
+  </data>
+  <data name="CreationWallpaper_AddManual" xml:space="preserve">
+    <value>登録を追加</value>
+  </data>
+  <data name="CreationWallpaper_RetrySave" xml:space="preserve">
+    <value>再度保存する</value>
+  </data>
+  <data name="CreationWallpaper_InvalidName" xml:space="preserve">
+    <value>デスクトップ名を入力してください。空白も含めて完全一致で照合します。</value>
+  </data>
+  <data name="CreationWallpaper_InvalidNumber" xml:space="preserve">
+    <value>1以上の整数を入力してください。</value>
+  </data>
+  <data name="CreationWallpaper_DuplicateName" xml:space="preserve">
+    <value>同じデスクトップ名の登録が既にあります。</value>
+  </data>
+  <data name="CreationWallpaper_DuplicateNumber" xml:space="preserve">
+    <value>同じデスクトップ番号の登録が既にあります。</value>
+  </data>
+  <data name="CreationWallpaper_EnterPath" xml:space="preserve">
+    <value>画像ファイルのパスを入力するか、ファイルを選択してください。</value>
+  </data>
+  <data name="CreationWallpaper_AbsolutePath" xml:space="preserve">
+    <value>画像ファイルの完全なパスを入力してください。</value>
+  </data>
+  <data name="CreationWallpaper_UnreadableImage" xml:space="preserve">
+    <value>画像として読み込めません。ファイルを確認してください。</value>
+  </data>
+  <data name="CreationWallpaper_MissingImage" xml:space="preserve">
+    <value>画像ファイルが見つからないため、背景画像を設定できません。</value>
+  </data>
+  <data name="CreationWallpaper_SaveFailed" xml:space="preserve">
+    <value>変更はメモリ上に反映されましたが、ファイルに保存できませんでした。設定の保存先を確認してから再度保存してください。</value>
+  </data>
+  <data name="CreationWallpaper_ConfigurationChanged" xml:space="preserve">
+    <value>別の操作で登録が変更されたため、その登録の未保存の編集を取り消しました。現在の登録を確認してください。</value>
+  </data>
 </root>

@@ -888,4 +888,82 @@
   <data name="Placement_FollowNo" xml:space="preserve">
     <value>Off</value>
   </data>
+  <data name="CreationWallpaper_Title" xml:space="preserve">
+    <value>Wallpaper for new desktops</value>
+  </data>
+  <data name="CreationWallpaper_Hint" xml:space="preserve">
+    <value>Sets the wallpaper of newly created desktops by their name or number. Adding or changing entries does not affect existing desktops.</value>
+  </data>
+  <data name="CreationWallpaper_Excluded" xml:space="preserve">
+    <value>Not applied to desktops restored at startup or by importing settings, or to desktops that app placement creates only to fill missing numbers.</value>
+  </data>
+  <data name="CreationWallpaper_LegacyNote" xml:space="preserve">
+    <value>Applied when "{1}" is turned on in {0}.</value>
+  </data>
+  <data name="CreationWallpaper_NameList" xml:space="preserve">
+    <value>By desktop name</value>
+  </data>
+  <data name="CreationWallpaper_NameHint" xml:space="preserve">
+    <value>Matched against the name a desktop has when it is created. Name entries take priority: if the image cannot be read, number entries are not used instead. Renaming a desktop later does not change its wallpaper.</value>
+  </data>
+  <data name="CreationWallpaper_NumberList" xml:space="preserve">
+    <value>By desktop number</value>
+  </data>
+  <data name="CreationWallpaper_NumberHint" xml:space="preserve">
+    <value>Matched against a desktop's number when it is created.</value>
+  </data>
+  <data name="CreationWallpaper_NameColumn" xml:space="preserve">
+    <value>Desktop name</value>
+  </data>
+  <data name="CreationWallpaper_NumberColumn" xml:space="preserve">
+    <value>Desktop number</value>
+  </data>
+  <data name="CreationWallpaper_ImageColumn" xml:space="preserve">
+    <value>Wallpaper</value>
+  </data>
+  <data name="CreationWallpaper_DeleteLabel" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="CreationWallpaper_Delete" xml:space="preserve">
+    <value>Delete entry</value>
+  </data>
+  <data name="CreationWallpaper_ChooseImage" xml:space="preserve">
+    <value>Choose an image</value>
+  </data>
+  <data name="CreationWallpaper_AddManual" xml:space="preserve">
+    <value>Add entry</value>
+  </data>
+  <data name="CreationWallpaper_RetrySave" xml:space="preserve">
+    <value>Save again</value>
+  </data>
+  <data name="CreationWallpaper_InvalidName" xml:space="preserve">
+    <value>Enter a desktop name. Spaces are matched exactly.</value>
+  </data>
+  <data name="CreationWallpaper_InvalidNumber" xml:space="preserve">
+    <value>Enter a whole number of 1 or greater.</value>
+  </data>
+  <data name="CreationWallpaper_DuplicateName" xml:space="preserve">
+    <value>An entry for this desktop name already exists.</value>
+  </data>
+  <data name="CreationWallpaper_DuplicateNumber" xml:space="preserve">
+    <value>An entry for this desktop number already exists.</value>
+  </data>
+  <data name="CreationWallpaper_EnterPath" xml:space="preserve">
+    <value>Enter an image file path or choose a file.</value>
+  </data>
+  <data name="CreationWallpaper_AbsolutePath" xml:space="preserve">
+    <value>Enter the full path of the image file.</value>
+  </data>
+  <data name="CreationWallpaper_UnreadableImage" xml:space="preserve">
+    <value>The file could not be read as an image. Check the file.</value>
+  </data>
+  <data name="CreationWallpaper_MissingImage" xml:space="preserve">
+    <value>The wallpaper cannot be set because the image file was not found.</value>
+  </data>
+  <data name="CreationWallpaper_SaveFailed" xml:space="preserve">
+    <value>The change is active in memory, but could not be saved to disk. Check the settings storage and save again before closing.</value>
+  </data>
+  <data name="CreationWallpaper_ConfigurationChanged" xml:space="preserve">
+    <value>Entries were changed elsewhere, and an unsaved edit to a changed entry was discarded. Review the current entries.</value>
+  </data>
 </root>
