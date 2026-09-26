@@ -23,7 +23,10 @@
 		<StackPanel Margin="16,0,16,16" Focusable="True" TextElement.Foreground="{DynamicResource ForegroundBrushKey}">
 			<TextBlock Text="{Binding Text[CloseTitle]}" Style="{DynamicResource HeaderStyleKey}" />
 			<TextBlock Text="{Binding Text[CloseHint]}" Style="{StaticResource InlineMessage}" Margin="8,0,0,8" />
-			<CheckBox Content="{Binding Text[CloseCreated]}" IsChecked="{Binding CloseCreatedDesktops}" Margin="8,0,0,8" />
+			<CheckBox Content="{Binding Text[CloseCreated]}"
+			          IsChecked="{Binding CloseCreatedDesktops}"
+			          IsEnabled="{Binding CreateMissingDesktops}"
+			          Margin="8,0,0,8" />
 			<ItemsControl ItemsSource="{Binding ClosingGroups}" Focusable="False">
 				<ItemsControl.ItemTemplate>
 					<DataTemplate>
