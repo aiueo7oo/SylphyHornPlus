@@ -20,6 +20,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private bool _placementSuspended;
 		private bool _placementChanging;
 
+		private static bool AffectsPlacementDestinations(DesktopCoordinatorTransition transition)
+		{
+			if (transition.RequiresReconciliation) return true;
+			var change = transition.StateChanged;
+			// Wallpaper and unchanged reconciliation results do not invalidate a resolved destination.
+			if (change == null) return false;
+			return (change.Kind != DesktopStateChangeKind.Reconciled && change.Kind != DesktopStateChangeKind.LocalEdit)
+				|| change.CurrentChanged || change.AddedIds.Count != 0 || change.RemovedIds.Count != 0
+				|| change.Moves.Count != 0 || change.NameChanges.Count != 0;
+		}
+
 		internal PlacementResult[] PlacementResults => this._placementHistory.Snapshot();
 
 		internal string PlacementStatus

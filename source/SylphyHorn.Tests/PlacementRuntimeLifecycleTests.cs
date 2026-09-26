@@ -11,6 +11,55 @@ namespace SylphyHorn.Tests
 {
 	public sealed class PlacementRuntimeLifecycleTests
 	{
+		[Theory]
+		[InlineData("unchanged")]
+		[InlineData("wallpaper")]
+		[InlineData("position")]
+		public async Task UnchangedDestinationsPreservePermitAndDoNotRestartObservation(string change)
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(PlacementProcessorTests.Configuration());
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByNumber(1), session.Cancellation.Token);
+			harness.Owner.Drain();
+			var result = await request;
+			if (change == "position") harness.Runtime.EditWallpaperPosition(A, SylphyHorn.Services.WallpaperPosition.Center);
+			else harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", change == "wallpaper" ? "updated" : "wall")));
+			Assert.True(result.Permit.TryStart());
+			Assert.Equal(0, session.DesktopChanges);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Theory]
+		[InlineData("add")]
+		[InlineData("name")]
+		[InlineData("remove")]
+		[InlineData("reorder")]
+		[InlineData("current")]
+		[InlineData("reset")]
+		public async Task DestinationChangesRevokePermit(string change)
+		{
+			var factory = new Factory();
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "home", ""), Entry(B, 1, "work", "")), factory);
+			await harness.Runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
+			await harness.Runtime.ConfigurePlacementAsync(PlacementProcessorTests.Configuration());
+			var session = factory.Sessions[0];
+			var request = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token);
+			harness.Owner.Drain();
+			var result = await request;
+			var entries = change == "add" ? new[] { Entry(A, 0, "home", ""), Entry(B, 1, "work", ""), Entry(C, 2, "new", "") }
+				: change == "remove" ? new[] { Entry(A, 0, "home", "") }
+				: change == "reorder" ? new[] { Entry(B, 0, "work", ""), Entry(A, 1, "home", "") }
+				: new[] { Entry(A, 0, "home", ""), Entry(B, 1, change == "name" ? "renamed" : "work", "") };
+			harness.Provider.PublishStable(Batch(change == "reset" ? 2 : 1, 2, change == "current" ? B : A, entries));
+			Assert.False(result.Permit.TryStart());
+			Assert.Equal(1, session.DesktopChanges);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
 		[Fact]
 		public async Task DisabledAndEmptyConfigurationsAllocateNoSession()
 		{
@@ -564,7 +613,9 @@ namespace SylphyHorn.Tests
 				this._authorize = authorize;
 			}
 
-			public void DesktopChanged() { }
+			internal int DesktopChanges;
+
+			public void DesktopChanged() => this.DesktopChanges++;
 
 			public Task Completion => this.Ended.Task;
 

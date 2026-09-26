@@ -819,8 +819,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 				return;
 			}
 
-			this._placementPermit?.Cancel();
-			this._placementSession?.DesktopChanged();
+			if (AffectsPlacementDestinations(transition))
+			{
+				this._placementPermit?.Cancel();
+				this._placementSession?.DesktopChanged();
+			}
 			if (applyProjection && transition.Projection != null) this._settings.ApplyProjection(this._persistenceProtection?.CreateProjection(transition.NewState) ?? transition.Projection);
 			transitionCommitted?.Invoke();
 			this._publishing = true;
