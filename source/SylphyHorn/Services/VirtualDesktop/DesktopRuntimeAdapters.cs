@@ -44,13 +44,22 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 	internal sealed class ApplicationDesktopSettingsTransactions : IDesktopSettingsTransactions
 	{
-		private readonly LocalSettingsProvider _provider;
-		internal ApplicationDesktopSettingsTransactions(LocalSettingsProvider provider) => this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
+		private readonly DictionaryProvider _provider;
+		private readonly GeneralSettings _general;
+		private readonly AppPlacementSettings _placement;
+
+		internal ApplicationDesktopSettingsTransactions(DictionaryProvider provider, GeneralSettings general, AppPlacementSettings placement)
+		{
+			this._provider = provider ?? throw new ArgumentNullException(nameof(provider));
+			this._general = general ?? throw new ArgumentNullException(nameof(general));
+			this._placement = placement ?? throw new ArgumentNullException(nameof(placement));
+		}
+
 		public DesktopStartupSeed CaptureStartupSeed() => SettingsService.CaptureDesktopStartupSeed();
-		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => new GeneralSettings(this._provider).DesktopWallpapersOnCreation.Value;
-		public bool PerDesktopWallpaperEnabled => new GeneralSettings(this._provider).ChangeBackgroundEachDesktop.Value;
-		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value;
-		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => new AppPlacementSettings(this._provider).CreatedDesktopGroups.Value = groups;
+		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => this._general.DesktopWallpapersOnCreation.Value;
+		public bool PerDesktopWallpaperEnabled => this._general.ChangeBackgroundEachDesktop.Value;
+		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this._placement.CreatedDesktopGroups.Value;
+		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => this._placement.CreatedDesktopGroups.Value = groups;
 		public void ApplyProjection(DesktopSettingsProjection projection) => SettingsService.ApplyDesktopProjection(projection);
 		public long SettingsRevision => this._provider.SettingsRevision;
 		public Task<SettingsSaveResult> RequestSaveAsync(long stateRevision) => this._provider.SaveWithResultAsync(stateRevision);

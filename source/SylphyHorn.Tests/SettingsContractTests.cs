@@ -27,6 +27,46 @@ namespace SylphyHorn.Tests
 			Assert.Null(SettingsHost.Instance<RegistryHost<Guid>>());
 		}
 
+		[Fact]
+		public async Task DesktopSettingsAdapterReadsSharedUpdatesWithoutAddingSubscriptions()
+		{
+			var provider = await CreateProviderAsync();
+			var general = new GeneralSettings(provider);
+			var placement = new AppPlacementSettings(provider);
+			var first = new DesktopWallpaperOnCreation("Work", null, @"C:\Images\first.bmp");
+			var second = new DesktopWallpaperOnCreation(null, 2, @"C:\Images\second.bmp");
+			general.DesktopWallpapersOnCreation.Value = new[] { first };
+			general.ChangeBackgroundEachDesktop.Value = true;
+			placement.CreatedDesktopGroups.Value = new[] { new AppPlacement.PlacementCreatedGroup(new[] { Guid.NewGuid() }, false) };
+			var adapter = new Services.DesktopTransitions.ApplicationDesktopSettingsTransactions(provider, general, placement);
+			Assert.Same(first, Assert.Single(adapter.ReadWallpapersOnCreation()));
+			Assert.True(adapter.PerDesktopWallpaperEnabled);
+			Assert.Single(adapter.ReadCreatedDesktopGroups());
+			var reloaded = typeof(DictionaryProvider).GetField("Reloaded", BindingFlags.Instance | BindingFlags.NonPublic);
+			var subscriptions = ((Delegate)reloaded.GetValue(provider)).GetInvocationList().Length;
+
+			general.DesktopWallpapersOnCreation.Value = new[] { first, second };
+			Assert.Equal(2, adapter.ReadWallpapersOnCreation().Length);
+			general.DesktopWallpapersOnCreation.Value = new[] { second };
+			Assert.Same(second, Assert.Single(adapter.ReadWallpapersOnCreation()));
+			general.DesktopWallpapersOnCreation.Value = Array.Empty<DesktopWallpaperOnCreation>();
+			general.ChangeBackgroundEachDesktop.Value = false;
+			placement.CreatedDesktopGroups.Value = Array.Empty<AppPlacement.PlacementCreatedGroup>();
+			for (var index = 0; index < 20; index++)
+			{
+				Assert.Empty(adapter.ReadWallpapersOnCreation());
+				Assert.Empty(adapter.ReadCreatedDesktopGroups());
+				Assert.False(adapter.PerDesktopWallpaperEnabled);
+			}
+			var groups = new[] { new AppPlacement.PlacementCreatedGroup(new[] { Guid.NewGuid() }, true) };
+			adapter.WriteCreatedDesktopGroups(groups);
+			Assert.Same(groups[0], Assert.Single(placement.CreatedDesktopGroups.Value));
+			Assert.Equal(subscriptions, ((Delegate)reloaded.GetValue(provider)).GetInvocationList().Length);
+			provider.Clear();
+			Assert.Empty(adapter.ReadCreatedDesktopGroups());
+			Assert.Empty(adapter.ReadWallpapersOnCreation());
+		}
+
 		private sealed class RegistryHost<T> : SettingsHost { }
 
 		[Fact]

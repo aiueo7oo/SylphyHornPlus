@@ -234,7 +234,7 @@ namespace SylphyHorn
 				this._startupTrace?.Write(StartupPhase.ProviderInitCompleted, StartupTraceResult.Succeeded);
 				var runtime = new DesktopTransitionRuntime(
 					new VirtualDesktopProviderClient(provider),
-					new ApplicationDesktopSettingsTransactions(LocalSettingsProvider.Instance),
+					new ApplicationDesktopSettingsTransactions(LocalSettingsProvider.Instance, Settings.General, Settings.AppPlacement),
 					new DispatcherDesktopOwnerContext(Application.Current.Dispatcher),
 					new VirtualDesktopOperations());
 				runtime.Faulted += (sender, fault) => LoggingService.Instance.Register(new DesktopRuntimeLog(fault));
