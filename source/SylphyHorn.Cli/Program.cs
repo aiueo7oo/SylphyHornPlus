@@ -15,10 +15,20 @@ namespace SylphyHorn.Cli
 		private static async Task<int> Main(string[] args)
 		{
 			Console.OutputEncoding = new UTF8Encoding(false);
+			if (args.Length == 1 && args[0] == "--version")
+			{
+				var version = CliVersionInfo.Read(Assembly.GetExecutingAssembly());
+				var revision = version.Revision == null ? "" : " (" + version.Revision.Substring(0, 9) + ")";
+				Console.WriteLine("sylphyhorn-cli " + version.Version + revision);
+				return 0;
+			}
+			if (args.Length == 1 && args[0] == "version")
+				return Print(CliVersionInfo.Combine(CliVersionInfo.Read(Assembly.GetExecutingAssembly()), await SendAsync(args)));
 			if (args.Length > 0 && args[0] == "spec")
 				return Print(await CliSpecService.ExecuteAsync(args, SendAsync));
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
+				Console.WriteLine("sylphyhorn-cli --version");
 				Console.WriteLine("sylphyhorn-cli spec [COMMAND...] [--resolve]");
 				foreach (var item in CliSpecCatalog.All)
 				{
@@ -65,9 +75,9 @@ namespace SylphyHorn.Cli
 			var company = assembly.GetCustomAttribute<AssemblyCompanyAttribute>().Company;
 			var product = assembly.GetCustomAttribute<AssemblyProductAttribute>().Product;
 			using (var pipe = new NamedPipeClientStream(".", CliProtocol.PipeName(company, product), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
-			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(
-				operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
-				|| operation.StartsWith("startup ", StringComparison.Ordinal) ? 45 : 15)))
+			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(operation == "version" ? 2
+				: operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
+					|| operation.StartsWith("startup ", StringComparison.Ordinal) ? 45 : 15)))
 			{
 				var submitted = false;
 				try
@@ -76,6 +86,9 @@ namespace SylphyHorn.Cli
 					submitted = true;
 					await CliProtocol.WriteAsync(pipe, new CliRequest { Args = args }, deadline.Token);
 					response = await CliProtocol.ReadAsync<CliResponse>(pipe, deadline.Token);
+					if (operation == "version" && response?.SchemaVersion == 1 && response.Command == null
+						&& !response.Success && response.Data == null && response.Error?.Code == "invalid_arguments")
+						return CliResponse.Fail(operation, "unsupported", "This host does not support version queries.");
 					if (response == null || response.SchemaVersion != 1 || response.Command != operation
 						|| (response.Success ? response.Data == null || response.Error != null : response.Error == null || response.Data != null))
 						throw new InvalidDataException("Invalid host response.");

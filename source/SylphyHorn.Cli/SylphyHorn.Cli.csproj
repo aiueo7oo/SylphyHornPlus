@@ -16,4 +16,16 @@
 		<ProjectReference Include="..\SylphyHorn.Core\SylphyHorn.Core.csproj" />
 	</ItemGroup>
 
+	<Target Name="ReadProductVersion" BeforeTargets="GetAssemblyVersion">
+		<XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\SylphyHorn\SylphyHorn.csproj" Query="/Project/PropertyGroup/Version/text()">
+			<Output TaskParameter="Result" PropertyName="Version" />
+		</XmlPeek>
+		<XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\SylphyHorn\SylphyHorn.csproj" Query="/Project/ItemGroup/AssemblyMetadata[@Include='ExtraVersion']/@Value">
+			<Output TaskParameter="Result" PropertyName="ProductExtraVersion" />
+		</XmlPeek>
+		<ItemGroup>
+			<AssemblyMetadata Include="ExtraVersion" Value="$(ProductExtraVersion)" />
+		</ItemGroup>
+	</Target>
+
 </Project>

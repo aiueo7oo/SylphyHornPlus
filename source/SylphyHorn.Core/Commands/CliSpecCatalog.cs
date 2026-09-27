@@ -20,6 +20,15 @@ namespace SylphyHorn.Commands
 
 		private static IEnumerable<CliCommandSpec> Build()
 		{
+			var version = C("version", "Read CLI and running GUI versions and embedded Git revisions.", "cli host",
+				notes: "Always returns local CLI information. Inspect host.status (available or unavailable) and host.errorCode: outer success does not imply " +
+					"a reachable host. Missing revisions are null. A revision is not proof of a clean working tree or compatibility. " +
+					"The host query has a two-second deadline and never starts the GUI. --version prints the local CLI version and available nine-character Git revision as text without connecting.");
+			version.Prerequisites = new[]
+			{
+				"No GUI required for local information; host information requires a compatible running GUI in the same user session and elevation level.",
+			};
+			yield return version;
 			yield return C("logs", "Read recent application logs from the current GUI host.", "logs totalCount omittedCount",
 				new[] { A("--limit", "integer", omission: "50", minimum: 1, maximum: int.MaxValue) },
 				notes: "Returns the latest entries in oldest-first order, with ISO 8601 timestamps, headers and full contents. " +

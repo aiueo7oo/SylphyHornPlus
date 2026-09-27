@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
@@ -82,6 +84,46 @@ namespace SylphyHorn.Commands
 	}
 
 	[DataContract]
+	internal sealed class CliVersionInfo
+	{
+		[DataMember(Name = "version")]
+		public string Version;
+
+		[DataMember(Name = "revision")]
+		public string Revision;
+
+		[DataMember(Name = "status", EmitDefaultValue = false)]
+		public string Status;
+
+		[DataMember(Name = "errorCode", EmitDefaultValue = false)]
+		public string ErrorCode;
+
+		internal static CliVersionInfo Read(Assembly assembly)
+		{
+			var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+			var parts = informational?.Split('+');
+			var version = parts?[0] ?? assembly.GetName().Version.ToString();
+			var extra = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(item => item.Key == "ExtraVersion")?.Value;
+			if (!string.IsNullOrEmpty(extra) && !version.EndsWith("-" + extra, StringComparison.Ordinal)) version += "-" + extra;
+			var revision = parts?.Length == 2 ? parts[1] : null;
+			if (revision != null && ((revision.Length != 40 && revision.Length != 64) || !revision.All(Uri.IsHexDigit))) revision = null;
+			return new CliVersionInfo { Version = version, Revision = revision };
+		}
+
+		internal static CliResponse Combine(CliVersionInfo cli, CliResponse response)
+		{
+			var host = response?.Success == true && !string.IsNullOrWhiteSpace(response.Data?.Host?.Version)
+				? response.Data.Host : new CliVersionInfo
+				{
+					Status = "unavailable",
+					ErrorCode = response?.Error?.Code ?? "result_unconfirmed",
+				};
+			if (host.Version != null) host.Status = "available";
+			return CliResponse.Ok("version", new CliData { Cli = cli, Host = host });
+		}
+	}
+
+	[DataContract]
 	internal sealed class CliLog
 	{
 		[DataMember(Name = "timestamp")]
@@ -97,6 +139,12 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "cli", EmitDefaultValue = false)]
+		public CliVersionInfo Cli;
+
+		[DataMember(Name = "host", EmitDefaultValue = false)]
+		public CliVersionInfo Host;
+
 		[DataMember(Name = "saved", EmitDefaultValue = false)]
 		public bool? Saved;
 

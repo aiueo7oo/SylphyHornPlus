@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +12,58 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliProtocolTests
 	{
+		[Theory]
+		[InlineData("4.0.0+0123456789012345678901234567890123456789", "beta.16", "4.0.0-beta.16", "0123456789012345678901234567890123456789")]
+		[InlineData("4.0.0-beta.16", "beta.16", "4.0.0-beta.16", null)]
+		[InlineData("4.0.0+build-metadata", null, "4.0.0", null)]
+		public void VersionReadsPrereleaseAndOnlyEmbeddedCommitHashes(string informational, string extra, string version, string revision)
+		{
+			var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("VersionTest"), AssemblyBuilderAccess.Run);
+			assembly.SetCustomAttribute(new CustomAttributeBuilder(
+				typeof(AssemblyInformationalVersionAttribute).GetConstructor(new[] { typeof(string) }), new object[] { informational }));
+			if (extra != null)
+				assembly.SetCustomAttribute(new CustomAttributeBuilder(
+					typeof(AssemblyMetadataAttribute).GetConstructor(new[] { typeof(string), typeof(string) }), new object[] { "ExtraVersion", extra }));
+			var result = CliVersionInfo.Read(assembly);
+			Assert.Equal(version, result.Version);
+			Assert.Equal(revision, result.Revision);
+		}
+
+		[Theory]
+		[InlineData("host_unavailable")]
+		[InlineData("unsupported")]
+		[InlineData("result_unconfirmed")]
+		public void VersionRetainsLocalInformationWhenHostCannotBeQueried(string error)
+		{
+			var local = new CliVersionInfo { Version = "4.0.0-beta.16", Revision = "local-revision" };
+			var response = CliVersionInfo.Combine(local, CliResponse.Fail("version", error, "synthetic"));
+			var result = CliProtocol.Deserialize<CliResponse>(CliProtocol.Serialize(response));
+			Assert.True(result.Success);
+			Assert.Equal(0, result.ExitCode);
+			Assert.Equal("version", result.Command);
+			Assert.Equal(local.Version, result.Data.Cli.Version);
+			Assert.Equal(local.Revision, result.Data.Cli.Revision);
+			Assert.Equal("unavailable", result.Data.Host.Status);
+			Assert.Equal(error, result.Data.Host.ErrorCode);
+			Assert.Null(result.Data.Host.Version);
+			Assert.Null(result.Data.Host.Revision);
+		}
+
+		[Fact]
+		public void VersionDistinguishesHostBuildAndRejectsMissingHostInformation()
+		{
+			var local = new CliVersionInfo { Version = "4.0.0-beta.16", Revision = "local" };
+			var host = new CliVersionInfo { Version = "4.0.0-beta.15", Revision = "host" };
+			var response = CliVersionInfo.Combine(local, CliResponse.Ok("version", new CliData { Host = host }));
+			Assert.Equal("available", response.Data.Host.Status);
+			Assert.Equal("4.0.0-beta.15", response.Data.Host.Version);
+			Assert.Equal("host", response.Data.Host.Revision);
+			Assert.Null(response.Data.Host.ErrorCode);
+			var malformed = CliVersionInfo.Combine(local, CliResponse.Ok("version", new CliData()));
+			Assert.Equal("unavailable", malformed.Data.Host.Status);
+			Assert.Equal("result_unconfirmed", malformed.Data.Host.ErrorCode);
+		}
+
 		[Fact]
 		public void LogsPreservesEmptyResultsAndMultilineContents()
 		{

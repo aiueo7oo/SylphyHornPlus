@@ -6,6 +6,14 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Fact]
+		public void VersionIsSingleWordAndHasNoHostOption()
+		{
+			Assert.Equal("version", CliCommand.Parse(new[] { "version" }).Operation);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "version", "--host" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "version", "extra" }));
+		}
+
 		[Theory]
 		[InlineData("settings save --path settings.xml")]
 		[InlineData("settings save --yes")]

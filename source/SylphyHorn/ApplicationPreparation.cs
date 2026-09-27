@@ -137,6 +137,8 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "version")
+				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData { Host = CliVersionInfo.Read(typeof(ApplicationPreparation).Assembly) }));
 			if (command.Operation == "logs")
 			{
 				var entries = LoggingService.Instance.GetRecent(command.Limit, out var totalCount);
