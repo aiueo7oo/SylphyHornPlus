@@ -11,6 +11,25 @@ namespace SylphyHorn.Tests
 	public sealed class SettingsContractTests
 	{
 		[Fact]
+		public void ConcurrentHostRegistrationPreservesTypedLookupAndLastRegistration()
+		{
+			Parallel.For(0, 2000, index =>
+			{
+				new RegistryHost<int>();
+				new RegistryHost<string>();
+				Assert.NotNull(SettingsHost.Instance<RegistryHost<int>>());
+				Assert.NotNull(SettingsHost.Instance<RegistryHost<string>>());
+			});
+			var lastInteger = new RegistryHost<int>();
+			var lastString = new RegistryHost<string>();
+			Assert.Same(lastInteger, SettingsHost.Instance<RegistryHost<int>>());
+			Assert.Same(lastString, SettingsHost.Instance<RegistryHost<string>>());
+			Assert.Null(SettingsHost.Instance<RegistryHost<Guid>>());
+		}
+
+		private sealed class RegistryHost<T> : SettingsHost { }
+
+		[Fact]
 		public async Task GeneralSettingsSchemaKeysTypesAndDefaultsRemainStable()
 		{
 			var provider = await CreateProviderAsync();

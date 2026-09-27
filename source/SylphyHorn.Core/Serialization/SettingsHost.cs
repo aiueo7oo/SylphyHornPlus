@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -6,7 +7,7 @@ namespace SylphyHorn.Serialization
 {
 	public abstract class SettingsHost
 	{
-		private static readonly Dictionary<Type, SettingsHost> _instances = new Dictionary<Type, SettingsHost>();
+		private static readonly ConcurrentDictionary<Type, SettingsHost> _instances = new ConcurrentDictionary<Type, SettingsHost>();
 		private readonly Dictionary<string, object> _cachedProperties = new Dictionary<string, object>();
 
 		protected virtual string CategoryName => this.GetType().Name;
