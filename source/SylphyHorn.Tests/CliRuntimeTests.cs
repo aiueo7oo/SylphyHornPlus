@@ -150,6 +150,50 @@ namespace SylphyHorn.Tests
 			Assert.True(response.Data.Changed);
 			Assert.Equal(B.ToString(), Assert.Single(response.Data.Desktops).Id);
 			Assert.Equal(new[] { A }, harness.Operations.RemovedIds);
+			Assert.Null(Assert.Single(harness.Operations.RemovalFallbackIds));
+		}
+
+		[Theory]
+		[InlineData("--fallback-id", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")]
+		[InlineData("--fallback-number", "2")]
+		public async Task DeletePassesResolvedFallbackAndConfirmsCurrentDestination(string option, string value)
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, B, Entry(B, 0, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", option, value });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal(new[] { A }, harness.Operations.RemovedIds);
+			Assert.Equal(B, Assert.Single(harness.Operations.RemovalFallbackIds));
+			Assert.True(Assert.Single(response.Data.Desktops).Current);
+		}
+
+		[Theory]
+		[InlineData("--fallback-id", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "invalid_arguments")]
+		[InlineData("--fallback-number", "1", "invalid_arguments")]
+		[InlineData("--fallback-id", "cccccccc-cccc-cccc-cccc-cccccccccccc", "desktop_not_found")]
+		[InlineData("--fallback-number", "3", "desktop_not_found")]
+		public async Task InvalidFallbackDoesNotRemoveAnyDesktop(string option, string value, string error)
+		{
+			var harness = await Create();
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", option, value });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.False(response.Success);
+			Assert.Equal(error, response.Error.Code);
+			Assert.Empty(harness.Operations.RemovedIds);
+		}
+
+		[Fact]
+		public async Task DeleteDoesNotConfirmSuccessIfDisplayDidNotReachFallback()
+		{
+			var harness = await Create();
+			harness.Provider.EnqueueResult(Batch(1, 3, C, Entry(B, 0, "work", ""), Entry(C, 1, "other", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", "--fallback-number", "2" });
+			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
+			Assert.False(response.Success);
+			Assert.Equal("result_unconfirmed", response.Error.Code);
+			Assert.False(response.Error.Retryable);
+			Assert.Equal(B, Assert.Single(harness.Operations.RemovalFallbackIds));
 		}
 
 		[Fact]

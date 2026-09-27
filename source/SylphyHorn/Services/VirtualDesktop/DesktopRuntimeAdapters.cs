@@ -87,7 +87,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 		public void MoveFirst(Guid desktopId) => Resolve(desktopId).MoveToFirst();
 		public void MoveLast(Guid desktopId) => Resolve(desktopId).MoveToLast();
 		public void Switch(Guid desktopId) => Resolve(desktopId).Switch();
-		public void Remove(Guid desktopId) => Resolve(desktopId).Remove();
+
+		public void Remove(Guid desktopId, Guid? fallbackId = null)
+		{
+			var desktop = Resolve(desktopId);
+			if (fallbackId.HasValue) desktop.Remove(Resolve(fallbackId.Value));
+			else desktop.Remove();
+		}
+
 		public bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent)
 		{
 			var desktops = VirtualDesktop.GetDesktops();

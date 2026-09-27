@@ -90,10 +90,13 @@ namespace SylphyHorn.Services.DesktopTransitions
 				}
 				if (command.Operation == "desktop delete")
 				{
+					var fallback = this.ResolveCliRemovalFallback(command, target);
+					var removingCurrent = this.State.CurrentDesktopId == target;
 					this.EnsureCliAvailable(cancellation);
 					submitted = true;
-					this._operations.Remove(target);
-					await this.ConfirmCliDesktopAsync(() => !this.State.Records.ContainsKey(target), cancellation);
+					this._operations.Remove(target, fallback);
+					await this.ConfirmCliDesktopAsync(() => !this.State.Records.ContainsKey(target)
+						&& (!removingCurrent || !fallback.HasValue || this.State.CurrentDesktopId == fallback), cancellation);
 					return CliResponse.Ok(command.Operation, new CliData
 					{
 						Changed = true,
@@ -316,6 +319,23 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (confirmed()) return;
 				await Task.Delay(100, cancellation);
 			}
+		}
+
+		private Guid? ResolveCliRemovalFallback(CliCommand command, Guid target)
+		{
+			var fallback = command.FallbackId;
+			if (command.FallbackNumber.HasValue)
+			{
+				var index = command.FallbackNumber.Value - 1;
+				if (index >= this.State.Order.Count)
+					throw new CliFailure("desktop_not_found", "The fallback desktop does not exist.");
+				fallback = this.State.Order[index];
+			}
+			if (fallback.HasValue && !this.State.Records.ContainsKey(fallback.Value))
+				throw new CliFailure("desktop_not_found", "The fallback desktop does not exist.");
+			if (fallback == target)
+				throw new CliFailure("invalid_arguments", "The fallback desktop must differ from the desktop being deleted.");
+			return fallback;
 		}
 
 		private Guid ResolveCliTarget(CliCommand command)

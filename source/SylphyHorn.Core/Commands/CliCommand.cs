@@ -105,6 +105,10 @@ namespace SylphyHorn.Commands
 
 		internal int? Number { get; private set; }
 
+		internal Guid? FallbackId { get; private set; }
+
+		internal int? FallbackNumber { get; private set; }
+
 		internal string WallpaperPath { get; private set; }
 
 		internal string WallpaperPosition { get; private set; }
@@ -367,6 +371,19 @@ namespace SylphyHorn.Commands
 						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
 					command.SetTarget("number", value);
 				}
+				else if (option == "--fallback-id" && command.Operation == "desktop delete")
+				{
+					var id = ReadValue(args, ref i);
+					RequireId(id);
+					command.FallbackId = Guid.Parse(id);
+				}
+				else if (option == "--fallback-number" && command.Operation == "desktop delete")
+				{
+					var value = ReadValue(args, ref i);
+					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
+						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
+					command.FallbackNumber = number;
+				}
 				else if (option == "--path" && command.Operation == "desktop wallpaper")
 					command.WallpaperPath = ReadTextValue(args, ref i, "A wallpaper path is missing.");
 				else if (option == "--position" && command.Operation == "desktop wallpaper")
@@ -410,6 +427,8 @@ namespace SylphyHorn.Commands
 				throw new ArgumentException("Specify exactly one of --path or --position.");
 			if ((command.Operation == "window pin" || command.Operation == "window unpin") && (command.WindowId == null || command.Scope == null))
 				throw new ArgumentException("Specify --id from window list and --scope window or app.");
+			if (command.FallbackId.HasValue && command.FallbackNumber.HasValue)
+				throw new ArgumentException("--fallback-id and --fallback-number are mutually exclusive.");
 			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
 				throw new ArgumentException("--wrap requires a next or previous destination.");
 			if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && command.TargetKind == null)

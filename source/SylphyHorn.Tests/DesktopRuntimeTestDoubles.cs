@@ -269,6 +269,7 @@ namespace SylphyHorn.Tests
 		internal int CreateCalls { get; private set; }
 		internal Func<Guid> Creating { get; set; }
 		internal List<Guid> RemovedIds { get; } = new List<Guid>();
+		internal List<Guid?> RemovalFallbackIds { get; } = new List<Guid?>();
 		internal Exception NameFailure { get; set; }
 		internal Exception CreateFailure { get; set; }
 		internal string FailNameValue { get; set; }
@@ -288,9 +289,10 @@ namespace SylphyHorn.Tests
 		public void MoveFirst(Guid desktopId) => this.RecordDesktopOperation(nameof(this.MoveFirst), desktopId);
 		public void MoveLast(Guid desktopId) => this.RecordDesktopOperation(nameof(this.MoveLast), desktopId);
 		public void Switch(Guid desktopId) => this.RecordDesktopOperation(nameof(this.Switch), desktopId);
-		public void Remove(Guid desktopId)
+		public void Remove(Guid desktopId, Guid? fallbackId = null)
 		{
 			this.RemovedIds.Add(desktopId);
+			this.RemovalFallbackIds.Add(fallbackId);
 			this.RecordDesktopOperation(nameof(this.Remove), desktopId);
 		}
 

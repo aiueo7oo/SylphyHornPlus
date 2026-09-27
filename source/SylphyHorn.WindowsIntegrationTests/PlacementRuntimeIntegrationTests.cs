@@ -356,7 +356,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 
 			public void Switch(Guid desktopId) => this.Reject();
 
-			public void Remove(Guid desktopId) => this.Reject();
+			public void Remove(Guid desktopId, Guid? fallbackId = null) => this.Reject();
 		}
 	}
 }

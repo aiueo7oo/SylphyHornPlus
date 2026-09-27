@@ -52,7 +52,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		void MoveFirst(Guid desktopId);
 		void MoveLast(Guid desktopId);
 		void Switch(Guid desktopId);
-		void Remove(Guid desktopId);
+		void Remove(Guid desktopId, Guid? fallbackId = null);
 		bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent);
 	}
 

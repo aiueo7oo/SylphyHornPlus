@@ -67,10 +67,18 @@ namespace SylphyHorn.Commands
 					arguments.Add(A("--position", "string", values: "center tile stretch fit fill span"));
 					constraints.Add(One("--path --position"));
 				}
+				else
+				{
+					arguments.Add(Desktop("--fallback-id"));
+					arguments.Add(Desktop("--fallback-number"));
+					constraints.Add(new CliSpecConstraint { Kind = "atMostOne", Arguments = Split("--fallback-id --fallback-number") });
+				}
 				yield return C(name, wallpaper ? "Set wallpaper image or placement for one desktop." : "Close one desktop using the existing GUI removal behavior.",
 					wallpaper ? "desktop changed" : "desktops changed", arguments.ToArray(), constraints.ToArray(),
 					wallpaper ? "Wallpaper requires OS support or enabled per-desktop wallpaper. Position names are lowercase and case-sensitive."
-						: "Windows on the removed desktop move to the fallback selected by the existing removal operation. This is not application termination.",
+						: "Windows move to the specified existing fallback, which must differ from the deleted desktop. " +
+							"If the deleted desktop is current, the display also switches there. Without a fallback, existing removal behavior is preserved. " +
+							"Numbers use the order before deletion. This is not application termination.",
 					wallpaper ? "change-wallpaper" : "remove-desktop relocate-windows possible-switch",
 					wallpaper ? "--number 2 --position fill" : "--number 2", Q("desktop list", "desktop settings"));
 			}
