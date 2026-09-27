@@ -139,7 +139,7 @@ namespace SylphyHorn.Commands
 
 		internal static string Recognize(string[] args)
 		{
-			if (args != null && args.Length > 0 && (args[0] == "logs" || args[0] == "version")) return args[0];
+			if (args != null && args.Length > 0 && (args[0] == "logs" || args[0] == "version" || args[0] == "exit")) return args[0];
 			if (args == null || args.Length < 2) return null;
 			var operation = args[0] + " " + args[1];
 			if ((operation == "app assignment" || operation == "desktop autoclose") && args.Length >= 3) operation += " " + args[2];

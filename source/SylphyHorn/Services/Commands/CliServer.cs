@@ -11,13 +11,15 @@ namespace SylphyHorn.Services.Commands
 	internal sealed class CliServer
 	{
 		private readonly string _name;
+		private readonly Action _shutdown;
 		private readonly Func<CliCommand, CancellationToken, Task<CliResponse>> _execute;
 		private readonly CancellationTokenSource _stop = new CancellationTokenSource();
 		private readonly Task _completion;
 
-		internal CliServer(string name, Func<CliCommand, CancellationToken, Task<CliResponse>> execute)
+		internal CliServer(string name, Func<CliCommand, CancellationToken, Task<CliResponse>> execute, Action shutdown)
 		{
 			this._name = name;
+			this._shutdown = shutdown ?? throw new ArgumentNullException(nameof(shutdown));
 			this._execute = execute;
 			var first = this.CreatePipe();
 			this._completion = Task.Run(() => this.RunAsync(first));
@@ -96,6 +98,11 @@ namespace SylphyHorn.Services.Commands
 							}
 							catch (IOException) { }
 							catch (OperationCanceledException) { }
+							if (response.Command == "exit" && response.Success && response.Data?.Accepted == true)
+							{
+								this._shutdown();
+								return;
+							}
 						}
 					}
 					if (!this._stop.IsCancellationRequested) pipe = this.CreatePipe();

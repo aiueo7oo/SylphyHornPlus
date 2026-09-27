@@ -137,6 +137,8 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "exit")
+				return Task.FromResult(CliResponse.Ok("exit", new CliData { Accepted = true }));
 			if (command.Operation == "version")
 				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData { Host = CliVersionInfo.Read(typeof(ApplicationPreparation).Assembly) }));
 			if (command.Operation == "logs")
@@ -302,7 +304,8 @@ namespace SylphyHorn
 					this._cliServer = new Services.Commands.CliServer(
 						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
 						(command, token) => Application.Current.Dispatcher.InvokeAsync(
-							() => this.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap());
+							() => this.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap(),
+						() => Application.Current.Dispatcher.BeginInvoke(this._shutdownAction));
 				}
 				catch (Exception ex)
 				{

@@ -29,6 +29,10 @@ namespace SylphyHorn.Commands
 				"No GUI required for local information; host information requires a compatible running GUI in the same user session and elevation level.",
 			};
 			yield return version;
+			yield return C("exit", "Request normal shutdown of the connected SylphyHorn GUI host.", "accepted",
+				notes: "Acceptance does not confirm process exit or settings persistence. The host attempts to send the response before normal shutdown. " +
+					"Once accepted, shutdown proceeds even if the client disconnects. Use settings save first if its result must be checked.",
+				effects: "exit-host save-settings stop-monitoring");
 			yield return C("logs", "Read recent application logs from the current GUI host.", "logs totalCount omittedCount",
 				new[] { A("--limit", "integer", omission: "50", minimum: 1, maximum: int.MaxValue) },
 				notes: "Returns the latest entries in oldest-first order, with ISO 8601 timestamps, headers and full contents. " +

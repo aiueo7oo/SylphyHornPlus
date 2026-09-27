@@ -15,7 +15,7 @@ namespace SylphyHorn.Tests
 		{
 			var overview = await CliSpecService.ExecuteAsync(new[] { "spec" }, NeverQuery);
 			Assert.True(overview.Success);
-			Assert.Equal(52, overview.Data.Commands.Length);
+			Assert.Equal(53, overview.Data.Commands.Length);
 			var allowedQueries = new[] { "desktop list", "desktop settings", "window list", "app list", "app assignment list",
 				"app assignment status", "desktop autoclose list", "monitor list", "notification settings", "tray settings",
 				"desktop creation wallpaper list", "settings get", "startup status", "shortcut list", "shortcut keys" };

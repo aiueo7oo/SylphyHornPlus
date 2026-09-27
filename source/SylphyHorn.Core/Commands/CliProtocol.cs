@@ -139,6 +139,9 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "accepted", EmitDefaultValue = false)]
+		public bool? Accepted;
+
 		[DataMember(Name = "cli", EmitDefaultValue = false)]
 		public CliVersionInfo Cli;
 

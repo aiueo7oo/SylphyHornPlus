@@ -7,6 +7,14 @@ namespace SylphyHorn.Tests
 	public sealed class CliCommandTests
 	{
 		[Fact]
+		public void ExitAcceptsNoArguments()
+		{
+			Assert.Equal("exit", CliCommand.Parse(new[] { "exit" }).Operation);
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "exit", "--force" }));
+			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "app", "exit" }));
+		}
+
+		[Fact]
 		public void VersionIsSingleWordAndHasNoHostOption()
 		{
 			Assert.Equal("version", CliCommand.Parse(new[] { "version" }).Operation);
