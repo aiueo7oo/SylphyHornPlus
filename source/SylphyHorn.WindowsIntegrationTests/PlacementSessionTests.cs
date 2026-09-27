@@ -51,7 +51,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 				}
 				catch (OperationCanceledException) { }
 				Assert.True(pending.IsCompleted);
-				await Assert.ThrowsAsync<InvalidOperationException>(() => session.PreviewAsync(PlacementDesktopMap.Unavailable, TestContext.Current.CancellationToken));
+				await Assert.ThrowsAsync<PlacementRequestRejectedException>(() => session.PreviewAsync(PlacementDesktopMap.Unavailable, TestContext.Current.CancellationToken));
 			}
 			finally
 			{

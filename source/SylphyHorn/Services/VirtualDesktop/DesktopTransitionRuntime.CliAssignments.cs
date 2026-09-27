@@ -82,8 +82,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 					this._cliWindows.Remove(key);
 				if (this._cliWindows.Count > 4096 - 256)
 					return CliResponse.Fail(command.Operation, "host_busy", "Too many unexpired window identifiers. Retry after they expire.", true);
+				var request = this._placementSession.ApplyRulesAsync(this.PlacementDestinations, app, command.DryRun, cancellation);
 				submitted = !command.DryRun;
-				var application = await this._placementSession.ApplyRulesAsync(this.PlacementDestinations, app, command.DryRun, cancellation);
+				var application = await request;
 				var results = application.Preview.Items.Select(item =>
 				{
 					var previous = this._cliWindows.FirstOrDefault(pair => pair.Value.Identity.SameInstance(item.Identity));
@@ -116,6 +117,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 					Changed = results.Any(result => result.Outcome == "moved"),
 					Results = results,
 				});
+			}
+			catch (PlacementRequestRejectedException ex) when (!submitted)
+			{
+				return CliResponse.Fail(command.Operation, "host_busy", ex.Message, true);
 			}
 			catch (CliFailure ex)
 			{

@@ -308,6 +308,27 @@ namespace SylphyHorn.Tests
 			}
 		}
 
+		[Theory]
+		[InlineData(false, "host_busy", true)]
+		[InlineData(true, "result_unconfirmed", false)]
+		public async Task AdmissionRejectionIsDistinguishedFromFailureAfterAcceptance(bool accepted, string error, bool retryable)
+		{
+			var factory = new Factory();
+			var harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "source", ""), Entry(B, 1, "Development", "")), factory);
+			await harness.Runtime.InitializeAsync(false, CancellationToken.None);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, new[] { factory.Session.Preview.Items[0].Rule }));
+			factory.Session.RuleApplication = _ => throw new PlacementRequestRejectedException();
+			if (accepted)
+				factory.Session.RuleApplicationPending = Task.FromException<PlacementRuleApplication>(new InvalidOperationException("synthetic"));
+			harness.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "source", ""), Entry(B, 1, "Development", "")));
+			var response = await harness.Runtime.ApplyCliAssignmentsAsync(
+				CliCommand.Parse(new[] { "app", "assignment", "apply", "--all" }), CancellationToken.None);
+			Assert.False(response.Success);
+			Assert.Equal(error, response.Error.Code);
+			Assert.Equal(retryable, response.Error.Retryable);
+			await harness.Runtime.ShutdownAsync();
+		}
+
 		[Fact]
 		public async Task DryRunWindowIdsRemainStableAndPartialApplyPreservesConfirmedResults()
 		{

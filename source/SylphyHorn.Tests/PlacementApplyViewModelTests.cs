@@ -213,6 +213,7 @@ namespace SylphyHorn.Tests
 		internal readonly PlacementPreview Preview;
 		internal Task<PlacementPreview> PreviewPending;
 		internal Task<PlacementResult[]> ApplyPending;
+		internal Task<PlacementRuleApplication> RuleApplicationPending { get; set; }
 		internal Guid[] Selection;
 		internal int ApplyCalls;
 		internal CancellationToken Token;
@@ -239,7 +240,7 @@ namespace SylphyHorn.Tests
 		public Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation)
 		{
 			this.RequestedApp = app;
-			return Task.FromResult(this.RuleApplication?.Invoke(dryRun) ?? throw new NotSupportedException());
+			return this.RuleApplicationPending ?? Task.FromResult(this.RuleApplication?.Invoke(dryRun) ?? throw new NotSupportedException());
 		}
 
 		public bool IsReady => true;

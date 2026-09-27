@@ -8,6 +8,12 @@ using SylphyHorn.AppPlacement;
 
 namespace SylphyHorn.Services.AppPlacement
 {
+	internal sealed class PlacementRequestRejectedException : InvalidOperationException
+	{
+		internal PlacementRequestRejectedException()
+			: base("Placement is unavailable or another request is pending.") { }
+	}
+
 	internal interface IPlacementSession
 	{
 		bool IsReady { get; }
@@ -140,7 +146,7 @@ namespace SylphyHorn.Services.AppPlacement
 			lock (this._gate)
 			{
 				if (this._ended || !this.IsReady || this._cancellation.IsCancellationRequested || this._request != null || this._requestRunning)
-					throw new InvalidOperationException("Placement is unavailable or another request is pending.");
+					throw new PlacementRequestRejectedException();
 				var request = new Request<T>(action, cancellation);
 				this._request = request;
 				this._requestReady.Set();
