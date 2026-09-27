@@ -170,16 +170,19 @@ jobs:
               'windows11'
             )
             $actualTags = @($locale.Tags | Sort-Object)
+            $repositoryUrl = $locale.PackageUrl
+            $repositoryUrlsMatch =
+              $repositoryUrl -cin @('https://github.com/hwtnb/SylphyHornPlusWin11', 'https://github.com/hwtnb/SylphyHornPlus') -and
+              $locale.PublisherSupportUrl -ceq "$repositoryUrl/issues" -and
+              $locale.LicenseUrl -ceq "$repositoryUrl/blob/HEAD/LICENSE.txt"
             $localeContractMatches =
               $locale.PackageIdentifier -ceq 'hwtnb.SylphyHornPlus' -and
               $locale.PackageLocale -ceq 'en-US' -and
               $locale.Publisher -ceq 'hwtnb' -and
               $locale.PublisherUrl -ceq 'https://github.com/hwtnb' -and
-              $locale.PublisherSupportUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus/issues' -and
+              $repositoryUrlsMatch -and
               $locale.PackageName -ceq 'SylphyHornPlus' -and
-              $locale.PackageUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus' -and
               $locale.License -ceq 'MIT' -and
-              $locale.LicenseUrl -ceq 'https://github.com/hwtnb/SylphyHornPlus/blob/HEAD/LICENSE.txt' -and
               $locale.ShortDescription -ceq 'Virtual Desktop Tools for Windows 11 and 10.' -and
               @(Compare-Object $expectedTags $actualTags).Count -eq 0
             if (-not $localeContractMatches) {
