@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
 using Xunit;
 
@@ -141,6 +143,122 @@ namespace SylphyHorn.Tests
 				Assert.True(provider.TryGetValue<int>("Future.Unknown", out var unknown));
 				Assert.Equal(42, unknown);
 			});
+		}
+
+		[Theory]
+		[InlineData(false, false)]
+		[InlineData(false, true)]
+		[InlineData(true, false)]
+		[InlineData(true, true)]
+		public async Task StructuredSettingsSurviveOldReaderSaveAndCurrentImport(bool empty, bool legacyInput)
+		{
+			await WithTemporaryDirectory(async root =>
+			{
+				var file = new FileInfo(Path.Combine(root, "Settings.xml"));
+				var configuration = empty ? AppPlacementConfiguration.Empty : new AppPlacementConfiguration(true,
+					new[] { new AppPlacementRule(Guid.NewGuid(), true,
+						new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\Apps\Editor.exe"),
+						PlacementDestination.ByName("Work"), "Editor", followForeground: false) }, true, true,
+					new[] { PlacementDestination.ByNumber(3) }, false);
+				var groups = empty
+					? Array.Empty<PlacementCreatedGroup>()
+					: new[] { new PlacementCreatedGroup(new[] { Guid.NewGuid() }, true) };
+				var wallpapers = empty ? Array.Empty<DesktopWallpaperOnCreation>() : new[]
+				{
+					new DesktopWallpaperOnCreation("Work", null, @"C:\Images\work.png"),
+					new DesktopWallpaperOnCreation(null, 2, @"C:\Images\other.png"),
+				};
+				var values = new Dictionary<string, object>
+				{
+					[AppPlacementSettings.ConfigurationKey] = configuration,
+					[AppPlacementSettings.CreatedDesktopGroupsKey] = groups,
+					[DesktopWallpaperOnCreation.SettingsKey] = wallpapers,
+					["GeneralSettings.ChangeBackgroundEachDesktop"] = true,
+					["Future.Unknown"] = "preserved",
+				};
+				if (legacyInput)
+				{
+					using (var stream = File.Create(file.FullName))
+						new DataContractSerializer(typeof(IDictionary<string, object>), new[]
+						{
+							typeof(bool), typeof(int[]), typeof(AppPlacementConfiguration),
+							typeof(PlacementCreatedGroup[]), typeof(DesktopWallpaperOnCreation[]),
+						}).WriteObject(stream, values);
+					var legacyProvider = new ExplicitPathSettingsProvider(file);
+					await legacyProvider.LoadAsync();
+					await legacyProvider.SaveAsync();
+				}
+				else await AtomicSettingsFile.WriteAsync(values, file, KnownTypes);
+
+				// beta.16 knows only these primitive types and reads the entire dictionary at once.
+				var oldSerializer = new DataContractSerializer(typeof(IDictionary<string, object>), KnownTypes);
+				IDictionary<string, object> oldValues;
+				using (var stream = File.OpenRead(file.FullName))
+					oldValues = (IDictionary<string, object>)oldSerializer.ReadObject(stream);
+				Assert.IsType<string>(oldValues[AppPlacementSettings.ConfigurationKey]);
+				Assert.IsType<string>(oldValues[AppPlacementSettings.CreatedDesktopGroupsKey]);
+				Assert.IsType<string>(oldValues[DesktopWallpaperOnCreation.SettingsKey]);
+				Assert.True(Assert.IsType<bool>(oldValues["GeneralSettings.ChangeBackgroundEachDesktop"]));
+				oldValues["GeneralSettings.ChangeBackgroundEachDesktop"] = false;
+				using (var stream = File.Create(file.FullName)) oldSerializer.WriteObject(stream, oldValues);
+
+				var provider = new ExplicitPathSettingsProvider(new FileInfo(Path.Combine(root, "imported.xml")));
+				await provider.LoadAsync();
+				await provider.ImportAsync(file.FullName);
+				Assert.True(provider.TryGetValue<AppPlacementConfiguration>(AppPlacementSettings.ConfigurationKey, out var restored));
+				Assert.Equal(SerializeValue(configuration), SerializeValue(restored));
+				Assert.True(provider.TryGetValue<PlacementCreatedGroup[]>(AppPlacementSettings.CreatedDesktopGroupsKey, out var restoredGroups));
+				Assert.Equal(SerializeValue(groups), SerializeValue(restoredGroups));
+				Assert.True(provider.TryGetValue<DesktopWallpaperOnCreation[]>(DesktopWallpaperOnCreation.SettingsKey, out var restoredWallpapers));
+				Assert.Equal(SerializeValue(wallpapers), SerializeValue(restoredWallpapers));
+				Assert.True(provider.TryGetValue<bool>("GeneralSettings.ChangeBackgroundEachDesktop", out var changed));
+				Assert.False(changed);
+				var export = Path.Combine(root, "export.xml");
+				await provider.ExportAsync(export);
+				using (var stream = File.OpenRead(export))
+				{
+					var exported = (IDictionary<string, object>)oldSerializer.ReadObject(stream);
+					Assert.Equal(oldValues, exported);
+				}
+				Assert.Same(configuration, values[AppPlacementSettings.ConfigurationKey]);
+			});
+		}
+
+		[Theory]
+		[InlineData("not xml")]
+		[InlineData("<wrong />")]
+		[InlineData("<!DOCTYPE x [<!ENTITY value 'x'>]><x>&value;</x>")]
+		public async Task InvalidStructuredStringCannotReplaceActiveSettings(string payload)
+		{
+			await WithTemporaryDirectory(async root =>
+			{
+				var active = new FileInfo(Path.Combine(root, "active.xml"));
+				var provider = new ExplicitPathSettingsProvider(active);
+				await provider.LoadAsync();
+				provider.SetValue(AppPlacementSettings.ConfigurationKey, AppPlacementConfiguration.Empty);
+				await provider.SaveAsync();
+				var before = File.ReadAllBytes(active.FullName);
+				var invalid = Path.Combine(root, "invalid.xml");
+				using (var stream = File.Create(invalid))
+					new DataContractSerializer(typeof(IDictionary<string, object>), KnownTypes).WriteObject(stream,
+						new Dictionary<string, object> { [AppPlacementSettings.ConfigurationKey] = payload });
+				await Assert.ThrowsAnyAsync<Exception>(() => provider.PrepareImportAsync(invalid));
+				Assert.False(provider.ImportTransactionActive);
+				Assert.Equal(before, File.ReadAllBytes(active.FullName));
+				Assert.True(provider.TryGetValue<AppPlacementConfiguration>(AppPlacementSettings.ConfigurationKey, out var preserved));
+				Assert.False(preserved.Enabled);
+				var valid = await provider.PrepareImportAsync(active.FullName);
+				provider.DiscardStagedImport(valid);
+			});
+		}
+
+		private static string SerializeValue<T>(T value)
+		{
+			using (var stream = new MemoryStream())
+			{
+				new DataContractSerializer(typeof(T)).WriteObject(stream, value);
+				return Encoding.UTF8.GetString(stream.ToArray());
+			}
 		}
 
 		private static string ComputeHash(string path)

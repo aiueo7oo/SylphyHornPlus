@@ -283,7 +283,11 @@ namespace SylphyHorn.Tests
 				await provider.SaveAsync();
 				var original = File.ReadAllBytes(activePath);
 				var document = XDocument.Load(activePath);
-				document.Descendants().First(e => e.Name.LocalName == member).Value = invalid;
+				var value = document.Descendants().Single(e => e.Name.LocalName == "Key" && e.Value == Key)
+					.Parent.Elements().Single(e => e.Name.LocalName == "Value");
+				var payload = XDocument.Parse(value.Value);
+				payload.Descendants().First(e => e.Name.LocalName == member).Value = invalid;
+				value.Value = payload.ToString(SaveOptions.DisableFormatting);
 				var bad = Path.Combine(directory, "bad.xml");
 				document.Save(bad);
 				await Assert.ThrowsAnyAsync<Exception>(() => provider.PrepareImportAsync(bad));
@@ -308,10 +312,14 @@ namespace SylphyHorn.Tests
 				await provider.SaveAsync();
 				var before = File.ReadAllBytes(path);
 				var document = XDocument.Load(path);
-				var list = document.Descendants().Single(e => e.Name.LocalName == "Rules");
+				var value = document.Descendants().Single(e => e.Name.LocalName == "Key" && e.Value == Key)
+					.Parent.Elements().Single(e => e.Name.LocalName == "Value");
+				var payload = XDocument.Parse(value.Value);
+				var list = payload.Descendants().Single(e => e.Name.LocalName == "Rules");
 				var duplicate = new XElement(list.Elements().Single());
 				duplicate.Elements().Single(e => e.Name.LocalName == "Id").Value = Guid.NewGuid().ToString();
 				list.Add(duplicate);
+				value.Value = payload.ToString(SaveOptions.DisableFormatting);
 				var imported = Path.Combine(directory, "duplicate.xml");
 				document.Save(imported);
 				await Assert.ThrowsAsync<SerializationException>(() => provider.PrepareImportAsync(imported));

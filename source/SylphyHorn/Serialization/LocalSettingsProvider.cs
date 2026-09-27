@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Xml;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Properties;
 
 namespace SylphyHorn.Serialization
@@ -84,6 +85,31 @@ namespace SylphyHorn.Serialization
 
 	internal static class AtomicSettingsFile
 	{
+		// Older versions can preserve string values without knowing the feature's CLR types.
+		private static readonly Dictionary<string, Type> StructuredTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
+		{
+			[AppPlacementSettings.ConfigurationKey] = typeof(AppPlacementConfiguration),
+			[AppPlacementSettings.CreatedDesktopGroupsKey] = typeof(PlacementCreatedGroup[]),
+			[DesktopWallpaperOnCreation.SettingsKey] = typeof(DesktopWallpaperOnCreation[]),
+		};
+
+		private static IDictionary<string, object> EncodeValues(IDictionary<string, object> values)
+		{
+			var stored = new Dictionary<string, object>(values, StringComparer.Ordinal);
+			foreach (var entry in StructuredTypes)
+			{
+				if (!values.TryGetValue(entry.Key, out var value)) continue;
+				if (value == null || value.GetType() != entry.Value) throw new SerializationException("Invalid settings value: " + entry.Key);
+				using (var output = new StringWriter())
+				{
+					using (var writer = XmlWriter.Create(output, new XmlWriterSettings { OmitXmlDeclaration = true }))
+						new DataContractSerializer(entry.Value).WriteObject(writer, value);
+					stored[entry.Key] = output.ToString();
+				}
+			}
+			return stored;
+		}
+
 		internal static Task WriteAsync(IDictionary<string, object> dictionary, FileInfo targetFile, Type[] knownTypes)
 		{
 			if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
@@ -94,13 +120,14 @@ namespace SylphyHorn.Serialization
 				var tempPath = Path.Combine(targetFile.DirectoryName, targetFile.Name + "." + Guid.NewGuid().ToString("N") + ".tmp");
 				try
 				{
-					var serializer = new DataContractSerializer(dictionary.GetType(), knownTypes);
+					var stored = EncodeValues(dictionary);
+					var serializer = new DataContractSerializer(typeof(IDictionary<string, object>), knownTypes);
 					var writerSettings = new XmlWriterSettings { Indent = true, CloseOutput = false };
 					using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
 					{
 						using (var writer = XmlWriter.Create(stream, writerSettings))
 						{
-							serializer.WriteObject(writer, dictionary);
+							serializer.WriteObject(writer, stored);
 							writer.Flush();
 						}
 						stream.Flush(true);
@@ -123,7 +150,23 @@ namespace SylphyHorn.Serialization
 				if (!File.Exists(file.FullName)) return null;
 				var serializer = new DataContractSerializer(typeof(IDictionary<string, object>), knownTypes);
 				using (var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.Read))
-					return serializer.ReadObject(stream) as IDictionary<string, object>;
+				{
+					var values = serializer.ReadObject(stream) as IDictionary<string, object>;
+					if (values == null) return null;
+					foreach (var entry in StructuredTypes)
+					{
+						if (values.TryGetValue(entry.Key, out var value) && value is string xml)
+						{
+							using (var input = new StringReader(xml))
+							using (var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }))
+							{
+								values[entry.Key] = new DataContractSerializer(entry.Value).ReadObject(reader);
+								if (reader.MoveToContent() != XmlNodeType.None) throw new SerializationException("Unexpected content after a settings value.");
+							}
+						}
+					}
+					return values;
+				}
 			});
 		}
 

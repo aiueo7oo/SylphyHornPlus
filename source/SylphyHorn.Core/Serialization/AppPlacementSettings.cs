@@ -8,6 +8,7 @@ namespace SylphyHorn.Serialization
 	public sealed class AppPlacementSettings : SettingsHost
 	{
 		internal const string ConfigurationKey = "AppPlacementSettings.Configuration";
+		internal const string CreatedDesktopGroupsKey = "AppPlacementSettings.CreatedDesktopGroups";
 		private readonly ISerializationProvider _provider;
 
 		public AppPlacementSettings(ISerializationProvider provider)
@@ -21,7 +22,7 @@ namespace SylphyHorn.Serialization
 
 		internal static void ValidateEntry(string key, object value)
 		{
-			if (key == "AppPlacementSettings.CreatedDesktopGroups" && (!(value is PlacementCreatedGroup[] groups) || Array.Exists(groups, group => group == null)))
+			if (key == CreatedDesktopGroupsKey && (!(value is PlacementCreatedGroup[] groups) || Array.Exists(groups, group => group == null)))
 				throw new SerializationException("Invalid created desktop groups.");
 			if (key == ConfigurationKey && !(value is AppPlacementConfiguration))
 				throw new SerializationException("Invalid app placement configuration.");
