@@ -180,6 +180,20 @@ namespace SylphyHorn.Tests
 								SylphyHorn.Services.ResourceService.Current.ChangeCulture(originalSetting);
 								Resources.Culture = CultureInfo.GetCultureInfo(culture);
 							}
+							fixture.Model.CloseCreatedDesktops = true;
+							foreach (var enabled in new[] { false, true })
+							{
+								fixture.Model.IsEnabled = enabled;
+								foreach (var createMissing in new[] { false, true })
+								{
+									fixture.Model.CreateMissingDesktops = createMissing;
+									Render(closeView, scale);
+									var closeCreated = Assert.Single(Descendants(closeView).OfType<CheckBox>());
+									Assert.Equal(enabled && createMissing, closeCreated.IsEnabled);
+									Assert.True(closeCreated.IsChecked);
+									Assert.True(fixture.Settings.Configuration.Value.CloseCreatedDesktops);
+								}
+							}
 							Assert.Empty(errors.Messages);
 						}
 						completion.TrySetResult(true);

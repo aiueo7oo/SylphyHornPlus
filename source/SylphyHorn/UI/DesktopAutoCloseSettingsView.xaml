@@ -25,7 +25,7 @@
 			<TextBlock Text="{Binding Text[CloseHint]}" Style="{StaticResource InlineMessage}" Margin="8,0,0,8" />
 			<CheckBox Content="{Binding Text[CloseCreated]}"
 			          IsChecked="{Binding CloseCreatedDesktops}"
-			          IsEnabled="{Binding CreateMissingDesktops}"
+			          IsEnabled="{Binding CanConfigureCreatedDesktopClosing}"
 			          Margin="8,0,0,8" />
 			<ItemsControl ItemsSource="{Binding ClosingGroups}" Focusable="False">
 				<ItemsControl.ItemTemplate>

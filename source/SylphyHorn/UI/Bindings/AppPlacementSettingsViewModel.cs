@@ -370,6 +370,8 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		public bool CanConfigureCreatedDesktopClosing => this.IsEnabled && this.CreateMissingDesktops;
+
 		public IReadOnlyList<PlacementClosingGroup> ClosingGroups { get; }
 
 		public bool CloseCreatedDesktops
@@ -505,6 +507,7 @@ namespace SylphyHorn.UI.Bindings
 			if (this._disposed) return;
 			this.OnPropertyChanged(nameof(this.IsEnabled));
 			this.OnPropertyChanged(nameof(this.CreateMissingDesktops));
+			this.OnPropertyChanged(nameof(this.CanConfigureCreatedDesktopClosing));
 			this.OnPropertyChanged(nameof(this.FollowForeground));
 			this.OnPropertyChanged(nameof(this.DefaultFollowOption));
 			this.RefreshFollowOptions();
