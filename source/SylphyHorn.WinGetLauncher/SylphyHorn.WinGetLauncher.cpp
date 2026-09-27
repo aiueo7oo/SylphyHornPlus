@@ -236,8 +236,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 	startupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 	constexpr BOOL inheritHandles = TRUE;
+	const wchar_t* workingDirectory = nullptr;
 #else
 	constexpr BOOL inheritHandles = FALSE;
+	const auto workingDirectory = installationDirectory.c_str();
 #endif
 	PROCESS_INFORMATION processInformation{};
 	if (!CreateProcessW(
@@ -248,7 +250,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		inheritHandles,
 		0,
 		nullptr,
-		installationDirectory.c_str(),
+		workingDirectory,
 		&startupInfo,
 		&processInformation))
 	{

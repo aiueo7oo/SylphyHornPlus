@@ -1420,6 +1420,13 @@ if ($canExecuteTarget) {
 	Assert-Condition ($LASTEXITCODE -eq 0) `
 		"CLI WinGet portable alias integration test failed."
 
+	$cliWorkingDirectoryTestResult = & $winGetAliasTest `
+		-LauncherPath (Join-Path $wrapperRoot "sylphyhorn-cli.WinGetLauncher.exe") `
+		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
+		-Cli -RequireSymbolicLink:($env:GITHUB_ACTIONS -ceq "true")
+	Assert-Condition ($LASTEXITCODE -eq 0) `
+		"CLI launcher working-directory test failed."
+
 	$winGetAliasTestResult = & $winGetAliasTest `
 		-LauncherPath (Join-Path $wrapperRoot "SylphyHorn.WinGetLauncher.exe") `
 		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
@@ -1428,6 +1435,10 @@ if ($canExecuteTarget) {
 		"WinGet portable alias integration test failed."
 }
 else {
+	$cliWorkingDirectoryTestResult = [pscustomobject]@{
+		Status = "NotRun"
+		Reason = "HostArchitectureCannotExecuteArm64"
+	}
 	$cliWinGetAliasTestResult = [pscustomobject]@{
 		Status = "NotRun"
 		Reason = "HostArchitectureCannotExecuteArm64"
@@ -1710,6 +1721,8 @@ $result = [ordered]@{
 			Join-Path $wrapperRoot "sylphyhorn-cli.WinGetLauncher.exe")).Machine
 	CliWinGetAliasTestStatus = $cliWinGetAliasTestResult.Status
 	CliWinGetAliasTestReason = $cliWinGetAliasTestResult.Reason
+	CliWorkingDirectoryTestStatus = $cliWorkingDirectoryTestResult.Status
+	CliWorkingDirectoryTestReason = $cliWorkingDirectoryTestResult.Reason
 	WinGetAliasTestStatus = $winGetAliasTestResult.Status
 	WinGetAliasTestReason = $winGetAliasTestResult.Reason
 	PdbCount            = 0

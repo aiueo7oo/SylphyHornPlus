@@ -9,7 +9,10 @@ param(
 	[string] $ProbePath,
 
 	[Parameter()]
-	[switch] $RequireSymbolicLink
+	[switch] $RequireSymbolicLink,
+
+	[Parameter()]
+	[switch] $Cli
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,31 +39,38 @@ $temporaryRoot = Join-Path `
 	("SylphyHornPlus-AliasTest-{0}" -f ([guid]::NewGuid().ToString("N")))
 $packageRoot = Join-Path $temporaryRoot "package with spaces"
 $linksRoot = Join-Path $temporaryRoot "WinGet Links"
-$aliasPath = Join-Path $linksRoot "SylphyHornPlus.exe"
-$probePath = Join-Path $packageRoot "SylphyHorn.exe"
+$aliasName = if ($Cli) { "sylphyhorn-cli.exe" } else { "SylphyHornPlus.exe" }
+$targetName = if ($Cli) { "sylphyhorn-cli.exe" } else { "SylphyHorn.exe" }
+$launcherName = if ($Cli) { "sylphyhorn-cli.WinGetLauncher.exe" } else { "SylphyHorn.WinGetLauncher.exe" }
+$aliasPath = Join-Path $linksRoot $aliasName
+$probePath = Join-Path $packageRoot $targetName
+$usedSymbolicLink = $true
 $markerPath = Join-Path $temporaryRoot "alias-launched.txt"
 $launcherProcess = $null
+$createdRoot = $null
+$directoryMarkerName = "cwd-{0}.txt" -f [guid]::NewGuid().ToString("N")
+$directoryMarkerValue = [guid]::NewGuid().ToString("N")
 
 try {
 	New-Item -ItemType Directory -Path $packageRoot, $linksRoot | Out-Null
+	$createdRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path
+	$expectedDirectory = if ($Cli) { $linksRoot } else { $packageRoot }
+	Set-Content -LiteralPath (Join-Path $expectedDirectory $directoryMarkerName) -Value $directoryMarkerValue -NoNewline
 	Copy-Item -LiteralPath $resolvedLauncher -Destination `
-		(Join-Path $packageRoot "SylphyHorn.WinGetLauncher.exe")
+		(Join-Path $packageRoot $launcherName)
 	Copy-Item -LiteralPath $resolvedProbe -Destination $probePath
 	try {
 		New-Item -ItemType SymbolicLink -Path $aliasPath -Target `
-			(Join-Path $packageRoot "SylphyHorn.WinGetLauncher.exe") | Out-Null
+			(Join-Path $packageRoot $launcherName) | Out-Null
 	}
 	catch [System.UnauthorizedAccessException] {
 		if ($RequireSymbolicLink) {
 			throw
 		}
 
-		Write-Warning `
-			"WinGet alias integration test skipped because symbolic-link creation is not permitted."
-		return [pscustomobject]@{
-			Status = "Skipped"
-			Reason = "SymbolicLinkPrivilegeUnavailable"
-		}
+		Write-Warning "Symbolic-link creation is not permitted; testing the launcher directly."
+		$aliasPath = Join-Path $packageRoot $launcherName
+		$usedSymbolicLink = $false
 	}
 
 	$expectedArguments = @(
@@ -73,6 +83,7 @@ try {
 	$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
 	$startInfo.FileName = $aliasPath
 	$startInfo.UseShellExecute = $false
+	$startInfo.WorkingDirectory = $linksRoot
 	$startInfo.Environment["SYLPHYHORN_ALIAS_TEST_RESULT"] = $markerPath
 	foreach ($argument in $expectedArguments) {
 		$startInfo.ArgumentList.Add($argument)
@@ -120,6 +131,12 @@ try {
 					"The alias probe result ended inside argument $index."
 				$actualArguments += [Text.Encoding]::Unicode.GetString($bytes)
 			}
+			$directoryLength = $reader.ReadUInt32()
+			$workingDirectory = [Text.Encoding]::Unicode.GetString($reader.ReadBytes($directoryLength * 2))
+			$directoryMarker = Join-Path $workingDirectory $directoryMarkerName
+			Assert-Condition ((Test-Path -LiteralPath $directoryMarker -PathType Leaf) -and
+				(Get-Content -LiteralPath $directoryMarker -Raw) -ceq $directoryMarkerValue) `
+				"Unexpected child working directory: $workingDirectory (expected $expectedDirectory)."
 			Assert-Condition ($stream.Position -eq $stream.Length) `
 				"The alias probe result contains trailing data."
 		}
@@ -156,8 +173,8 @@ try {
 	}
 
 	return [pscustomobject]@{
-		Status = "Passed"
-		Reason = $null
+		Status = if ($usedSymbolicLink) { "Passed" } else { "DirectOnly" }
+		Reason = if ($usedSymbolicLink) { $null } else { "SymbolicLinkPrivilegeUnavailable" }
 	}
 }
 finally {
@@ -169,6 +186,11 @@ finally {
 		$launcherProcess.Dispose()
 	}
 	if (Test-Path -LiteralPath $temporaryRoot) {
-		Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+		$resolvedTemporaryRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path
+		if ($resolvedTemporaryRoot -ne $createdRoot -or
+			-not [IO.Path]::GetFileName($resolvedTemporaryRoot).StartsWith("SylphyHornPlus-AliasTest-")) {
+			throw "Unexpected alias test cleanup path: $resolvedTemporaryRoot"
+		}
+		Remove-Item -LiteralPath $resolvedTemporaryRoot -Recurse -Force
 	}
 }
