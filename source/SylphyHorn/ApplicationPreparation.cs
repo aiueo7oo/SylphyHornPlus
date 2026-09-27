@@ -137,6 +137,21 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "logs")
+			{
+				var entries = LoggingService.Instance.GetRecent(command.Limit, out var totalCount);
+				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData
+				{
+					Logs = entries.Select(entry => new CliLog
+					{
+						Timestamp = entry.Log.DateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+						Header = entry.Log.Header,
+						Content = entry.Log.Content,
+					}).ToArray(),
+					TotalCount = totalCount,
+					OmittedCount = totalCount - entries.Length,
+				}));
+			}
 			if (command.Operation == "settings reset")
 				return this._cliSettingsReset.ExecuteAsync(command, cancellation);
 			if (command.Operation == "settings export" || command.Operation == "settings import")

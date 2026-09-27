@@ -37,6 +37,17 @@ namespace SylphyHorn.Services
 
 		private LoggingService() { }
 
+		internal LogEntry[] GetRecent(int limit, out int totalCount)
+		{
+			if (limit < 1) throw new ArgumentOutOfRangeException(nameof(limit));
+			lock (this._gate)
+			{
+				totalCount = this._logs.Count;
+				var start = Math.Max(0, totalCount - limit);
+				return this._logs.Skip(start).Select((log, index) => new LogEntry(start + index + 1L, log)).ToArray();
+			}
+		}
+
 		public void Register(ILog log)
 		{
 			lock (this._gate)

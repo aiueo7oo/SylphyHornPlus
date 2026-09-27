@@ -20,6 +20,11 @@ namespace SylphyHorn.Commands
 
 		private static IEnumerable<CliCommandSpec> Build()
 		{
+			yield return C("logs", "Read recent application logs from the current GUI host.", "logs totalCount omittedCount",
+				new[] { A("--limit", "integer", omission: "50", minimum: 1, maximum: int.MaxValue) },
+				notes: "Returns the latest entries in oldest-first order, with ISO 8601 timestamps, headers and full contents. " +
+					"totalCount includes entries omitted by the limit; omittedCount reports that difference. Logs are retained only for this host lifetime. " +
+					"If the response exceeds the transport size limit, request fewer entries.", example: "--limit 50");
 			yield return C("desktop list", "Read desktops in current order and their IDs, names and wallpaper state.", "desktops",
 				queries: Q("desktop list"));
 			yield return C("desktop switch", "Switch the displayed desktop.", "desktop changed",

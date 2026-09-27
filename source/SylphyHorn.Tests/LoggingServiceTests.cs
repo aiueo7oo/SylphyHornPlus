@@ -21,6 +21,24 @@ namespace SylphyHorn.Tests
 		private const int TimeoutMilliseconds = 10000;
 
 		[Fact]
+		public void RecentSnapshotReturnsNewestEntriesInOrderWithoutClearingHistory()
+		{
+			var service = LoggingService.Instance;
+			var first = new TestLog("recent-first");
+			var second = new TestLog("recent-second");
+			service.Register(first);
+			service.Register(second);
+
+			var entries = service.GetRecent(2, out var total);
+			Assert.Equal(new[] { first, second }, entries.Select(entry => entry.Log));
+			var latest = service.GetRecent(1, out var unchangedTotal);
+			Assert.Equal(total, unchangedTotal);
+			Assert.Same(second, Assert.Single(latest).Log);
+			Assert.Equal(total, service.GetRecent(int.MaxValue, out _).Length);
+			Assert.Equal(entries[1].Sequence, latest[0].Sequence);
+		}
+
+		[Fact]
 		public void SubscribeIncludesPreexistingLogsExactlyOnceInSnapshot()
 		{
 			var service = LoggingService.Instance;

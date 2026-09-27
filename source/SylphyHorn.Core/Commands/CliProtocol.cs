@@ -82,8 +82,30 @@ namespace SylphyHorn.Commands
 	}
 
 	[DataContract]
+	internal sealed class CliLog
+	{
+		[DataMember(Name = "timestamp")]
+		public string Timestamp;
+
+		[DataMember(Name = "header")]
+		public string Header;
+
+		[DataMember(Name = "content")]
+		public string Content;
+	}
+
+	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "logs", EmitDefaultValue = false)]
+		public CliLog[] Logs;
+
+		[DataMember(Name = "totalCount", EmitDefaultValue = false)]
+		public int? TotalCount;
+
+		[DataMember(Name = "omittedCount", EmitDefaultValue = false)]
+		public int? OmittedCount;
+
 		[DataMember(Name = "wallpapersOnCreation", EmitDefaultValue = false)]
 		public CliCreationWallpaper[] WallpapersOnCreation;
 

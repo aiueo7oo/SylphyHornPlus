@@ -6,6 +6,25 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Fact]
+		public void LogsAcceptsSingleWordCommandAndDefaultsToFiftyEntries()
+		{
+			Assert.Equal("logs", CliCommand.Recognize(new[] { "logs" }));
+			Assert.Equal(50, CliCommand.Parse(new[] { "logs" }).Limit);
+			Assert.Equal(3, CliCommand.Parse(new[] { "logs", "--limit", "3" }).Limit);
+		}
+
+		[Theory]
+		[InlineData("logs list")]
+		[InlineData("logs --limit")]
+		[InlineData("logs --limit 0")]
+		[InlineData("logs --limit -1")]
+		[InlineData("logs --limit 2147483648")]
+		[InlineData("logs --limit 1 --limit 2")]
+		[InlineData("logs --unknown 1")]
+		public void LogsRejectsInvalidOptions(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
 		[Theory]
 		[InlineData("desktop configure")]
 		[InlineData("notification configure")]

@@ -11,6 +11,30 @@ namespace SylphyHorn.Tests
 	public sealed class CliProtocolTests
 	{
 		[Fact]
+		public void LogsPreservesEmptyResultsAndMultilineContents()
+		{
+			var data = new CliData { Logs = Array.Empty<CliLog>(), TotalCount = 0, OmittedCount = 0 };
+			var empty = CliProtocol.Deserialize<CliResponse>(CliProtocol.Serialize(CliResponse.Ok("logs", data)));
+			Assert.Empty(empty.Data.Logs);
+			Assert.Equal(0, empty.Data.TotalCount);
+			Assert.Equal(0, empty.Data.OmittedCount);
+
+			data.Logs = new[]
+			{
+				new CliLog { Timestamp = "2026-09-27T12:00:00.0000000+09:00", Header = "エラー", Content = "first\nsecond" },
+			};
+			data.TotalCount = 4;
+			data.OmittedCount = 3;
+			var result = CliProtocol.Deserialize<CliResponse>(CliProtocol.Serialize(CliResponse.Ok("logs", data)));
+			Assert.Equal("logs", result.Command);
+			Assert.Equal(data.Logs[0].Timestamp, result.Data.Logs[0].Timestamp);
+			Assert.Equal("エラー", result.Data.Logs[0].Header);
+			Assert.Equal("first\nsecond", result.Data.Logs[0].Content);
+			Assert.Equal(4, result.Data.TotalCount);
+			Assert.Equal(3, result.Data.OmittedCount);
+		}
+
+		[Fact]
 		public void AssignmentStatusPreservesDisabledSettingsAndBothClosingTargetKinds()
 		{
 			var response = CliResponse.Ok("app assignment status", new CliData

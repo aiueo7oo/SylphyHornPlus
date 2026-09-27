@@ -6,6 +6,8 @@ namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		internal int Limit { get; private set; } = 50;
+
 		internal bool ConfirmReset { get; private set; }
 
 		internal string FilePath { get; private set; }
@@ -137,6 +139,7 @@ namespace SylphyHorn.Commands
 
 		internal static string Recognize(string[] args)
 		{
+			if (args != null && args.Length > 0 && args[0] == "logs") return "logs";
 			if (args == null || args.Length < 2) return null;
 			var operation = args[0] + " " + args[1];
 			if ((operation == "app assignment" || operation == "desktop autoclose") && args.Length >= 3) operation += " " + args[2];
@@ -147,7 +150,7 @@ namespace SylphyHorn.Commands
 		internal static CliCommand Parse(string[] args)
 		{
 			if (args == null) throw new ArgumentNullException(nameof(args));
-			if (args.Length < 2) throw new ArgumentException("Specify a command.");
+			if (args.Length == 0) throw new ArgumentException("Specify a command.");
 			var command = new CliCommand { Operation = Recognize(args) };
 			if (command.Operation == null) throw new ArgumentException("Unknown command.");
 			var assignment = command.Operation.StartsWith("app assignment ", StringComparison.Ordinal);
@@ -155,11 +158,17 @@ namespace SylphyHorn.Commands
 			var creationWallpaper = command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal);
 
 			var options = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = creationWallpaper ? 4 : assignment || autoclose ? 3 : 2; i < args.Length; i++)
+			for (var i = command.Operation.Split(' ').Length; i < args.Length; i++)
 			{
 				var option = args[i];
 				if (!options.Add(option)) throw new ArgumentException("Duplicate option: " + option);
-				if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && (option == "--name" || option == "--number"))
+				if (command.Operation == "logs" && option == "--limit")
+				{
+					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var limit) || limit < 1)
+						throw new ArgumentException("--limit requires a positive integer.");
+					command.Limit = limit;
+				}
+				else if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && (option == "--name" || option == "--number"))
 				{
 					var value = ReadValue(args, ref i);
 					if (option == "--number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
