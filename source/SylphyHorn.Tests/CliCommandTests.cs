@@ -6,6 +6,14 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliCommandTests
 	{
+		[Theory]
+		[InlineData("settings save --path settings.xml")]
+		[InlineData("settings save --yes")]
+		[InlineData("app assignment resume --enabled true")]
+		[InlineData("app assignment resume --all")]
+		public void RecoveryCommandsRejectArguments(string args)
+			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
 		[Fact]
 		public void LogsAcceptsSingleWordCommandAndDefaultsToFiftyEntries()
 		{

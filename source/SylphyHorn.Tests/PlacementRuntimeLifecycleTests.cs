@@ -11,6 +11,62 @@ namespace SylphyHorn.Tests
 {
 	public sealed class PlacementRuntimeLifecycleTests
 	{
+#if !NETFRAMEWORK
+		[Fact]
+		public async Task CliResumeOnlyRestartsPausedMonitoringAndPreservesConfiguration()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			var command = SylphyHorn.Commands.CliCommand.Parse(new[] { "app", "assignment", "resume" });
+			Assert.Equal("assignment_unavailable", (await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None)).Error.Code);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>()));
+			Assert.Equal("assignment_unavailable", (await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None)).Error.Code);
+			Assert.Equal("request_cancelled", (await harness.Runtime.ResumeCliPlacementAsync(command, new CancellationToken(true))).Error.Code);
+			Assert.Empty(factory.Sessions);
+
+			var configuration = PlacementProcessorTests.Configuration();
+			await harness.Runtime.ConfigurePlacementAsync(configuration);
+			var preparing = await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None);
+			Assert.True(preparing.Success);
+			Assert.False(preparing.Data.Changed);
+			Assert.Equal("preparing", preparing.Data.AssignmentStatus);
+			factory.Sessions[0].IsReady = true;
+			var active = await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None);
+			Assert.False(active.Data.Changed);
+			Assert.Equal("active", active.Data.AssignmentStatus);
+			Assert.Single(factory.Sessions);
+
+			factory.Sessions[0].Release();
+			var resumed = await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None);
+			Assert.True(resumed.Success);
+			Assert.True(resumed.Data.Changed);
+			Assert.Equal("preparing", resumed.Data.AssignmentStatus);
+			Assert.Equal(2, factory.Sessions.Count);
+			Assert.Same(configuration, factory.Sessions[1].Configuration);
+			var stopping = harness.Runtime.ConfigurePlacementAsync(AppPlacementConfiguration.Empty);
+			Assert.Equal("host_busy", (await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None)).Error.Code);
+			factory.Sessions[1].Release();
+			await stopping;
+			await harness.Runtime.ShutdownAsync();
+		}
+
+		[Fact]
+		public async Task CliResumeDoesNotReportSuccessWhenTheWorkerCannotStart()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(PlacementProcessorTests.Configuration());
+			factory.Sessions[0].Release();
+			factory.FailStart = true;
+			var command = SylphyHorn.Commands.CliCommand.Parse(new[] { "app", "assignment", "resume" });
+			var result = await harness.Runtime.ResumeCliPlacementAsync(command, CancellationToken.None);
+			Assert.False(result.Success);
+			Assert.Equal("assignment_unavailable", result.Error.Code);
+			Assert.Equal("Paused", harness.Runtime.PlacementStatus);
+			await harness.Runtime.ShutdownAsync();
+		}
+#endif
+
 		[Theory]
 		[InlineData(false)]
 		[InlineData(true)]
@@ -600,12 +656,15 @@ namespace SylphyHorn.Tests
 		{
 			internal readonly List<Session> Sessions = new List<Session>();
 
+			internal bool FailStart { get; set; }
+
 			public IPlacementSession Start(
 				AppPlacementConfiguration configuration,
 				Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize,
 				PlacementHistory history,
 				Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
 			{
+				if (this.FailStart) throw new InvalidOperationException("synthetic");
 				var session = new Session(configuration, authorize) { Close = closeDesktops };
 				this.Sessions.Add(session);
 				return session;

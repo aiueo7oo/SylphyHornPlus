@@ -97,6 +97,9 @@ namespace SylphyHorn.Commands
 	[DataContract]
 	internal sealed class CliData
 	{
+		[DataMember(Name = "saved", EmitDefaultValue = false)]
+		public bool? Saved;
+
 		[DataMember(Name = "logs", EmitDefaultValue = false)]
 		public CliLog[] Logs;
 

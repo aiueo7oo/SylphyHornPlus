@@ -102,6 +102,10 @@ namespace SylphyHorn.Commands
 				yield return C("app assignment " + verb, verb == "list" ? "Read saved application assignment rules." : "Read assignment configuration and monitoring status.",
 					verb == "list" ? "assignments assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets" : "assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets",
 					queries: Q("app assignment " + verb));
+			yield return C("app assignment resume", "Resume paused automatic placement monitoring without changing settings.", "assignmentStatus changed",
+				notes: "Paused monitoring starts a fresh session. Active or preparing monitoring is left unchanged. Disabled placement or no rules returns " +
+					"assignment_unavailable; temporary suspension returns host_busy. A preparing result is not confirmation of active monitoring. " +
+					"Does not bulk-apply rules to existing windows.", effects: "resume-monitoring", queries: Q("app assignment status"));
 			yield return C("app assignment configure", "Change automatic assignment, desktop creation and closure settings.",
 				"assignments assignmentEnabled assignmentStatus createMissingDesktops followForeground closeCreatedDesktops closingTargets changed",
 				Bools("--enabled --create-missing-desktops --close-created-desktops --follow-foreground"), new[] { Some("--enabled --create-missing-desktops --close-created-desktops --follow-foreground") },
@@ -191,6 +195,9 @@ namespace SylphyHorn.Commands
 				notes: "Not a merge. true applies saved desktop count, names and wallpaper paths; false still applies other settings and wallpaper positions. Startup " +
 					"registrations are unaffected. Partial failure is not a rollback guarantee.",
 				effects: "replace-settings possible-create-remove-desktops", example: "--path backup.xml --apply-desktops false");
+			yield return C("settings save", "Save the current in-memory application settings to the normal settings file.", "saved",
+				notes: "Saves current committed settings, not the values from a previous failed save. Does not commit unfinished GUI edits, " +
+					"change preferences or apply wallpapers. No prior save failure is required. Use settings export for a separate file.", effects: "persist-settings");
 			yield return C("settings reset", "Reset application settings using the GUI reset transaction.", "reset",
 				new[] { Flag("--yes", true) }, notes: "Clears rules and restores defaults. Preserves desktop count, order, names, wallpaper paths and startup registrations; wallpaper positions become " +
 					"Fill. Export first if a backup is needed. Does not restart the app.",

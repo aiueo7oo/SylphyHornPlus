@@ -164,6 +164,8 @@ namespace SylphyHorn
 				return this._cliSettings.ExecuteAsync(command, cancellation);
 			if (command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
 				return this._cliCreationWallpapers.ExecuteAsync(command, cancellation);
+			if (command.Operation == "app assignment resume")
+				return this._desktopRuntime.ResumeCliPlacementAsync(command, cancellation);
 			if (command.Operation == "app assignment apply")
 				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
 			if (command.Operation == "app list" || command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)

@@ -11,6 +11,45 @@ namespace SylphyHorn.Services.DesktopTransitions
 {
 	internal sealed partial class DesktopTransitionRuntime
 	{
+		internal async Task<CliResponse> ResumeCliPlacementAsync(CliCommand command, CancellationToken cancellation)
+		{
+			this.EnsureOwnerAccess();
+			var submitted = false;
+			try
+			{
+				this.EnsureCliAvailable(cancellation);
+				var status = this.PlacementStatus;
+				if (status == "Stopping" || status == "Suspended")
+					return CliResponse.Fail(command.Operation, "host_busy", "Placement is being stopped or suspended.", true);
+				if (status == "Disabled" || status == "NoRules")
+					return CliResponse.Fail(command.Operation, "assignment_unavailable",
+						"Enable automatic placement and configure an enabled rule or closing target first.");
+				if (status == "Paused")
+				{
+					submitted = true;
+					await this.RestartPlacementAsync().WaitAsync(cancellation);
+					this.EnsureCliAvailable(cancellation);
+					status = this.PlacementStatus;
+					if (status != "Active" && status != "Preparing")
+						return CliResponse.Fail(command.Operation, "assignment_unavailable", "Monitoring did not resume. Read assignment status and logs before retrying.");
+				}
+				return CliResponse.Ok(command.Operation, new CliData { Changed = submitted, AssignmentStatus = status.ToLowerInvariant() });
+			}
+			catch (CliFailure failure)
+			{
+				return CliResponse.Fail(command.Operation, submitted ? "result_unconfirmed" : failure.Code, failure.Message, !submitted && failure.Retryable);
+			}
+			catch (OperationCanceledException)
+			{
+				return CliResponse.Fail(command.Operation, submitted ? "result_unconfirmed" : "request_cancelled", "Read assignment status before retrying.");
+			}
+			catch (Exception ex)
+			{
+				this.ReportFault(new DesktopRuntimeFault("Cli.ResumePlacement", ex.GetType()));
+				return CliResponse.Fail(command.Operation, submitted ? "result_unconfirmed" : "operation_failed", "Monitoring could not be resumed.");
+			}
+		}
+
 		internal async Task<CliResponse> ApplyCliAssignmentsAsync(CliCommand command, CancellationToken cancellation)
 		{
 			this.EnsureOwnerAccess();

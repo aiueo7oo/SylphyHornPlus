@@ -78,10 +78,11 @@ namespace SylphyHorn.Services.Commands
 			=> operation == "monitor list" || operation == "desktop settings" || operation == "desktop configure"
 				|| operation == "notification settings" || operation == "notification configure"
 				|| operation == "tray settings" || operation == "tray configure"
-				|| operation == "settings get" || operation == "settings configure";
+				|| operation == "settings get" || operation == "settings configure" || operation == "settings save";
 
 		internal async Task<CliResponse> ExecuteAsync(CliCommand command, CancellationToken cancellation)
 		{
+			if (command.Operation == "settings save") return await this.SaveAsync(command, cancellation);
 			var changed = false;
 			try
 			{
@@ -188,6 +189,31 @@ namespace SylphyHorn.Services.Commands
 			{
 				return CliResponse.Fail(command.Operation, changed ? "result_unconfirmed" : "operation_failed",
 					"Settings application or persistence could not be confirmed. Read current settings before retrying.");
+			}
+		}
+
+		private async Task<CliResponse> SaveAsync(CliCommand command, CancellationToken cancellation)
+		{
+			var submitted = false;
+			try
+			{
+				cancellation.ThrowIfCancellationRequested();
+				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				submitted = true;
+				var result = await this._save().WaitAsync(cancellation);
+				return result.Succeeded
+					? CliResponse.Ok(command.Operation, new CliData { Saved = true })
+					: CliResponse.Fail(command.Operation, "settings_save_failed",
+						"Current settings could not be saved. Retry settings save after resolving the storage problem.");
+			}
+			catch (OperationCanceledException)
+			{
+				return CliResponse.Fail(command.Operation, submitted ? "result_unconfirmed" : "request_cancelled",
+					"Settings saving was cancelled; persistence may have completed.");
+			}
+			catch (Exception)
+			{
+				return CliResponse.Fail(command.Operation, submitted ? "settings_save_failed" : "operation_failed", "Current settings could not be saved.");
 			}
 		}
 

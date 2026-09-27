@@ -13,6 +13,52 @@ namespace SylphyHorn.Tests
 {
 	public sealed class CliSettingsTests
 	{
+		[Fact]
+		public async Task SaveRetriesCurrentSettingsWithoutReplayingFailedChanges()
+		{
+			var provider = new TestDictionaryProvider();
+			await provider.InitializeAsync();
+			var settings = new GeneralSettings(provider);
+			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null);
+			settings.LoopDesktop.Value = true;
+			provider.SaveFailure = new IOException("synthetic");
+			Assert.Equal("settings_save_failed", (await Run(service, "settings save")).Error.Code);
+			settings.LoopDesktop.Value = false;
+			provider.SaveFailure = null;
+			var response = await Run(service, "settings save");
+			Assert.True(response.Success);
+			Assert.True(response.Data.Saved);
+			Assert.Null(response.Data.Changed);
+			Assert.False(settings.LoopDesktop.Value);
+			Assert.False((bool)Assert.Single(provider.SavedDictionaries)["GeneralSettings.LoopDesktop"]);
+			Assert.True((await Run(service, "settings save")).Data.Saved);
+		}
+
+		[Fact]
+		public async Task SaveRejectsBusyOrCancelledRequestsBeforePersistence()
+		{
+			var available = false;
+			var service = new CliSettingsService(null, () => throw new Exception("Must not save."), () => available, null);
+			Assert.Equal("host_busy", (await Run(service, "settings save")).Error.Code);
+			available = true;
+			var cancelled = await service.ExecuteAsync(CliCommand.Parse(new[] { "settings", "save" }), new CancellationToken(true));
+			Assert.Equal("request_cancelled", cancelled.Error.Code);
+		}
+
+		[Fact]
+		public async Task SaveCancellationAfterSubmissionDoesNotClaimFailureOrSuccess()
+		{
+			var pending = new TaskCompletionSource<SettingsSaveResult>();
+			var service = new CliSettingsService(null, () => pending.Task, () => true, null);
+			using (var cancellation = new CancellationTokenSource())
+			{
+				var request = service.ExecuteAsync(CliCommand.Parse(new[] { "settings", "save" }), cancellation.Token);
+				cancellation.Cancel();
+				Assert.Equal("result_unconfirmed", (await request).Error.Code);
+			}
+			pending.SetCanceled(TestContext.Current.CancellationToken);
+		}
+
 		[Theory]
 		[InlineData(false, true)]
 		[InlineData(true, true)]
