@@ -63,7 +63,7 @@ namespace SylphyHorn.Commands
 				var constraints = new List<CliSpecConstraint> { One("--id --number") };
 				if (wallpaper)
 				{
-					arguments.Add(A("--path", "string", description: "Path to an existing wallpaper image."));
+					arguments.Add(A("--path", "string", description: "Absolute path to an existing readable wallpaper image."));
 					arguments.Add(A("--position", "string", values: "center tile stretch fit fill span"));
 					constraints.Add(One("--path --position"));
 				}
@@ -173,7 +173,7 @@ namespace SylphyHorn.Commands
 						"Inspect each result, not only the envelope success."
 						: "Rules store a destination name or number, not a desktop ID. Destinations may be absent. set with --id updates that rule; executable paths and " +
 							"package identities are distinct. set requires a destination unless both --id and --follow-foreground are supplied; in that case omission preserves the destination.",
-					verb == "apply" ? "move-windows-unless-dry-run possible-create" : "persist-rules",
+					verb == "apply" ? "move-windows-unless-dry-run" : "persist-rules",
 					sample, Q(queries.ToArray()));
 			}
 			foreach (var verb in new[] { "list", "add", "remove" })

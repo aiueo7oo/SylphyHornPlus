@@ -28,6 +28,9 @@ namespace SylphyHorn.Tests
 				var spec = response.Data.Specification;
 				Assert.NotEmpty(spec.Prerequisites);
 				Assert.NotEmpty(spec.Effects);
+				Assert.Contains(response.Data.Errors, item => item.Code == "launcher_failure");
+				Assert.Contains(response.Data.Errors, item => item.Code == "response_too_large");
+				if (entry.Name == "app assignment apply") Assert.DoesNotContain("possible-create", spec.Effects);
 				Assert.Equal(spec.Arguments.Length, spec.Arguments.Select(argument => argument.Name).Distinct().Count());
 				Assert.Contains(response.Data.ResultSchema, type => type.Name == "CliData");
 				foreach (var example in spec.Examples)

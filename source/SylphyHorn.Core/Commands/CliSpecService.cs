@@ -72,7 +72,9 @@ namespace SylphyHorn.Commands
 		private static readonly CliSpecError[] CommonErrors =
 		{
 			Error("invalid_arguments", "Exit 2. Correct arguments using this specification."),
-			Error("host_unavailable", "Exit 3. Start a compatible GUI host in the same user session and elevation level."),
+			Error("host_unavailable", "Exit 3. The host may be absent or busy. Wait, then check that a compatible GUI host runs in the same user session and elevation level."),
+			Error("launcher_failure", "Exit 4. The native launcher could not start the CLI or obtain its exit status. Check the installation; inspect state before retrying."),
+			Error("response_too_large", "Exit 4. The response exceeded the transport limit. A mutation may have completed; query affected state before retrying."),
 			Error("settings_save_failed", "Changes may be active in memory. Read current values and resolve the save failure before retrying."),
 			Error("desktop_not_found", "Read desktop list and select a current destination."),
 			Error("window_not_found", "Read window list; the window ID may have expired."),
@@ -118,7 +120,8 @@ namespace SylphyHorn.Commands
 		private static CliSpecError[] ErrorsFor(string command)
 		{
 			var codes = new HashSet<string>(new[] { "invalid_arguments", "host_unavailable", "host_busy", "unsupported",
-				"state_changed", "state_unavailable", "result_unconfirmed", "request_cancelled", "operation_failed" });
+				"state_changed", "state_unavailable", "result_unconfirmed", "request_cancelled", "operation_failed",
+				"response_too_large", "launcher_failure" });
 			if (command.StartsWith("desktop ", StringComparison.Ordinal) || command == "window move")
 				codes.UnionWith(new[] { "desktop_not_found", "no_next_desktop", "no_previous_desktop", "no_last_used_desktop" });
 			if (command.StartsWith("window ", StringComparison.Ordinal))

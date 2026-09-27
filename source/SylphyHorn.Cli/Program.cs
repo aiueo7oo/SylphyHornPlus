@@ -98,7 +98,7 @@ namespace SylphyHorn.Cli
 				{
 					response = submitted
 						? CliResponse.Fail(operation, "result_unconfirmed", "The host response could not be confirmed. Query current state before retrying.")
-						: CliResponse.Fail(operation, "host_unavailable", "Cannot connect to SylphyHorn in this user session and elevation level.", true);
+						: CliResponse.Fail(operation, "host_unavailable", "Cannot connect to SylphyHorn. The host may be absent or busy; check the user session and elevation level.", true);
 				}
 			}
 			return response;
