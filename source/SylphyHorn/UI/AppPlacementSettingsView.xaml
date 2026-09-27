@@ -177,7 +177,6 @@
 													        ToolTip="{Binding Group.Owner.Text[Delete]}"
 													        AutomationProperties.Name="{Binding Group.Owner.Text[Delete]}" />
 													<TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Group.Owner.Text[AppColumn]}" VerticalAlignment="Center" />
-													<!-- The path runs up to "…", whose right edge meets the Delete button's. -->
 													<DockPanel Grid.Row="2" Grid.Column="4" Grid.ColumnSpan="2" VerticalAlignment="Center">
 														<Button KeyboardNavigation.TabIndex="5"
 														        DockPanel.Dock="Right"

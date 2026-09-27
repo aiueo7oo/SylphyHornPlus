@@ -150,7 +150,7 @@ namespace SylphyHorn.Tests
 		[InlineData(false, true)]
 		[InlineData(true, false)]
 		[InlineData(true, true)]
-		public async Task StructuredSettingsSurviveOldReaderSaveAndCurrentImport(bool empty, bool legacyInput)
+		public async Task StructuredSettingsSurviveOldReaderSaveAndCurrentImport(bool empty, bool typedInput)
 		{
 			await WithTemporaryDirectory(async root =>
 			{
@@ -176,7 +176,7 @@ namespace SylphyHorn.Tests
 					["GeneralSettings.ChangeBackgroundEachDesktop"] = true,
 					["Future.Unknown"] = "preserved",
 				};
-				if (legacyInput)
+				if (typedInput)
 				{
 					using (var stream = File.Create(file.FullName))
 						new DataContractSerializer(typeof(IDictionary<string, object>), new[]
@@ -184,9 +184,9 @@ namespace SylphyHorn.Tests
 							typeof(bool), typeof(int[]), typeof(AppPlacementConfiguration),
 							typeof(PlacementCreatedGroup[]), typeof(DesktopWallpaperOnCreation[]),
 						}).WriteObject(stream, values);
-					var legacyProvider = new ExplicitPathSettingsProvider(file);
-					await legacyProvider.LoadAsync();
-					await legacyProvider.SaveAsync();
+					var typedProvider = new ExplicitPathSettingsProvider(file);
+					await typedProvider.LoadAsync();
+					await typedProvider.SaveAsync();
 				}
 				else await AtomicSettingsFile.WriteAsync(values, file, KnownTypes);
 

@@ -106,7 +106,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 				}
 				Assert.True(consumed, "The native worker did not consume a fixture within five seconds.");
 				Assert.Equal(0, authorizations);
-				// Short native capacity probe; this is not the long-running/COM performance acceptance gate.
+				// Short native capacity probe without desktop COM operations.
 				for (var batch = 0; batch < 4; batch++)
 				{
 					var windows = new List<IntPtr>();

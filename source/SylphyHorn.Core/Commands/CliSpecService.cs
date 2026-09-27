@@ -41,7 +41,7 @@ namespace SylphyHorn.Commands
 				var sources = new List<CliSpecSource>();
 				foreach (var request in definition.Queries)
 				{
-					// Queries come only from the reviewed read-only catalog, never from user-supplied arguments.
+					// Queries come only from the fixed read-only catalog, never from user-supplied arguments.
 					CliResponse response;
 					try
 					{

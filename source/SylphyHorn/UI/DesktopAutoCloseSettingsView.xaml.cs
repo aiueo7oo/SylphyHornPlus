@@ -8,8 +8,8 @@ using SylphyHorn.UI.Bindings;
 
 namespace SylphyHorn.UI
 {
-	// Automatic closing of empty desktops, split from the app placement tab. The settings, the pending rows
-	// and the save path stay in the shared AppPlacementSettingsViewModel, so switching tabs keeps edits.
+	// Shares settings, pending rows and the save path through AppPlacementSettingsViewModel,
+	// so switching tabs keeps edits.
 	public partial class DesktopAutoCloseSettingsView : UserControl
 	{
 		public DesktopAutoCloseSettingsView()

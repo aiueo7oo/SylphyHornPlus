@@ -228,7 +228,7 @@ namespace SylphyHorn.Tests
 			view.Resources.Add("HeaderStyleKey", header);
 		}
 
-		// The approved two-line entry: switch combo boxes share the longest label's width and are not clipped,
+		// The two-line entry: switch combo boxes share the longest label's width and are not clipped,
 		// Delete and "…" share one right edge, and the path text starts after the icon.
 		private static void AssertEntryLayout(FrameworkElement view, SylphyHorn.UI.Bindings.AppPlacementSettingsViewModel model)
 		{
