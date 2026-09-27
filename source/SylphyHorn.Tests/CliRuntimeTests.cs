@@ -1,5 +1,6 @@
 ﻿#if !NETFRAMEWORK
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.Commands;
@@ -8,7 +9,7 @@ using static SylphyHorn.Tests.DesktopRuntimeTestData;
 
 namespace SylphyHorn.Tests
 {
-	public sealed class CliRuntimeTests
+	public sealed class CliRuntimeTests : IDisposable
 	{
 		[Theory]
 		[InlineData("--name", "work")]
@@ -212,14 +213,46 @@ namespace SylphyHorn.Tests
 		public async Task WallpaperPathWaitsForProviderConfirmation()
 		{
 			var harness = await Create();
-			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", "new.jpg"), Entry(B, 1, "work", "")));
-			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", "new.jpg" });
+			var image = this.CreateImage();
+			harness.Provider.EnqueueResult(Batch(1, 3, A, Entry(A, 0, "work", image), Entry(B, 1, "work", "")));
+			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", image });
 			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
 			Assert.True(response.Success);
 			Assert.True(response.Data.Changed);
-			Assert.Equal("new.jpg", response.Data.Desktop.WallpaperPath);
+			Assert.Equal(image, response.Data.Desktop.WallpaperPath);
 			Assert.True(response.Data.Desktop.WallpaperPathConfirmed);
 			Assert.Equal(1, harness.Operations.WallpaperCalls);
+		}
+
+		[Theory]
+		[InlineData("relative")]
+		[InlineData("missing")]
+		[InlineData("unreadable")]
+		[InlineData("empty")]
+		public async Task InvalidWallpaperDoesNotMutateDesktopOrSettings(string kind)
+		{
+			var harness = await Create();
+			if (kind == "unreadable") File.WriteAllText(this._imagePath, "not an image");
+			var path = kind == "relative" ? "wallpaper.bmp" : kind == "empty" ? "" : this._imagePath;
+			var before = harness.Runtime.State.Records[A].WallpaperPath.Value;
+			var response = await harness.Runtime.ExecuteCliAsync(
+				CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", path }), CancellationToken.None);
+			Assert.Equal("invalid_arguments", response.Error.Code);
+			Assert.Equal(0, harness.Operations.WallpaperCalls);
+			Assert.Equal(before, harness.Runtime.State.Records[A].WallpaperPath.Value);
+		}
+
+		[Fact]
+		public async Task LegacyWallpaperCanStillBeCleared()
+		{
+			var batch = Batch(1, 1, A, WallpaperUnsupported(A, 0, "work"));
+			var harness = Harness.Create(batch);
+			await harness.Runtime.InitializeAsync(false, CancellationToken.None);
+			harness.Provider.EnqueueResult(Batch(1, 2, A, WallpaperUnsupported(A, 0, "work")));
+			var response = await harness.Runtime.ExecuteCliAsync(
+				CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", "" }), CancellationToken.None);
+			Assert.True(response.Success);
+			Assert.Equal("", response.Data.Desktop.WallpaperPath);
 		}
 
 		[Fact]
@@ -238,8 +271,9 @@ namespace SylphyHorn.Tests
 		public async Task FailedWallpaperWriteIsNotReportedAsSuccess()
 		{
 			var harness = await Create();
-			harness.Operations.FailWallpaperValue = "new.jpg";
-			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", A.ToString(), "--path", "new.jpg" });
+			var image = this.CreateImage();
+			harness.Operations.FailWallpaperValue = image;
+			var command = CliCommand.Parse(new[] { "desktop", "wallpaper", "--id", A.ToString(), "--path", image });
 			var response = await harness.Runtime.ExecuteCliAsync(command, CancellationToken.None);
 			Assert.False(response.Success);
 			Assert.Equal("result_unconfirmed", response.Error.Code);
@@ -291,6 +325,19 @@ namespace SylphyHorn.Tests
 			Assert.False(response.Error.Retryable);
 			Assert.Equal(new[] { "MoveRight" }, harness.Operations.DesktopOperationNames);
 		}
+
+		private readonly string _imagePath = Path.Combine(Path.GetTempPath(), "SylphyHorn-cli-wallpaper-" + Guid.NewGuid().ToString("N") + ".bmp");
+
+		private string CreateImage()
+		{
+			var bytes = new byte[58];
+			bytes[0] = 66; bytes[1] = 77; bytes[2] = 58; bytes[10] = 54; bytes[14] = 40;
+			bytes[18] = 1; bytes[22] = 1; bytes[26] = 1; bytes[28] = 24; bytes[34] = 4;
+			File.WriteAllBytes(this._imagePath, bytes);
+			return this._imagePath;
+		}
+
+		public void Dispose() => File.Delete(this._imagePath);
 
 		private static async Task<Harness> Create()
 		{

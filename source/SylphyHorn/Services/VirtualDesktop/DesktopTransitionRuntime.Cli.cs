@@ -113,6 +113,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 						if (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported
 							&& string.IsNullOrEmpty(command.WallpaperPath))
 							throw new CliFailure("invalid_arguments", "The wallpaper path cannot be empty on this Windows build.");
+						if (!string.IsNullOrEmpty(command.WallpaperPath))
+						{
+							if (!Path.IsPathFullyQualified(command.WallpaperPath))
+								throw new CliFailure("invalid_arguments", "Specify an absolute image path.");
+							try { WallpaperService.ValidateImage(command.WallpaperPath); }
+							catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException
+								|| ex is ArgumentException || ex is NotSupportedException)
+							{
+								throw new CliFailure("invalid_arguments", "The image file does not exist or cannot be read.");
+							}
+						}
 						var changed = !record.WallpaperPath.HasValue || record.WallpaperPath.Value != command.WallpaperPath
 							|| (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported && !record.WallpaperPath.IsConfirmed);
 						if (changed)
