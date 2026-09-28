@@ -100,7 +100,7 @@ if possible.
 
 ## Requirements
 
-* Windows 10 build 14393 (Anniversary Update) or later
+* Windows 10 version 1809 (build 17763) or later
 
 
 ## Features
