@@ -56,7 +56,7 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 10.0.400
+          dotnet-version: 10.0.401
           architecture: ${{ matrix.platform }}
 
       - name: Restore the complete project graph
@@ -98,7 +98,7 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 10.0.400
+          dotnet-version: 10.0.401
 
       - name: Run environment-independent integration tests
         shell: pwsh
