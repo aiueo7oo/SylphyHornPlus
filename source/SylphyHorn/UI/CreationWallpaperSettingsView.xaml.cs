@@ -50,16 +50,25 @@ namespace SylphyHorn.UI
 
 		private async void Commit(object sender, EventArgs args)
 		{
-			if (sender is ComboBox combo && args is KeyboardFocusChangedEventArgs && (combo.IsDropDownOpen || combo.IsKeyboardFocusWithin)) return;
+			if (sender is ComboBox combo && args is KeyboardFocusChangedEventArgs && (combo.IsDropDownOpen || combo.IsKeyboardFocusWithin))
+			{
+				return;
+			}
 			if (!((sender as FrameworkElement)?.DataContext is CreationWallpaperRow row)) return;
 			// Moving between the fields of a new entry must not show an error before both are filled in.
-			if (row.Saved == null && (string.IsNullOrWhiteSpace(row.Destination) || string.IsNullOrWhiteSpace(row.WallpaperPath))) return;
+			if (row.Saved == null && (string.IsNullOrWhiteSpace(row.Destination) || string.IsNullOrWhiteSpace(row.WallpaperPath)))
+			{
+				return;
+			}
 			await row.Group.Owner.CommitAsync(row);
 		}
 
 		private async void ChooseImage(object sender, RoutedEventArgs args)
 		{
-			if ((sender as FrameworkElement)?.DataContext is CreationWallpaperRow row) await row.Group.Owner.ChooseImageAsync(row);
+			if ((sender as FrameworkElement)?.DataContext is CreationWallpaperRow row)
+			{
+				await row.Group.Owner.ChooseImageAsync(row);
+			}
 		}
 
 		private async void InputKey(object sender, KeyEventArgs args)
@@ -70,8 +79,14 @@ namespace SylphyHorn.UI
 			TextBox textBox = null;
 			for (var source = args.OriginalSource as DependencyObject; source != null && source != sender; source = VisualTreeHelper.GetParent(source))
 			{
-				if (source is ComboBox box) combo = box;
-				if (source is TextBox editor) textBox = editor;
+				if (source is ComboBox box)
+				{
+					combo = box;
+				}
+				if (source is TextBox editor)
+				{
+					textBox = editor;
+				}
 			}
 			if (combo == null && textBox == null) return;
 			if (combo != null && combo.IsDropDownOpen)

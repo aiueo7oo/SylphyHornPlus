@@ -39,7 +39,10 @@ namespace SylphyHorn.Services
 
 		internal LogEntry[] GetRecent(int limit, out int totalCount)
 		{
-			if (limit < 1) throw new ArgumentOutOfRangeException(nameof(limit));
+			if (limit < 1)
+			{
+				throw new ArgumentOutOfRangeException(nameof(limit));
+			}
 			lock (this._gate)
 			{
 				totalCount = this._logs.Count;

@@ -243,7 +243,10 @@ namespace SylphyHorn.UI.Bindings
 				: new[] { new CreationWallpaperGroup(this, false) });
 			this.RetrySaveCommand = new AsyncRelayCommand(this.SaveAsync, () => this.SaveFailed && !this._disposed);
 			this._subscription = settings.DesktopWallpapersOnCreation.Subscribe(_ => this.Reload());
-			if (!this._loaded) this.Reload();
+			if (!this._loaded)
+			{
+				this.Reload();
+			}
 			this._legacySubscription = settings.ChangeBackgroundEachDesktop.Subscribe(_ => this.OnPropertyChanged(nameof(this.LegacyNote)));
 			this.RefreshDestinationChoices();
 			ResourceService.Current.PropertyChanged += this.OnResourcesChanged;
@@ -300,7 +303,10 @@ namespace SylphyHorn.UI.Bindings
 						previous.Remove(row);
 						row.Rebase(entry);
 					}
-					else row = new CreationWallpaperRow(group, entry);
+					else
+					{
+						row = new CreationWallpaperRow(group, entry);
+					}
 					ordered.Add(row);
 				}
 				foreach (var row in previous)
@@ -310,12 +316,21 @@ namespace SylphyHorn.UI.Bindings
 				}
 				ordered.AddRange(group.Rows.Where(row => row.Saved == null));
 				for (var index = group.Rows.Count - 1; index >= 0; index--)
-					if (!ordered.Contains(group.Rows[index])) group.Rows.RemoveAt(index);
+					if (!ordered.Contains(group.Rows[index]))
+					{
+						group.Rows.RemoveAt(index);
+					}
 				for (var index = 0; index < ordered.Count; index++)
 				{
 					var current = group.Rows.IndexOf(ordered[index]);
-					if (current < 0) group.Rows.Insert(index, ordered[index]);
-					else if (current != index) group.Rows.Move(current, index);
+					if (current < 0)
+					{
+						group.Rows.Insert(index, ordered[index]);
+					}
+					else if (current != index)
+					{
+						group.Rows.Move(current, index);
+					}
 				}
 			}
 			if (discarded && !this._editDiscarded)
@@ -339,7 +354,10 @@ namespace SylphyHorn.UI.Bindings
 				foreach (var row in rows)
 				{
 					var path = row.Saved?.WallpaperPath;
-					if (this.Contains(row) && path != null && paths.Contains(path, StringComparer.Ordinal)) row.MarkMissing(missing.Contains(path) ? path : null);
+					if (this.Contains(row) && path != null && paths.Contains(path, StringComparer.Ordinal))
+					{
+						row.MarkMissing(missing.Contains(path) ? path : null);
+					}
 				}
 			}
 			catch (Exception) { /* A failed check leaves the rows editable without a message. */ }
@@ -356,7 +374,10 @@ namespace SylphyHorn.UI.Bindings
 
 		private void CancelValidation(CreationWallpaperRow row)
 		{
-			if (this._validations.TryGetValue(row, out var validation)) validation.Cancel();
+			if (this._validations.TryGetValue(row, out var validation))
+			{
+				validation.Cancel();
+			}
 		}
 
 		private bool IsDuplicate(DesktopWallpaperOnCreation entry, DesktopWallpaperOnCreation saved)
@@ -367,7 +388,10 @@ namespace SylphyHorn.UI.Bindings
 			if (!this.Contains(row)) return;
 			this.CancelValidation(row);
 			var trimmed = (row.WallpaperPath ?? "").Trim().Trim('"').Trim();
-			if (trimmed != row.WallpaperPath) row.WallpaperPath = trimmed;
+			if (trimmed != row.WallpaperPath)
+			{
+				row.WallpaperPath = trimmed;
+			}
 			var revision = row.Revision;
 			string name = null;
 			int? number = null;
@@ -430,12 +454,18 @@ namespace SylphyHorn.UI.Bindings
 					}
 					catch (Exception)
 					{
-						if (this.Contains(row) && revision == row.Revision && !cancellation.IsCancellationRequested) row.SetErrorKey("UnreadableImage");
+						if (this.Contains(row) && revision == row.Revision && !cancellation.IsCancellationRequested)
+						{
+							row.SetErrorKey("UnreadableImage");
+						}
 						return;
 					}
 					finally
 					{
-						if (this._validations.TryGetValue(row, out var current) && ReferenceEquals(current, cancellation)) this._validations.Remove(row);
+						if (this._validations.TryGetValue(row, out var current) && ReferenceEquals(current, cancellation))
+						{
+							this._validations.Remove(row);
+						}
 					}
 					// Input edited, restored or removed while the image was read keeps its newer state.
 					if (!this.Contains(row) || revision != row.Revision || cancellation.IsCancellationRequested) return;
@@ -449,7 +479,14 @@ namespace SylphyHorn.UI.Bindings
 			}
 			var entries = this.Entries.ToList();
 			var index = row.Saved == null ? -1 : entries.FindIndex(existing => Same(existing, row.Saved));
-			if (index < 0) entries.Add(entry); else entries[index] = entry;
+			if (index < 0)
+			{
+				entries.Add(entry);
+			}
+			else
+			{
+				entries[index] = entry;
+			}
 			row.Accept(entry);
 			await this.PublishAsync(entries.ToArray());
 		}
@@ -468,7 +505,10 @@ namespace SylphyHorn.UI.Bindings
 			if (row.Saved == null) return;
 			var current = this.Entries;
 			var entries = current.Where(entry => !Same(entry, row.Saved)).ToArray();
-			if (entries.Length != current.Length) await this.PublishAsync(entries);
+			if (entries.Length != current.Length)
+			{
+				await this.PublishAsync(entries);
+			}
 		}
 
 		internal async Task ChooseImageAsync(CreationWallpaperRow row)
@@ -477,7 +517,10 @@ namespace SylphyHorn.UI.Bindings
 			var path = this._chooseImage();
 			if (string.IsNullOrEmpty(path) || !this.Contains(row)) return;
 			row.WallpaperPath = path;
-			if (!string.IsNullOrWhiteSpace(row.Destination)) await this.CommitAsync(row);
+			if (!string.IsNullOrWhiteSpace(row.Destination))
+			{
+				await this.CommitAsync(row);
+			}
 		}
 
 		private Task PublishAsync(DesktopWallpaperOnCreation[] entries)

@@ -99,26 +99,47 @@ namespace SylphyHorn.Services.AppPlacement
 			IReadOnlyList<PlacementProcessIdentity> children,
 			Func<string, bool> isRegisteredPackageApp)
 		{
-			if (owner == null || owner.Id == 0 || owner.CreatedAt <= 0 || string.IsNullOrEmpty(owner.Path)) return Unavailable("ProcessIdentityUnavailable");
+			if (owner == null || owner.Id == 0 || owner.CreatedAt <= 0 || string.IsNullOrEmpty(owner.Path))
+			{
+				return Unavailable("ProcessIdentityUnavailable");
+			}
 			var executable = Path.GetFileName(owner.Path);
 			var host = string.Equals(executable, "ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase);
 			if (host || windowClass == "ApplicationFrameWindow")
 			{
 				// Never turn the shared frame host into an executable-path rule.
-				if (!host || windowClass != "ApplicationFrameWindow") return Unavailable("UnrecognizedHost");
+				if (!host || windowClass != "ApplicationFrameWindow")
+				{
+					return Unavailable("UnrecognizedHost");
+				}
 				var apps = new Dictionary<string, PlacementProcessIdentity>(StringComparer.Ordinal);
 				foreach (var child in children ?? Array.Empty<PlacementProcessIdentity>())
 				{
 					if (child == null || child.Id == owner.Id) continue;
-					if (child.CreatedAt <= 0 || string.IsNullOrEmpty(child.Family) || !IsPackageApp(child.AppId, child.Family)) return Unavailable("HostChildIdentityUnavailable");
-					if (apps.TryGetValue(child.AppId, out var previous) && !previous.SameProcess(child)) return Unavailable("AmbiguousHostProcesses");
+					if (child.CreatedAt <= 0 || string.IsNullOrEmpty(child.Family) || !IsPackageApp(child.AppId, child.Family))
+					{
+						return Unavailable("HostChildIdentityUnavailable");
+					}
+					if (apps.TryGetValue(child.AppId, out var previous) && !previous.SameProcess(child))
+					{
+						return Unavailable("AmbiguousHostProcesses");
+					}
 					apps[child.AppId] = child;
 				}
-				if (apps.Count > 1) return Unavailable("AmbiguousHostApps");
+				if (apps.Count > 1)
+				{
+					return Unavailable("AmbiguousHostApps");
+				}
 				if (!string.IsNullOrEmpty(windowAppId))
 				{
-					if (!IsPackageApp(windowAppId, null) || !isRegisteredPackageApp(windowAppId)) return Unavailable("UnverifiedHostAppId");
-					if (apps.Count != 0 && !apps.ContainsKey(windowAppId)) return Unavailable("ConflictingHostAppId");
+					if (!IsPackageApp(windowAppId, null) || !isRegisteredPackageApp(windowAppId))
+					{
+						return Unavailable("UnverifiedHostAppId");
+					}
+					if (apps.Count != 0 && !apps.ContainsKey(windowAppId))
+					{
+						return Unavailable("ConflictingHostAppId");
+					}
 					apps.TryGetValue(windowAppId, out var process);
 					return Package(window, thread, owner, process, windowAppId);
 				}
@@ -129,14 +150,29 @@ namespace SylphyHorn.Services.AppPlacement
 				}
 				return new PlacementWindowInspection(PlacementInspectionStatus.NotReady, "HostAppNotReady");
 			}
-			if (string.Equals(executable, "RuntimeBroker.exe", StringComparison.OrdinalIgnoreCase)) return Unavailable("SharedHost");
+			if (string.Equals(executable, "RuntimeBroker.exe", StringComparison.OrdinalIgnoreCase))
+			{
+				return Unavailable("SharedHost");
+			}
 			if (!string.IsNullOrEmpty(owner.Family))
 			{
 				var appId = !string.IsNullOrEmpty(windowAppId) ? windowAppId : owner.AppId;
-				if (string.IsNullOrEmpty(appId)) return new PlacementWindowInspection(PlacementInspectionStatus.NotReady, "PackageAppNotReady");
-				if (!IsPackageApp(appId, owner.Family)) return Unavailable("PackageAppIdUnavailable");
-				if (!string.IsNullOrEmpty(owner.AppId) && !string.Equals(appId, owner.AppId, StringComparison.Ordinal)) return Unavailable("ConflictingPackageAppId");
-				if (string.IsNullOrEmpty(owner.AppId) && !isRegisteredPackageApp(appId)) return Unavailable("UnverifiedPackageAppId");
+				if (string.IsNullOrEmpty(appId))
+				{
+					return new PlacementWindowInspection(PlacementInspectionStatus.NotReady, "PackageAppNotReady");
+				}
+				if (!IsPackageApp(appId, owner.Family))
+				{
+					return Unavailable("PackageAppIdUnavailable");
+				}
+				if (!string.IsNullOrEmpty(owner.AppId) && !string.Equals(appId, owner.AppId, StringComparison.Ordinal))
+				{
+					return Unavailable("ConflictingPackageAppId");
+				}
+				if (string.IsNullOrEmpty(owner.AppId) && !isRegisteredPackageApp(appId))
+				{
+					return Unavailable("UnverifiedPackageAppId");
+				}
 				return Package(window, thread, owner, owner, appId);
 			}
 			// An explicit desktop AUMID is not a package identity. Normal Win32 apps use their executable.

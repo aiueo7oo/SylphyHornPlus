@@ -13,15 +13,22 @@ namespace SylphyHorn.Commands
 		internal static async Task<CliResponse> ExecuteAsync(string[] args, Func<string[], Task<CliResponse>> query)
 		{
 			if (args == null || args.Length == 0 || args[0] != "spec")
+			{
 				return CliResponse.Fail("spec", "invalid_arguments", "Specify spec [COMMAND...] [--resolve].");
+			}
 
 			var resolve = args.Length > 1 && args[args.Length - 1] == "--resolve";
 			var words = args.Skip(1).Take(args.Length - 1 - (resolve ? 1 : 0)).ToArray();
 			if (words.Any(word => string.IsNullOrWhiteSpace(word) || word.StartsWith("--", StringComparison.Ordinal)))
+			{
 				return CliResponse.Fail("spec", "invalid_arguments", "Specify a command name followed by optional --resolve; do not pass command arguments.");
+			}
 			if (words.Length == 0)
 			{
-				if (resolve) return CliResponse.Fail("spec", "invalid_arguments", "Select one command before --resolve.");
+				if (resolve)
+				{
+					return CliResponse.Fail("spec", "invalid_arguments", "Select one command before --resolve.");
+				}
 				return CliResponse.Ok("spec", new CliData
 				{
 					SpecVersion = 1,
@@ -30,7 +37,10 @@ namespace SylphyHorn.Commands
 			}
 			var target = string.Join(" ", words);
 			var definition = CliSpecCatalog.Find(target);
-			if (definition == null) return CliResponse.Fail("spec", "invalid_arguments", "Unknown command; use spec for the command list.");
+			if (definition == null)
+			{
+				return CliResponse.Fail("spec", "invalid_arguments", "Unknown command; use spec for the command list.");
+			}
 			var data = new CliData
 			{
 				SpecVersion = 1, Target = target, Specification = definition,
@@ -48,7 +58,9 @@ namespace SylphyHorn.Commands
 						response = await query((string[])request.Clone());
 						if (response == null || response.SchemaVersion != 1 || response.Command != CliCommand.Recognize(request)
 							|| (response.Success ? response.Data == null || response.Error != null : response.Error == null || response.Data != null))
+						{
 							response = CliResponse.Fail(CliCommand.Recognize(request), "result_unconfirmed", "Invalid source response.");
+						}
 					}
 					catch (Exception)
 					{
@@ -123,23 +135,44 @@ namespace SylphyHorn.Commands
 				"state_changed", "state_unavailable", "result_unconfirmed", "request_cancelled", "operation_failed",
 				"response_too_large", "launcher_failure" });
 			if (command.StartsWith("desktop ", StringComparison.Ordinal) || command == "window move")
+			{
 				codes.UnionWith(new[] { "desktop_not_found", "no_next_desktop", "no_previous_desktop", "no_last_used_desktop" });
+			}
 			if (command.StartsWith("window ", StringComparison.Ordinal))
+			{
 				codes.UnionWith(new[] { "window_not_found", "window_changed", "window_pinned", "app_id_unavailable" });
+			}
 			if (command.StartsWith("startup ", StringComparison.Ordinal))
+			{
 				codes.UnionWith(new[] { "startup_target_mismatch", "startup_query_failed", "elevation_required" });
+			}
 			if (command.StartsWith("settings ", StringComparison.Ordinal))
+			{
 				codes.UnionWith(new[] { "file_exists", "file_not_found", "invalid_settings_file", "partial_failure" });
+			}
 			if (command.StartsWith("app ", StringComparison.Ordinal) || command.StartsWith("desktop autoclose ", StringComparison.Ordinal))
+			{
 				codes.UnionWith(new[] { "assignment_not_found", "assignment_conflict", "ambiguous_assignment", "app_unavailable",
 					"assignment_disabled", "assignment_unavailable", "assignment_failed", "partial_failure" });
-			if (command == "ui settings") codes.Add("settings_unavailable");
-			if (command.StartsWith("shortcut ", StringComparison.Ordinal)) codes.Add("shortcut_conflict");
-			if (command.StartsWith("notification ", StringComparison.Ordinal)) codes.Add("monitor_unavailable");
+			}
+			if (command == "ui settings")
+			{
+				codes.Add("settings_unavailable");
+			}
+			if (command.StartsWith("shortcut ", StringComparison.Ordinal))
+			{
+				codes.Add("shortcut_conflict");
+			}
+			if (command.StartsWith("notification ", StringComparison.Ordinal))
+			{
+				codes.Add("monitor_unavailable");
+			}
 			if (command == "settings save" || command.EndsWith(" configure", StringComparison.Ordinal) || command.StartsWith("app ", StringComparison.Ordinal)
 				|| command.StartsWith("shortcut ", StringComparison.Ordinal) || command.StartsWith("desktop autoclose ", StringComparison.Ordinal)
 				|| command.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
+			{
 				codes.Add("settings_save_failed");
+			}
 			return CommonErrors.Where(error => codes.Contains(error.Code)).ToArray();
 		}
 
@@ -150,7 +183,10 @@ namespace SylphyHorn.Commands
 			var pending = new Queue<Type>();
 			var seen = new HashSet<Type>();
 			var dataFields = Members(typeof(CliData)).Where(field => definition.ResultFields.Contains(Member(field).Name)).ToArray();
-			if (dataFields.Length != definition.ResultFields.Length) throw new InvalidOperationException("Unknown result field in " + definition.Name);
+			if (dataFields.Length != definition.ResultFields.Length)
+			{
+				throw new InvalidOperationException("Unknown result field in " + definition.Name);
+			}
 			result.Add(new CliSpecType { Name = "CliData", Fields = dataFields.Select(DescribeField).ToArray() });
 			foreach (var field in dataFields) Enqueue(field.FieldType, pending);
 			pending.Enqueue(typeof(CliError));
@@ -173,9 +209,15 @@ namespace SylphyHorn.Commands
 
 		private static string TypeName(Type type)
 		{
-			if (type.IsArray) return TypeName(type.GetElementType()) + "[]";
+			if (type.IsArray)
+			{
+				return TypeName(type.GetElementType()) + "[]";
+			}
 			var underlying = Nullable.GetUnderlyingType(type);
-			if (underlying != null) return TypeName(underlying) + "|null";
+			if (underlying != null)
+			{
+				return TypeName(underlying) + "|null";
+			}
 			if (type == typeof(string)) return "string|null";
 			if (type == typeof(bool)) return "boolean";
 			if (type == typeof(double) || type == typeof(float)) return "number";
@@ -185,8 +227,14 @@ namespace SylphyHorn.Commands
 
 		private static void Enqueue(Type type, Queue<Type> queue)
 		{
-			if (type.IsArray) type = type.GetElementType();
-			if (type.GetCustomAttribute<DataContractAttribute>() != null) queue.Enqueue(type);
+			if (type.IsArray)
+			{
+				type = type.GetElementType();
+			}
+			if (type.GetCustomAttribute<DataContractAttribute>() != null)
+			{
+				queue.Enqueue(type);
+			}
 		}
 	}
 }

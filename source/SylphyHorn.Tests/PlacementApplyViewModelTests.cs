@@ -127,7 +127,10 @@ namespace SylphyHorn.Tests
 					f.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Renamed", ""), Entry(B, 1, "Other", "")));
 					f.Harness.Owner.Drain();
 				}
-				else f.Model.Dispose();
+				else
+				{
+					f.Model.Dispose();
+				}
 				Assert.True(f.Session.Token.IsCancellationRequested);
 				gate.SetResult(f.Session.Preview);
 				await loading;

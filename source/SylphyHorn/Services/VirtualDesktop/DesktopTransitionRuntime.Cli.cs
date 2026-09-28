@@ -28,18 +28,28 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				await this.RefreshCliStateAsync(cancellation);
 				if (command.Operation == "desktop list")
+				{
 					return CliResponse.Ok(command.Operation, new CliData { Desktops = this.State.Order.Select(this.CliDesktopInfo).ToArray() });
-				if (command.Operation == "window list") return CliResponse.Ok(command.Operation, this.ListCliWindows(cancellation));
+				}
+				if (command.Operation == "window list")
+				{
+					return CliResponse.Ok(command.Operation, this.ListCliWindows(cancellation));
+				}
 				if (command.Operation == "desktop create")
 				{
 					if (command.Name != null && !ProductInfo.IsNameSupportBuild)
+					{
 						throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
+					}
 					this.EnsureCliAvailable(cancellation);
 					submitted = true;
 					var created = this.WithCreationWallpapersHeld(() =>
 					{
 						var id = this._operations.Create();
-						if (command.Name != null) this._operations.SetName(id, command.Name);
+						if (command.Name != null)
+						{
+							this._operations.SetName(id, command.Name);
+						}
 						return id;
 					}, command.Name);
 					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(created)
@@ -57,7 +67,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 					? Guid.Empty : this.ResolveCliTarget(command);
 				if (command.Operation == "desktop rename")
 				{
-					if (!ProductInfo.IsNameSupportBuild) throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
+					if (!ProductInfo.IsNameSupportBuild)
+					{
+						throw new CliFailure("unsupported", "Desktop names are unavailable on this Windows build.");
+					}
 					var changed = this.CliDesktopInfo(target).Name != command.Name;
 					if (changed)
 					{
@@ -71,18 +84,32 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (command.Operation == "desktop reorder")
 				{
 					if (!ProductInfo.IsReorderingSupportBuild)
+					{
 						throw new CliFailure("unsupported", "Desktop reordering is unavailable on this Windows build.");
+					}
 					var count = this.State.Order.Count;
-					if (command.Number > count) throw new CliFailure("desktop_not_found", "The destination position does not exist.");
+					if (command.Number > count)
+					{
+						throw new CliFailure("desktop_not_found", "The destination position does not exist.");
+					}
 					var original = this.CliDesktopInfo(target).Number;
 					for (var number = original; number != command.Number;)
 					{
 						this.EnsureCliAvailable(cancellation);
-						if (this.State.Order.Count != count) throw new CliFailure("state_changed", "The desktop order changed during reordering.");
+						if (this.State.Order.Count != count)
+						{
+							throw new CliFailure("state_changed", "The desktop order changed during reordering.");
+						}
 						var next = number + (command.Number > number ? 1 : -1);
 						submitted = true;
-						if (next > number) this._operations.MoveRight(target);
-						else this._operations.MoveLeft(target);
+						if (next > number)
+						{
+							this._operations.MoveRight(target);
+						}
+						else
+						{
+							this._operations.MoveLeft(target);
+						}
 						await this.ConfirmCliDesktopAsync(() => this.CliDesktopInfo(target).Number == next, cancellation);
 						number = next;
 					}
@@ -106,17 +133,23 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (command.Operation == "desktop wallpaper")
 				{
 					if (!ProductInfo.IsWallpaperSupportBuild && !Settings.General.ChangeBackgroundEachDesktop)
+					{
 						throw new CliFailure("unsupported", "Per-desktop wallpaper is disabled on this Windows build.");
+					}
 					var record = this.State.Records[target];
 					if (command.WallpaperPath != null)
 					{
 						if (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported
 							&& string.IsNullOrEmpty(command.WallpaperPath))
+						{
 							throw new CliFailure("invalid_arguments", "The wallpaper path cannot be empty on this Windows build.");
+						}
 						if (!string.IsNullOrEmpty(command.WallpaperPath))
 						{
 							if (!Path.IsPathFullyQualified(command.WallpaperPath))
+							{
 								throw new CliFailure("invalid_arguments", "Specify an absolute image path.");
+							}
 							try { WallpaperService.ValidateImage(command.WallpaperPath); }
 							catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException
 								|| ex is ArgumentException || ex is NotSupportedException)
@@ -133,10 +166,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 							this.EditWallpaperPath(target, command.WallpaperPath);
 							if (!this.State.Records[target].WallpaperPath.HasValue
 								|| this.State.Records[target].WallpaperPath.Value != command.WallpaperPath)
+							{
 								throw new CliFailure("result_unconfirmed", "The wallpaper path could not be applied.");
+							}
 							if (record.WallpaperPath.ReadStatus != VirtualDesktopReadStatus.Unsupported)
+							{
 								await this.ConfirmCliDesktopAsync(() => this.State.Records[target].WallpaperPath.IsConfirmed
 									&& this.State.Records[target].WallpaperPath.Value == command.WallpaperPath, cancellation);
+							}
 						}
 						return CliResponse.Ok(command.Operation, new CliData { Changed = changed, Desktop = this.CliDesktopInfo(target) });
 					}
@@ -148,7 +185,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 						submitted = true;
 						this.EditWallpaperPosition(target, position);
 						if (this.State.Records[target].WallpaperPosition != position)
+						{
 							throw new CliFailure("result_unconfirmed", "The wallpaper position could not be applied.");
+						}
 					}
 					return CliResponse.Ok(command.Operation, new CliData { Changed = positionChanged, Desktop = this.CliDesktopInfo(target) });
 				}
@@ -170,13 +209,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 				var windows = new PlacementWindows();
 				var inspection = windows.Inspect(entry.Identity.Window);
 				if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity))
+				{
 					throw new CliFailure("window_changed", "The window identity changed. Run window list again.");
+				}
 				if (command.Operation == "window pin" || command.Operation == "window unpin")
 				{
 					var pin = command.Operation == "window pin";
 					var appId = command.Scope == "app" ? ApplicationHelper.GetAppId(entry.Identity.Window) : null;
 					if (command.Scope == "app" && string.IsNullOrEmpty(appId))
+					{
 						throw new CliFailure("app_id_unavailable", "The window's application ID is unavailable.");
+					}
 					var current = command.Scope == "app" ? VirtualDesktop.IsPinnedApplication(appId) : VirtualDesktop.IsPinnedWindow(entry.Identity.Window);
 					var changed = current != pin;
 					if (changed)
@@ -185,15 +228,29 @@ namespace SylphyHorn.Services.DesktopTransitions
 						inspection = windows.Inspect(entry.Identity.Window);
 						if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity)
 							|| (command.Scope == "app" && ApplicationHelper.GetAppId(entry.Identity.Window) != appId))
+						{
 							throw new CliFailure("window_changed", "The window identity changed. Run window list again.");
+						}
 						submitted = true;
 						if (command.Scope == "app")
 						{
-							if (pin) VirtualDesktop.PinApplication(appId);
-							else VirtualDesktop.UnpinApplication(appId);
+							if (pin)
+							{
+								VirtualDesktop.PinApplication(appId);
+							}
+							else
+							{
+								VirtualDesktop.UnpinApplication(appId);
+							}
 						}
-						else if (pin) VirtualDesktop.PinWindow(entry.Identity.Window);
-						else VirtualDesktop.UnpinWindow(entry.Identity.Window);
+						else if (pin)
+						{
+							VirtualDesktop.PinWindow(entry.Identity.Window);
+						}
+						else
+						{
+							VirtualDesktop.UnpinWindow(entry.Identity.Window);
+						}
 						while (true)
 						{
 							this.EnsureCliAvailable(cancellation);
@@ -201,7 +258,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 							{
 								inspection = windows.Inspect(entry.Identity.Window);
 								if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity))
+								{
 									throw new CliFailure("result_unconfirmed", "The window changed before its pin state could be confirmed.");
+								}
 							}
 							current = command.Scope == "app" ? VirtualDesktop.IsPinnedApplication(appId) : VirtualDesktop.IsPinnedWindow(entry.Identity.Window);
 							if (current == pin) break;
@@ -218,8 +277,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					return CliResponse.Ok(command.Operation, result);
 				}
 				var location = windows.Locate(entry.Identity.Window);
-				if (location == null) throw new CliFailure("state_unavailable", "The window location could not be read.", true);
-				if (location.Pinned) throw new CliFailure("window_pinned", "A pinned window cannot be assigned to one desktop.");
+				if (location == null)
+				{
+					throw new CliFailure("state_unavailable", "The window location could not be read.", true);
+				}
+				if (location.Pinned)
+				{
+					throw new CliFailure("window_pinned", "A pinned window cannot be assigned to one desktop.");
+				}
 				var createdDesktop = false;
 				if (command.TargetKind == "new")
 				{
@@ -230,8 +295,13 @@ namespace SylphyHorn.Services.DesktopTransitions
 					await this.ConfirmCliDesktopAsync(() => this.State.Records.ContainsKey(target), cancellation);
 				}
 				else if (command.TargetKind == "next" || command.TargetKind == "previous")
+				{
 					target = this.ResolveCliRelativeTarget(command, location.Desktop);
-				else target = this.ResolveCliTarget(command);
+				}
+				else
+				{
+					target = this.ResolveCliTarget(command);
+				}
 				var moved = location.Desktop != target;
 				if (moved)
 				{
@@ -244,7 +314,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 							() => !cancellation.IsCancellationRequested && this.CliAvailable && this.State.Records.ContainsKey(target));
 						if (result != PlacementMoveStatus.Requested && result != PlacementMoveStatus.AlreadyPlaced)
 						{
-							if (!createdDesktop) submitted = false;
+							if (!createdDesktop)
+							{
+								submitted = false;
+							}
 							throw new CliFailure("window_changed", "The window could not be moved because its state changed.");
 						}
 					}
@@ -253,7 +326,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 						this.EnsureCliAvailable(cancellation);
 						inspection = windows.Inspect(entry.Identity.Window);
 						if (inspection.Status != PlacementInspectionStatus.Ready || !entry.Identity.SameInstance(inspection.Identity))
+						{
 							throw new CliFailure("result_unconfirmed", "The window changed before its destination could be confirmed.");
+						}
 						location = windows.Locate(entry.Identity.Window);
 						if (location != null && !location.Pinned && location.Desktop == target) break;
 						await Task.Delay(100, cancellation);
@@ -298,7 +373,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private void EnsureCliAvailable(CancellationToken cancellation)
 		{
 			cancellation.ThrowIfCancellationRequested();
-			if (!this.CliAvailable) throw new CliFailure("host_busy", "SylphyHorn is changing settings or shutting down.", true);
+			if (!this.CliAvailable)
+			{
+				throw new CliFailure("host_busy", "SylphyHorn is changing settings or shutting down.", true);
+			}
 		}
 
 		private async Task RefreshCliStateAsync(CancellationToken cancellation)
@@ -306,10 +384,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this.EnsureCliAvailable(cancellation);
 			var result = await this.RequestReconciliationAsync(cancellation).WaitAsync(cancellation);
 			this.EnsureCliAvailable(cancellation);
-			if (result.Status != VirtualDesktopReconciliationStatus.Succeeded) throw new CliFailure("state_unavailable", "Desktop state could not be refreshed.", true);
+			if (result.Status != VirtualDesktopReconciliationStatus.Succeeded)
+			{
+				throw new CliFailure("state_unavailable", "Desktop state could not be refreshed.", true);
+			}
 			this.ApplyStableBatch(result.Batch);
 			this.EnsureCliAvailable(cancellation);
-			if (!this.State.CurrentDesktopId.HasValue) throw new CliFailure("state_unavailable", "The current desktop is unknown.", true);
+			if (!this.State.CurrentDesktopId.HasValue)
+			{
+				throw new CliFailure("state_unavailable", "The current desktop is unknown.", true);
+			}
 		}
 
 		private async Task ConfirmCliSwitchAsync(Guid target, CancellationToken cancellation)
@@ -339,13 +423,19 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				var index = command.FallbackNumber.Value - 1;
 				if (index >= this.State.Order.Count)
+				{
 					throw new CliFailure("desktop_not_found", "The fallback desktop does not exist.");
+				}
 				fallback = this.State.Order[index];
 			}
 			if (fallback.HasValue && !this.State.Records.ContainsKey(fallback.Value))
+			{
 				throw new CliFailure("desktop_not_found", "The fallback desktop does not exist.");
+			}
 			if (fallback == target)
+			{
 				throw new CliFailure("invalid_arguments", "The fallback desktop must differ from the desktop being deleted.");
+			}
 			return fallback;
 		}
 
@@ -357,12 +447,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (this.State.Records.ContainsKey(id)) return id;
 			}
 			else if (command.TargetKind == "next" || command.TargetKind == "previous")
+			{
 				return this.ResolveCliRelativeTarget(command, this.State.CurrentDesktopId.Value);
+			}
 			else if (command.TargetKind == "last-used")
 			{
 				var previous = VirtualDesktop.History.Previous;
 				if (previous != null && previous.Id != this.State.CurrentDesktopId
-					&& this.State.Records.ContainsKey(previous.Id)) return previous.Id;
+					&& this.State.Records.ContainsKey(previous.Id))
+				{
+					return previous.Id;
+				}
 				throw new CliFailure("no_last_used_desktop", "No previously used desktop is available.");
 			}
 			else
@@ -370,8 +465,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 				var selector = command.TargetKind == "name" ? PlacementDestination.ByName(command.TargetValue)
 					: PlacementDestination.ByNumber(int.Parse(command.TargetValue, System.Globalization.CultureInfo.InvariantCulture));
 				var resolution = this.PlacementDestinations.Resolve(selector);
-				if (resolution.Status == PlacementResolutionStatus.Resolved) return resolution.DesktopId.Value;
-				if (resolution.Status == PlacementResolutionStatus.StateUnavailable) throw new CliFailure("state_unavailable", "Desktop names could not be resolved.", true);
+				if (resolution.Status == PlacementResolutionStatus.Resolved)
+				{
+					return resolution.DesktopId.Value;
+				}
+				if (resolution.Status == PlacementResolutionStatus.StateUnavailable)
+				{
+					throw new CliFailure("state_unavailable", "Desktop names could not be resolved.", true);
+				}
 			}
 			throw new CliFailure("desktop_not_found", "The specified desktop does not exist.");
 		}
@@ -380,10 +481,19 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			var order = this.State.Order.ToArray();
 			var sourceIndex = Array.IndexOf(order, source);
-			if (sourceIndex < 0) throw new CliFailure("state_unavailable", "The source desktop is no longer available.", true);
+			if (sourceIndex < 0)
+			{
+				throw new CliFailure("state_unavailable", "The source desktop is no longer available.", true);
+			}
 			var index = sourceIndex + (command.TargetKind == "next" ? 1 : -1);
-			if (command.Wrap) index = (index + order.Length) % order.Length;
-			if (index >= 0 && index < order.Length) return order[index];
+			if (command.Wrap)
+			{
+				index = (index + order.Length) % order.Length;
+			}
+			if (index >= 0 && index < order.Length)
+			{
+				return order[index];
+			}
 			throw new CliFailure(command.TargetKind == "next" ? "no_next_desktop" : "no_previous_desktop",
 				"There is no desktop in that direction.");
 		}
@@ -391,13 +501,18 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private CliWindowEntry ResolveCliWindow(Guid key)
 		{
 			if (!this._cliWindows.TryGetValue(key, out var entry) || entry.ExpiresAt < DateTime.UtcNow)
+			{
 				throw new CliFailure("window_not_found", "The window ID is unknown or expired. Run window list again.");
+			}
 			return entry;
 		}
 
 		private CliDesktop CliDesktopInfo(Guid id)
 		{
-			if (!this.State.Records.TryGetValue(id, out var record)) throw new CliFailure("state_unavailable", "The destination no longer exists.", true);
+			if (!this.State.Records.TryGetValue(id, out var record))
+			{
+				throw new CliFailure("state_unavailable", "The destination no longer exists.", true);
+			}
 			var available = record.Name.HasValue && record.Name.IsConfirmed && record.Name.ReadStatus == VirtualDesktopReadStatus.Success;
 			return new CliDesktop
 			{
@@ -435,7 +550,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 					if (previous.Value == null && this._cliWindows.Count >= 4096) { complete = false; return false; }
 					this._cliWindows[key] = new CliWindowEntry { Identity = identity, ExpiresAt = DateTime.UtcNow.AddMinutes(5) };
 					var location = windows.Locate(window);
-					if (location == null) unavailable++;
+					if (location == null)
+					{
+						unavailable++;
+					}
 					result.Add(this.CliWindowInfo(key, identity, location));
 				}
 				catch

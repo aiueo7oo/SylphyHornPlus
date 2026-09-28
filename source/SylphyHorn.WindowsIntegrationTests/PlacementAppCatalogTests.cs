@@ -20,8 +20,14 @@ namespace SylphyHorn.WindowsIntegrationTests
 				choice =>
 				{
 					Assert.False(string.IsNullOrEmpty(choice.Detail));
-					if (choice.Identity == null) Assert.Equal("IdentityUnavailable", choice.Problem);
-					if (choice.Identity?.Kind == PlacementAppKind.ExecutablePath) Assert.Equal(choice.Identity.Value, choice.Path, ignoreCase: true);
+					if (choice.Identity == null)
+					{
+						Assert.Equal("IdentityUnavailable", choice.Problem);
+					}
+					if (choice.Identity?.Kind == PlacementAppKind.ExecutablePath)
+					{
+						Assert.Equal(choice.Identity.Value, choice.Path, ignoreCase: true);
+					}
 					Assert.False(choice.ConfirmPath);
 				});
 		}

@@ -23,9 +23,13 @@ namespace SylphyHorn.Cli
 				return 0;
 			}
 			if (args.Length == 1 && args[0] == "version")
+			{
 				return Print(CliVersionInfo.Combine(CliVersionInfo.Read(Assembly.GetExecutingAssembly()), await SendAsync(args)));
+			}
 			if (args.Length > 0 && args[0] == "spec")
+			{
 				return Print(await CliSpecService.ExecuteAsync(args, SendAsync));
+			}
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
 				Console.WriteLine("sylphyhorn-cli --version");
@@ -88,10 +92,14 @@ namespace SylphyHorn.Cli
 					response = await CliProtocol.ReadAsync<CliResponse>(pipe, deadline.Token);
 					if (operation == "version" && response?.SchemaVersion == 1 && response.Command == null
 						&& !response.Success && response.Data == null && response.Error?.Code == "invalid_arguments")
+					{
 						return CliResponse.Fail(operation, "unsupported", "This host does not support version queries.");
+					}
 					if (response == null || response.SchemaVersion != 1 || response.Command != operation
 						|| (response.Success ? response.Data == null || response.Error != null : response.Error == null || response.Data != null))
+					{
 						throw new InvalidDataException("Invalid host response.");
+					}
 				}
 				catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is TimeoutException || ex is OperationCanceledException
 					|| ex is UnauthorizedAccessException || ex is System.Runtime.Serialization.SerializationException)

@@ -99,7 +99,10 @@ namespace SylphyHorn.Serialization
 			foreach (var entry in StructuredTypes)
 			{
 				if (!values.TryGetValue(entry.Key, out var value)) continue;
-				if (value == null || value.GetType() != entry.Value) throw new SerializationException("Invalid settings value: " + entry.Key);
+				if (value == null || value.GetType() != entry.Value)
+				{
+					throw new SerializationException("Invalid settings value: " + entry.Key);
+				}
 				using (var output = new StringWriter())
 				{
 					using (var writer = XmlWriter.Create(output, new XmlWriterSettings { OmitXmlDeclaration = true }))
@@ -161,7 +164,10 @@ namespace SylphyHorn.Serialization
 							using (var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }))
 							{
 								values[entry.Key] = new DataContractSerializer(entry.Value).ReadObject(reader);
-								if (reader.MoveToContent() != XmlNodeType.None) throw new SerializationException("Unexpected content after a settings value.");
+								if (reader.MoveToContent() != XmlNodeType.None)
+								{
+									throw new SerializationException("Unexpected content after a settings value.");
+								}
 							}
 						}
 					}

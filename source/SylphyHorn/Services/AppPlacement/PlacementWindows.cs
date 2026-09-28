@@ -35,10 +35,16 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			try
 			{
-				if (VirtualDesktop.IsPinnedWindow(window)) return new PlacementWindowLocation(Guid.Empty, true);
+				if (VirtualDesktop.IsPinnedWindow(window))
+				{
+					return new PlacementWindowLocation(Guid.Empty, true);
+				}
 				var appId = ApplicationHelper.GetAppId(window);
 				if (string.IsNullOrEmpty(appId)) return null;
-				if (VirtualDesktop.IsPinnedApplication(appId)) return new PlacementWindowLocation(Guid.Empty, true);
+				if (VirtualDesktop.IsPinnedApplication(appId))
+				{
+					return new PlacementWindowLocation(Guid.Empty, true);
+				}
 				var desktop = VirtualDesktop.FromHwnd(window);
 				return desktop == null ? null : new PlacementWindowLocation(desktop.Id, false);
 			}
@@ -86,7 +92,10 @@ namespace SylphyHorn.Services.AppPlacement
 			var destination = VirtualDesktop.FromId(target);
 			if (destination == null) return PlacementMoveStatus.MissingDestination;
 			var inspection = this.Inspect(expected.Window);
-			if (inspection.Status != PlacementInspectionStatus.Ready || !expected.SameInstance(inspection.Identity)) return PlacementMoveStatus.Changed;
+			if (inspection.Status != PlacementInspectionStatus.Ready || !expected.SameInstance(inspection.Identity))
+			{
+				return PlacementMoveStatus.Changed;
+			}
 			var location = this.Locate(expected.Window);
 			if (location == null) return PlacementMoveStatus.Changed;
 			if (location.Pinned) return PlacementMoveStatus.Pinned;

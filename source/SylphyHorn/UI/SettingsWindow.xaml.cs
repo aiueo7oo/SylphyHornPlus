@@ -34,7 +34,10 @@ namespace SylphyHorn.UI
 			if (source?.CompositionTarget == null) return;
 			var monitor = NativeMethods.MonitorFromWindow(source.Handle, MonitorDefaultTo.MONITOR_DEFAULTTONEAREST);
 			var info = new MONITORINFOEX { cbSize = Marshal.SizeOf(typeof(MONITORINFOEX)) };
-			if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info) || !NativeMethods.GetWindowRect(source.Handle, out var bounds)) return;
+			if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info) || !NativeMethods.GetWindowRect(source.Handle, out var bounds))
+			{
+				return;
+			}
 			var fromDevice = source.CompositionTarget.TransformFromDevice;
 			var work = new Rect(
 				fromDevice.Transform(new Point(info.rcWork.Left, info.rcWork.Top)),
@@ -42,7 +45,10 @@ namespace SylphyHorn.UI
 			var window = new Rect(
 				fromDevice.Transform(new Point(bounds.Left, bounds.Top)),
 				fromDevice.Transform(new Point(bounds.Right, bounds.Bottom)));
-			if (work.IsEmpty || (window.Width <= work.Width && window.Height <= work.Height && work.Contains(window))) return;
+			if (work.IsEmpty || (window.Width <= work.Width && window.Height <= work.Height && work.Contains(window)))
+			{
+				return;
+			}
 			var width = Math.Min(window.Width, work.Width);
 			var height = Math.Min(window.Height, work.Height);
 			this.Width = width;

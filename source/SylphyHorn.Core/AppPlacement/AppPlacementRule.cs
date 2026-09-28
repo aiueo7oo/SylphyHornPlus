@@ -31,7 +31,10 @@ namespace SylphyHorn.AppPlacement
 
 		private void Validate()
 		{
-			if (string.IsNullOrWhiteSpace(this.Value)) throw new SerializationException("An application identity is required.");
+			if (string.IsNullOrWhiteSpace(this.Value))
+			{
+				throw new SerializationException("An application identity is required.");
+			}
 			switch (this.Kind)
 			{
 				case PlacementAppKind.ExecutablePath:
@@ -40,7 +43,9 @@ namespace SylphyHorn.AppPlacement
 					var drivePath = path.Length > 3 && char.IsLetter(path[0]) && path[1] == ':' && path[2] == '\\';
 					var uncPath = path.StartsWith(@"\\", StringComparison.Ordinal) && !path.StartsWith(@"\\?", StringComparison.Ordinal) && !path.StartsWith(@"\\.", StringComparison.Ordinal);
 					if ((!drivePath && !uncPath) || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || path.IndexOfAny(new[] { '*', '?' }) >= 0)
+					{
 						throw new SerializationException("An absolute executable path is required.");
+					}
 					try
 					{
 						this.Value = Path.GetFullPath(path);
@@ -50,12 +55,16 @@ namespace SylphyHorn.AppPlacement
 						throw new SerializationException("Invalid executable path.", ex);
 					}
 					if (!string.Equals(Path.GetExtension(this.Value), ".exe", StringComparison.OrdinalIgnoreCase))
+					{
 						throw new SerializationException("The application path must identify an executable.");
+					}
 					break;
 				case PlacementAppKind.PackageAppId:
 					var separator = this.Value.IndexOf('!');
 					if (separator <= 0 || separator == this.Value.Length - 1 || separator != this.Value.LastIndexOf('!'))
+					{
 						throw new SerializationException("A package family and application ID are required.");
+					}
 					break;
 				default:
 					throw new SerializationException("Unknown application identity kind.");
@@ -109,7 +118,10 @@ namespace SylphyHorn.AppPlacement
 
 		private void Validate()
 		{
-			if (this.Kind == PlacementDestinationKind.Name && !string.IsNullOrWhiteSpace(this.Name) && this.Number == 0) return;
+			if (this.Kind == PlacementDestinationKind.Name && !string.IsNullOrWhiteSpace(this.Name) && this.Number == 0)
+			{
+				return;
+			}
 			if (this.Kind == PlacementDestinationKind.Number && this.Number > 0 && this.Name == null) return;
 			throw new SerializationException("Specify a nonempty desktop name or a positive desktop number.");
 		}
@@ -164,7 +176,9 @@ namespace SylphyHorn.AppPlacement
 		private void Validate()
 		{
 			if (this.Id == Guid.Empty || this.App == null || this.Destination == null)
+			{
 				throw new SerializationException("A rule ID, application and destination are required.");
+			}
 		}
 
 		[OnDeserialized]

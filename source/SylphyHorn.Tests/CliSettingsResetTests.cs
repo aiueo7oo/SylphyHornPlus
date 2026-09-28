@@ -24,7 +24,10 @@ namespace SylphyHorn.Tests
 			var settings = new GeneralSettings(harness.Settings.Provider);
 			settings.LoopDesktop.Value = true;
 			harness.Runtime.EditWallpaperPosition(A, WallpaperPosition.Tile);
-			if (saveFails) harness.Settings.Provider.SaveFailure = new IOException("synthetic");
+			if (saveFails)
+			{
+				harness.Settings.Provider.SaveFailure = new IOException("synthetic");
+			}
 			var suspended = false;
 			var refreshed = false;
 			var service = new CliSettingsResetService(harness.Runtime.ResetSettingsAsync, () => true,
@@ -49,8 +52,14 @@ namespace SylphyHorn.Tests
 			Assert.Equal(0, harness.Operations.CreateCalls);
 			Assert.Equal(0, harness.Operations.NameCalls);
 			Assert.Empty(harness.Operations.RemovedIds);
-			if (saveFails) Assert.Equal("result_unconfirmed", response.Error.Code);
-			else Assert.True(response.Data.Reset);
+			if (saveFails)
+			{
+				Assert.Equal("result_unconfirmed", response.Error.Code);
+			}
+			else
+			{
+				Assert.True(response.Data.Reset);
+			}
 		}
 
 		[Fact]

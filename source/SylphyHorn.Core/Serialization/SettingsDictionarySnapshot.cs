@@ -22,10 +22,22 @@ namespace SylphyHorn.Serialization
 			if (value == null || value is string || value.GetType().IsValueType) return value;
 			// The entire placement graph is immutable, including its read-only rule list.
 			if (value is AppPlacementConfiguration || value is PlacementCreatedGroup) return value;
-			if (value is Array array) return array.Clone();
-			if (value is IList<int> integers) return integers.ToList();
-			if (value is IList<string> strings) return strings.ToList();
-			if (value is IList<byte> bytes) return bytes.ToList();
+			if (value is Array array)
+			{
+				return array.Clone();
+			}
+			if (value is IList<int> integers)
+			{
+				return integers.ToList();
+			}
+			if (value is IList<string> strings)
+			{
+				return strings.ToList();
+			}
+			if (value is IList<byte> bytes)
+			{
+				return bytes.ToList();
+			}
 			if (value is IList list)
 			{
 				var copy = new ArrayList(list.Count);

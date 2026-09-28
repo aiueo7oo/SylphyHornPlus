@@ -120,7 +120,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		public Task<PlacementResult[]> ApplyAsync(PlacementPreview preview, Guid[] selection, CancellationToken cancellation)
 		{
-			if (selection == null || selection.Length > 256) throw new ArgumentException(nameof(selection));
+			if (selection == null || selection.Length > 256)
+			{
+				throw new ArgumentException(nameof(selection));
+			}
 			var selected = (Guid[])selection.Clone();
 			return this.Submit(
 				token =>
@@ -146,7 +149,9 @@ namespace SylphyHorn.Services.AppPlacement
 			lock (this._gate)
 			{
 				if (this._ended || !this.IsReady || this._cancellation.IsCancellationRequested || this._request != null || this._requestRunning)
+				{
 					throw new PlacementRequestRejectedException();
+				}
 				var request = new Request<T>(action, cancellation);
 				this._request = request;
 				this._requestReady.Set();
@@ -222,9 +227,18 @@ namespace SylphyHorn.Services.AppPlacement
 
 			internal override void Complete()
 			{
-				if (this._cancelled) this.Cancel();
-				else if (this._failure != null) this.Completion.TrySetException(this._failure);
-				else this.Completion.TrySetResult(this._result);
+				if (this._cancelled)
+				{
+					this.Cancel();
+				}
+				else if (this._failure != null)
+				{
+					this.Completion.TrySetException(this._failure);
+				}
+				else
+				{
+					this.Completion.TrySetResult(this._result);
+				}
 			}
 		}
 
@@ -299,12 +313,20 @@ namespace SylphyHorn.Services.AppPlacement
 					for (var i = pending.Count - 1; i >= 0 && !this._cancellation.IsCancellationRequested; i--)
 					{
 						var work = pending[i];
-						if (work.NextAt <= Now() || !this._monitor.Events.IsCurrent(work.Candidate)) processor.Step(work);
+						if (work.NextAt <= Now() || !this._monitor.Events.IsCurrent(work.Candidate))
+						{
+							processor.Step(work);
+						}
 						if (work.Result != null)
 						{
 							if (work.Target.HasValue && (work.Result.Outcome == PlacementOutcome.Moved || work.Result.Outcome == PlacementOutcome.AlreadyPlaced))
+							{
 								usedDesktops?.Add(work.Target.Value);
-							if (work.Result.Outcome != PlacementOutcome.NoRule) this._history.Add(work.Result);
+							}
+							if (work.Result.Outcome != PlacementOutcome.NoRule)
+							{
+								this._history.Add(work.Result);
+							}
 							this._monitor.Events.Complete(work.Candidate);
 							pending.RemoveAt(i);
 						}
@@ -315,7 +337,10 @@ namespace SylphyHorn.Services.AppPlacement
 						}
 					}
 					if (this._monitor.Events.State != PlacementMonitorState.Running) break;
-					if (this._monitor.Events.BufferedCount != 0 || (capacityReached && pending.Count < CandidateLimit)) delay = 0;
+					if (this._monitor.Events.BufferedCount != 0 || (capacityReached && pending.Count < CandidateLimit))
+					{
+						delay = 0;
+					}
 					if (occupancy != null)
 					{
 						var version = this._monitor.Events.Version;
@@ -360,7 +385,9 @@ namespace SylphyHorn.Services.AppPlacement
 				if (this._monitor != null)
 				{
 					if (this._monitor.Events.State == PlacementMonitorState.Paused)
+					{
 						this._history.Add(new PlacementResult(IntPtr.Zero, null, PlacementOutcome.MonitorPaused, this._monitor.Events.PauseReason));
+					}
 					try
 					{
 						this._monitor.StopAsync().GetAwaiter().GetResult();
@@ -380,7 +407,14 @@ namespace SylphyHorn.Services.AppPlacement
 					this._stop.Dispose();
 					this._requestReady.Dispose();
 				}
-				if (failure == null) this._completion.TrySetResult(true); else this._completion.TrySetException(failure);
+				if (failure == null)
+				{
+					this._completion.TrySetResult(true);
+				}
+				else
+				{
+					this._completion.TrySetException(failure);
+				}
 			}
 		}
 

@@ -100,7 +100,10 @@ namespace SylphyHorn.Services.AppPlacement
 					foreach (var app in apps)
 					{
 						token.ThrowIfCancellationRequested();
-						if (!result.ContainsKey(app)) result[app] = ReadIcon(app);
+						if (!result.ContainsKey(app))
+						{
+							result[app] = ReadIcon(app);
+						}
 					}
 					return result;
 				},
@@ -114,7 +117,10 @@ namespace SylphyHorn.Services.AppPlacement
 				var logo = Icon("shell:AppsFolder\\" + app.Value);
 				return new PlacementAppIcon(logo, logo == null ? PlacementAppPresence.Unknown : PlacementAppPresence.Present);
 			}
-			if (!File.Exists(app.Value)) return new PlacementAppIcon(null, PlacementAppPresence.Missing);
+			if (!File.Exists(app.Value))
+			{
+				return new PlacementAppIcon(null, PlacementAppPresence.Missing);
+			}
 			return new PlacementAppIcon(Icon(app.Value) ?? DefaultApplicationIcon(), PlacementAppPresence.Present);
 		}
 
@@ -157,7 +163,10 @@ namespace SylphyHorn.Services.AppPlacement
 		private static PlacementAppChoice Executable(string path)
 		{
 			var identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, path);
-			if (!File.Exists(identity.Value)) throw new FileNotFoundException();
+			if (!File.Exists(identity.Value))
+			{
+				throw new FileNotFoundException();
+			}
 			var name = FileVersionInfo.GetVersionInfo(identity.Value).FileDescription;
 			return new PlacementAppChoice(
 				string.IsNullOrWhiteSpace(name) ? System.IO.Path.GetFileNameWithoutExtension(path) : name,
@@ -174,12 +183,18 @@ namespace SylphyHorn.Services.AppPlacement
 				(window, state) =>
 				{
 					if (cancellation.IsCancellationRequested || handles.Count == 4096) return false;
-					if (IsWindowVisible(window)) handles.Add(window);
+					if (IsWindowVisible(window))
+					{
+						handles.Add(window);
+					}
 					return true;
 				},
 				IntPtr.Zero);
 			cancellation.ThrowIfCancellationRequested();
-			if (!ok) throw new InvalidOperationException("Window enumeration unavailable or over capacity.");
+			if (!ok)
+			{
+				throw new InvalidOperationException("Window enumeration unavailable or over capacity.");
+			}
 			var reader = new PlacementWindowReader();
 			var choices = new List<PlacementAppChoice>();
 			uint own;
@@ -213,10 +228,16 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application", true));
 				folder = ((dynamic)shell).NameSpace("shell:AppsFolder");
-				if (folder == null) throw new InvalidOperationException("AppsFolder unavailable.");
+				if (folder == null)
+				{
+					throw new InvalidOperationException("AppsFolder unavailable.");
+				}
 				items = ((dynamic)folder).Items();
 				int count = ((dynamic)items).Count;
-				if (count > 10000) throw new InvalidOperationException("AppsFolder over capacity.");
+				if (count > 10000)
+				{
+					throw new InvalidOperationException("AppsFolder over capacity.");
+				}
 				var choices = new List<PlacementAppChoice>();
 				var packages = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 				for (var i = 0; i < count; i++)
@@ -236,16 +257,28 @@ namespace SylphyHorn.Services.AppPlacement
 						if (PlacementAppIdentityResolver.IsPackageApp(id, null))
 						{
 							var family = id.Substring(0, id.IndexOf('!'));
-							if (!packages.TryGetValue(family, out var applications)) packages[family] = applications = ReadPackage(family);
-							if (applications.TryGetValue(id.Substring(id.IndexOf('!') + 1), out target)) identity = new PlacementAppIdentity(PlacementAppKind.PackageAppId, id);
-							else problem = "IdentityUnavailable";
+							if (!packages.TryGetValue(family, out var applications))
+							{
+								packages[family] = applications = ReadPackage(family);
+							}
+							if (applications.TryGetValue(id.Substring(id.IndexOf('!') + 1), out target))
+							{
+								identity = new PlacementAppIdentity(PlacementAppKind.PackageAppId, id);
+							}
+							else
+							{
+								problem = "IdentityUnavailable";
+							}
 						}
 						else
 						{
 							try
 							{
 								// Shell parsing names can be virtual items or commands, not filesystem paths.
-								if (string.IsNullOrEmpty(target) && System.IO.Path.IsPathRooted(path ?? "") && string.Equals(System.IO.Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase)) target = path;
+								if (string.IsNullOrEmpty(target) && System.IO.Path.IsPathRooted(path ?? "") && string.Equals(System.IO.Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase))
+								{
+									target = path;
+								}
 								if (File.Exists(target))
 								{
 									identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, target);
@@ -253,7 +286,10 @@ namespace SylphyHorn.Services.AppPlacement
 								}
 							}
 							catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is System.Runtime.Serialization.SerializationException) { }
-							if (identity == null) problem = "LauncherOnly";
+							if (identity == null)
+							{
+								problem = "LauncherOnly";
+							}
 						}
 						choices.Add(new PlacementAppChoice(
 							name,
@@ -318,7 +354,10 @@ namespace SylphyHorn.Services.AppPlacement
 								if (!string.IsNullOrEmpty(relative))
 								{
 									var resolved = System.IO.Path.GetFullPath(System.IO.Path.Combine(path.ToString(), relative));
-									if (resolved.StartsWith(path + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(resolved)) executable = resolved;
+									if (resolved.StartsWith(path + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(resolved))
+									{
+										executable = resolved;
+									}
 								}
 								applications[id] = applications.ContainsKey(id) ? null : executable;
 							}
@@ -358,7 +397,10 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			finally
 			{
-				if (bitmap != IntPtr.Zero) DeleteObject(bitmap);
+				if (bitmap != IntPtr.Zero)
+				{
+					DeleteObject(bitmap);
+				}
 				Release(item);
 			}
 		}
@@ -370,7 +412,10 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			if (_defaultApplicationIcon != null) return _defaultApplicationIcon;
 			var info = new StockIconInfo { Size = (uint)Marshal.SizeOf<StockIconInfo>() };
-			if (SHGetStockIconInfo(StockIconApplication, StockIconHandle, ref info) != 0 || info.Icon == IntPtr.Zero) return null;
+			if (SHGetStockIconInfo(StockIconApplication, StockIconHandle, ref info) != 0 || info.Icon == IntPtr.Zero)
+			{
+				return null;
+			}
 			try
 			{
 				var source = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
@@ -389,7 +434,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private static void Release(object value)
 		{
-			if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
+			if (value != null && Marshal.IsComObject(value))
+			{
+				Marshal.ReleaseComObject(value);
+			}
 		}
 
 		[StructLayout(LayoutKind.Sequential)]

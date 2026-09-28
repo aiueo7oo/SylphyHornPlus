@@ -160,7 +160,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 						if (!this._host.HasExited)
 						{
 							this._host.StandardInput.Close();
-							if (!this._host.WaitForExit(3000)) this._host.Kill();
+							if (!this._host.WaitForExit(3000))
+							{
+								this._host.Kill();
+							}
 						}
 						Assert.True(this._host.WaitForExit(3000), "Fixture process did not exit.");
 					}

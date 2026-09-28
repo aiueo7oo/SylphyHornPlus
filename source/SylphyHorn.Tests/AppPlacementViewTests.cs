@@ -309,7 +309,10 @@ namespace SylphyHorn.Tests
 
 			public override void Write(string message)
 			{
-				if (!string.IsNullOrEmpty(message)) this.Messages.Add(message);
+				if (!string.IsNullOrEmpty(message))
+				{
+					this.Messages.Add(message);
+				}
 			}
 
 			public override void WriteLine(string message) => this.Write(message);

@@ -53,8 +53,14 @@ namespace SylphyHorn.UI
 
 		private async void ClosingCommit(object sender, EventArgs args)
 		{
-			if (sender is ComboBox combo && (combo.IsDropDownOpen || (args is KeyboardFocusChangedEventArgs && combo.IsKeyboardFocusWithin))) return;
-			if ((sender as FrameworkElement)?.DataContext is PlacementClosingRow row) await row.Group.Owner.CommitClosingAsync(row);
+			if (sender is ComboBox combo && (combo.IsDropDownOpen || (args is KeyboardFocusChangedEventArgs && combo.IsKeyboardFocusWithin)))
+			{
+				return;
+			}
+			if ((sender as FrameworkElement)?.DataContext is PlacementClosingRow row)
+			{
+				await row.Group.Owner.CommitClosingAsync(row);
+			}
 		}
 
 		private async void ClosingInputKey(object sender, KeyEventArgs args)

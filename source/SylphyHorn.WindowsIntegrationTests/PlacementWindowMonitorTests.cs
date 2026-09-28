@@ -41,7 +41,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 				}
 				finally
 				{
-					if (window != IntPtr.Zero) DestroyWindow(window);
+					if (window != IntPtr.Zero)
+					{
+						DestroyWindow(window);
+					}
 					try
 					{
 						await monitor.StopAsync();
@@ -80,10 +83,19 @@ namespace SylphyHorn.WindowsIntegrationTests
 					PlacementCandidate value;
 					while ((value = monitor.Events.TakeCandidate()) != null)
 					{
-						if (value.Window == existing) admittedExisting = true;
+						if (value.Window == existing)
+						{
+							admittedExisting = true;
+						}
 						Assert.NotEqual(child, value.Window);
-						if (value.Window == created) candidate = value;
-						else monitor.Events.Complete(value);
+						if (value.Window == created)
+						{
+							candidate = value;
+						}
+						else
+						{
+							monitor.Events.Complete(value);
+						}
 					}
 					return candidate != null && admittedExisting;
 				});
@@ -99,8 +111,14 @@ namespace SylphyHorn.WindowsIntegrationTests
 			}
 			finally
 			{
-				if (created != IntPtr.Zero) DestroyWindow(created);
-				if (child != IntPtr.Zero) DestroyWindow(child);
+				if (created != IntPtr.Zero)
+				{
+					DestroyWindow(created);
+				}
+				if (child != IntPtr.Zero)
+				{
+					DestroyWindow(child);
+				}
 				DestroyWindow(existing);
 				try
 				{
@@ -211,7 +229,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 				IntPtr.Zero,
 				IntPtr.Zero,
 				IntPtr.Zero);
-			if (window == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+			if (window == IntPtr.Zero)
+			{
+				throw new Win32Exception(Marshal.GetLastWin32Error());
+			}
 			return window;
 		}
 

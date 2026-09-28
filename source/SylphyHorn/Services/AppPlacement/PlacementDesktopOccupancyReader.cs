@@ -45,7 +45,10 @@ namespace SylphyHorn.Services.AppPlacement
 					if (GetClassName(window, name, name.Capacity) == 0) { complete = false; return false; }
 					// Shell surfaces are not user windows. Owned dialogs and tool windows are deliberately included.
 					var type = name.ToString();
-					if (type == "Progman" || type == "WorkerW" || type == "Shell_TrayWnd" || type == "Shell_SecondaryTrayWnd") return true;
+					if (type == "Progman" || type == "WorkerW" || type == "Shell_TrayWnd" || type == "Shell_SecondaryTrayWnd")
+					{
+						return true;
+					}
 					try
 					{
 						var desktop = LocateDesktop(() => manager.GetWindowDesktopId(window), () => VirtualDesktop.IsPinnedWindow(window));
@@ -80,8 +83,14 @@ namespace SylphyHorn.Services.AppPlacement
 			catch (COMException ex) when (IsMissingView(ex))
 			{
 				// Both Shell lookups must confirm absence before excluding an unregistered helper.
-				try { if (pinned()) return null; }
-				catch (COMException pinFailure) when (IsMissingView(pinFailure)) { return null; }
+				try
+				{
+					if (pinned()) return null;
+				}
+				catch (COMException pinFailure) when (IsMissingView(pinFailure))
+				{
+					return null;
+				}
 				throw;
 			}
 		}

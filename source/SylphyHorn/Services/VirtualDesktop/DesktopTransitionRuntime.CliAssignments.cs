@@ -20,10 +20,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 				this.EnsureCliAvailable(cancellation);
 				var status = this.PlacementStatus;
 				if (status == "Stopping" || status == "Suspended")
+				{
 					return CliResponse.Fail(command.Operation, "host_busy", "Placement is being stopped or suspended.", true);
+				}
 				if (status == "Disabled" || status == "NoRules")
+				{
 					return CliResponse.Fail(command.Operation, "assignment_unavailable",
 						"Enable automatic placement and configure an enabled rule or closing target first.");
+				}
 				if (status == "Paused")
 				{
 					submitted = true;
@@ -31,7 +35,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 					this.EnsureCliAvailable(cancellation);
 					status = this.PlacementStatus;
 					if (status != "Active" && status != "Preparing")
+					{
 						return CliResponse.Fail(command.Operation, "assignment_unavailable", "Monitoring did not resume. Read assignment status and logs before retrying.");
+					}
 				}
 				return CliResponse.Ok(command.Operation, new CliData { Changed = submitted, AssignmentStatus = status.ToLowerInvariant() });
 			}
@@ -70,18 +76,30 @@ namespace SylphyHorn.Services.DesktopTransitions
 				{
 					var id = Guid.Parse(command.RuleId);
 					var rule = this._placementConfiguration.Rules.SingleOrDefault(item => item.Id == id);
-					if (rule == null) return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
-					if (!rule.Enabled) return CliResponse.Fail(command.Operation, "assignment_disabled", "The selected rule is disabled.");
+					if (rule == null)
+					{
+						return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+					}
+					if (!rule.Enabled)
+					{
+						return CliResponse.Fail(command.Operation, "assignment_disabled", "The selected rule is disabled.");
+					}
 					app = rule.App;
 				}
 				if (this.PlacementStatus != "Active")
+				{
 					return CliResponse.Fail(command.Operation, "assignment_unavailable", "Automatic app placement must be enabled and monitoring.");
+				}
 				if (app != null && this._placementConfiguration.FindEnabledRule(app) == null)
+				{
 					return CliResponse.Fail(command.Operation, "assignment_not_found", "No enabled assignment matches this executable path.");
+				}
 				foreach (var key in this._cliWindows.Where(pair => pair.Value.ExpiresAt < DateTime.UtcNow).Select(pair => pair.Key).ToArray())
 					this._cliWindows.Remove(key);
 				if (this._cliWindows.Count > 4096 - 256)
+				{
 					return CliResponse.Fail(command.Operation, "host_busy", "Too many unexpired window identifiers. Retry after they expire.", true);
+				}
 				var request = this._placementSession.ApplyRulesAsync(this.PlacementDestinations, app, command.DryRun, cancellation);
 				submitted = !command.DryRun;
 				var application = await request;

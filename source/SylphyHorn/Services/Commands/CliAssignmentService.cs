@@ -36,8 +36,13 @@ namespace SylphyHorn.Services.Commands
 			{
 				cancellation.ThrowIfCancellationRequested();
 				if (command.Operation == "app assignment status")
+				{
 					return CliResponse.Ok(command.Operation, this.Describe(this._settings.Configuration.Value, false));
-				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
+				if (!this._available())
+				{
+					return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
 				if (command.Operation == "app list")
 				{
 					var apps = await this._catalog.ReadAsync(command.Source == "windows", cancellation, false).WaitAsync(cancellation);
@@ -56,8 +61,14 @@ namespace SylphyHorn.Services.Commands
 					});
 				}
 				var current = this._settings.Configuration.Value;
-				if (command.Operation == "app assignment list") return CliResponse.Ok(command.Operation, this.Describe(current));
-				if (command.Operation == "desktop autoclose list") return CliResponse.Ok(command.Operation, this.Describe(current, false));
+				if (command.Operation == "app assignment list")
+				{
+					return CliResponse.Ok(command.Operation, this.Describe(current));
+				}
+				if (command.Operation == "desktop autoclose list")
+				{
+					return CliResponse.Ok(command.Operation, this.Describe(current, false));
+				}
 				AppPlacementConfiguration updated;
 				if (command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove")
 				{
@@ -72,7 +83,10 @@ namespace SylphyHorn.Services.Commands
 							changed = true;
 						}
 					}
-					else changed = targets.RemoveAll(item => SameDestination(item, target)) != 0;
+					else
+					{
+						changed = targets.RemoveAll(item => SameDestination(item, target)) != 0;
+					}
 					updated = changed ? new AppPlacementConfiguration(current.Enabled, current.Rules,
 						current.CreateMissingDesktops, current.CloseCreatedDesktops, targets, current.FollowForeground) : current;
 				}
@@ -90,10 +104,15 @@ namespace SylphyHorn.Services.Commands
 				{
 					var id = Guid.Parse(command.RuleId);
 					var rule = current.Rules.SingleOrDefault(item => item.Id == id);
-					if (rule == null) return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+					if (rule == null)
+					{
+						return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+					}
 					var enabled = command.Operation == "app assignment enable";
 					if (enabled && current.Rules.Any(item => item.Id != id && item.Enabled && item.App.Equals(rule.App)))
+					{
 						return CliResponse.Fail(command.Operation, "assignment_conflict", "Another rule for this application is enabled. Disable it first.");
+					}
 					var rules = current.Rules.Select(item => item.Id != id ? item : new AppPlacementRule(item.Id, enabled,
 						item.App, item.Destination, item.DisplayName, item.DisplayExecutablePath, item.FollowForeground));
 					updated = rule.Enabled == enabled ? current : new AppPlacementConfiguration(current.Enabled, rules,
@@ -108,7 +127,10 @@ namespace SylphyHorn.Services.Commands
 					{
 						var id = Guid.Parse(command.RuleId);
 						previous = current.Rules.SingleOrDefault(rule => rule.Id == id);
-						if (previous == null) return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+						if (previous == null)
+						{
+							return CliResponse.Fail(command.Operation, "assignment_not_found", "The saved rule no longer exists.");
+						}
 						identity = previous.App;
 					}
 					else
@@ -119,28 +141,40 @@ namespace SylphyHorn.Services.Commands
 						{
 							var apps = await this._catalog.ReadAsync(false, cancellation, false).WaitAsync(cancellation);
 							choice = apps.FirstOrDefault(app => identity.Equals(app.Identity));
-							if (choice == null) return CliResponse.Fail(command.Operation, "app_unavailable", "The registered package application could not be identified.");
+							if (choice == null)
+							{
+								return CliResponse.Fail(command.Operation, "app_unavailable", "The registered package application could not be identified.");
+							}
 						}
 						else if (command.Operation == "app assignment set")
 						{
 							choice = await this._catalog.ReadExecutableAsync(identity.Value, cancellation).WaitAsync(cancellation);
 							if (choice?.Identity == null)
+							{
 								return CliResponse.Fail(command.Operation, "app_unavailable", "The executable could not be identified.");
+							}
 							identity = choice.Identity;
 						}
 						cancellation.ThrowIfCancellationRequested();
 						if (!this._available() || !ReferenceEquals(current, this._settings.Configuration.Value))
+						{
 							return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while identifying the application.", true);
+						}
 						var matches = current.Rules.Where(rule => rule.App.Equals(identity)).ToArray();
 						if (matches.Length > 1)
+						{
 							return CliResponse.Fail(command.Operation, "ambiguous_assignment", "Multiple rules match this application. Select a saved rule ID.");
+						}
 						previous = matches.SingleOrDefault();
 					}
 					var rules = current.Rules.ToList();
 					var changed = false;
 					if (command.Operation == "app assignment remove")
 					{
-						if (previous != null) changed = rules.Remove(previous);
+						if (previous != null)
+						{
+							changed = rules.Remove(previous);
+						}
 					}
 					else
 					{
@@ -152,7 +186,14 @@ namespace SylphyHorn.Services.Commands
 						{
 							var rule = new AppPlacementRule(previous?.Id ?? Guid.NewGuid(), previous?.Enabled ?? true,
 								identity, destination, choice?.Name ?? previous?.DisplayName, choice?.Path ?? previous?.DisplayExecutablePath, follow);
-							if (previous == null) rules.Add(rule); else rules[rules.IndexOf(previous)] = rule;
+							if (previous == null)
+							{
+								rules.Add(rule);
+							}
+							else
+							{
+								rules[rules.IndexOf(previous)] = rule;
+							}
 						}
 					}
 					updated = changed ? new AppPlacementConfiguration(current.Enabled, rules, current.CreateMissingDesktops,
@@ -167,9 +208,13 @@ namespace SylphyHorn.Services.Commands
 				// Also retry persistence for an unchanged request after an earlier save failure.
 				var saved = await this._save().WaitAsync(cancellation);
 				if (!saved.Succeeded)
+				{
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
+				}
 				if (!ReferenceEquals(updated, this._settings.Configuration.Value))
+				{
 					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while saving. Query current assignments.");
+				}
 				var data = this.Describe(updated, !command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal));
 				data.Changed = configurationChanged;
 				return CliResponse.Ok(command.Operation, data);

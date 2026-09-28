@@ -46,7 +46,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this._selected;
 			set
 			{
-				if ((!value || this.Selectable) && this.SetProperty(ref this._selected, value)) this._selectionChanged();
+				if ((!value || this.Selectable) && this.SetProperty(ref this._selected, value))
+				{
+					this._selectionChanged();
+				}
 			}
 		}
 
@@ -137,7 +140,10 @@ namespace SylphyHorn.UI.Bindings
 		internal void RefreshStatus()
 		{
 			if (this._disposed) return;
-			if (this._runtime.PlacementStatus != "Active") this.Invalidate();
+			if (this._runtime.PlacementStatus != "Active")
+			{
+				this.Invalidate();
+			}
 			this.NotifyCommands();
 		}
 
@@ -173,16 +179,25 @@ namespace SylphyHorn.UI.Bindings
 				}
 				catch (OperationCanceledException)
 				{
-					if (!this._disposed) this.Message("ApplyCancelled");
+					if (!this._disposed)
+					{
+						this.Message("ApplyCancelled");
+					}
 				}
 				catch (Exception)
 				{
-					if (!this._disposed) this.Message("ApplyQueryFailed");
+					if (!this._disposed)
+					{
+						this.Message("ApplyQueryFailed");
+					}
 				}
 				finally
 				{
 					this._request = null;
-					if (!this._disposed) this.IsBusy = false;
+					if (!this._disposed)
+					{
+						this.IsBusy = false;
+					}
 				}
 			}
 		}
@@ -190,7 +205,10 @@ namespace SylphyHorn.UI.Bindings
 		private string DesktopLabel(DesktopRuntimeState state, Guid id)
 		{
 			var index = state.Order.ToList().IndexOf(id);
-			if (index < 0) return this.Text["DesktopUnknown"];
+			if (index < 0)
+			{
+				return this.Text["DesktopUnknown"];
+			}
 			var number = string.Format(CultureInfo.CurrentCulture, this.Text["DesktopNumber"], index + 1);
 			var name = state.Records[id].Name;
 			return name.IsConfirmed && name.HasValue && name.ReadStatus == WindowsDesktop.VirtualDesktopReadStatus.Success && !string.IsNullOrWhiteSpace(name.Value) ? number + " — " + name.Value : number;
@@ -204,7 +222,10 @@ namespace SylphyHorn.UI.Bindings
 			this._preview = null;
 			foreach (var row in this.Rows)
 			{
-				if (row.Selectable && !row.Selected) row.Result = this.Text["ApplyNotSelected"];
+				if (row.Selectable && !row.Selected)
+				{
+					row.Result = this.Text["ApplyNotSelected"];
+				}
 				row.Selectable = false;
 			}
 			foreach (var row in selected) row.Result = this.Text["Applying"];
@@ -236,7 +257,10 @@ namespace SylphyHorn.UI.Bindings
 				finally
 				{
 					this._request = null;
-					if (!this._disposed) this.IsBusy = false;
+					if (!this._disposed)
+					{
+						this.IsBusy = false;
+					}
 				}
 			}
 		}

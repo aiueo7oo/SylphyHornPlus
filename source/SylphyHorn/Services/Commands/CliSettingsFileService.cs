@@ -40,17 +40,26 @@ namespace SylphyHorn.Services.Commands
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
-				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are changing or input is being edited.", true);
+				if (!this._available())
+				{
+					return CliResponse.Fail(command.Operation, "host_busy", "Settings are changing or input is being edited.", true);
+				}
 				if (!System.IO.Path.IsPathFullyQualified(command.FilePath))
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "The host requires an absolute file path.");
+				}
 				var path = System.IO.Path.GetFullPath(command.FilePath);
 				if (string.Equals(path, System.IO.Path.GetFullPath(this._settingsPath), StringComparison.OrdinalIgnoreCase))
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "Use a separate settings backup file.");
+				}
 
 				if (command.Operation == "settings export")
 				{
 					if (!command.Overwrite && File.Exists(path))
+					{
 						return CliResponse.Fail(command.Operation, "file_exists", "Use --overwrite to replace an existing backup.");
+					}
 					var directory = System.IO.Path.GetDirectoryName(path);
 					Directory.CreateDirectory(directory);
 					var temporary = System.IO.Path.Combine(directory, "." + Guid.NewGuid().ToString("N") + ".xml");
@@ -62,14 +71,21 @@ namespace SylphyHorn.Services.Commands
 					}
 					finally
 					{
-						if (File.Exists(temporary)) File.Delete(temporary);
+						if (File.Exists(temporary))
+						{
+							File.Delete(temporary);
+						}
 					}
 					return CliResponse.Ok(command.Operation, new CliData { Path = path });
 				}
 				if (command.Operation != "settings import")
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown settings file command.");
+				}
 				if (command.ApplyDesktops == true && !this._nameSupported)
+				{
 					return CliResponse.Fail(command.Operation, "unsupported", "Applying a saved desktop layout is unavailable on this Windows build.");
+				}
 
 				// Keep the source present and immutable while the existing provider reads it.
 				using (var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))

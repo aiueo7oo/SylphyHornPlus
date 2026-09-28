@@ -18,7 +18,10 @@ namespace SylphyHorn.UI
 
 		private void Choose(object sender, RoutedEventArgs args)
 		{
-			if ((this.DataContext as PlacementAppPickerViewModel)?.CanChoose == true) this.Accepted?.Invoke(this, EventArgs.Empty);
+			if ((this.DataContext as PlacementAppPickerViewModel)?.CanChoose == true)
+			{
+				this.Accepted?.Invoke(this, EventArgs.Empty);
+			}
 		}
 
 		private void Cancel(object sender, RoutedEventArgs args) => this.Cancelled?.Invoke(this, EventArgs.Empty);
@@ -34,7 +37,10 @@ namespace SylphyHorn.UI
 				Multiselect = false,
 				Title = model.Text["Browse"]
 			};
-			if (dialog.ShowDialog(Window.GetWindow(this)) == true && await model.SelectFileAsync(dialog.FileName)) this.Accepted?.Invoke(this, EventArgs.Empty);
+			if (dialog.ShowDialog(Window.GetWindow(this)) == true && await model.SelectFileAsync(dialog.FileName))
+			{
+				this.Accepted?.Invoke(this, EventArgs.Empty);
+			}
 		}
 	}
 }

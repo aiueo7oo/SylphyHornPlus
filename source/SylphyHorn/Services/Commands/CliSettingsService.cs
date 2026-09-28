@@ -82,15 +82,22 @@ namespace SylphyHorn.Services.Commands
 
 		internal async Task<CliResponse> ExecuteAsync(CliCommand command, CancellationToken cancellation)
 		{
-			if (command.Operation == "settings save") return await this.SaveAsync(command, cancellation);
+			if (command.Operation == "settings save")
+			{
+				return await this.SaveAsync(command, cancellation);
+			}
 			var changed = false;
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
-				if (!Handles(command.Operation)) return CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown settings command.");
+				if (!Handles(command.Operation))
+				{
+					return CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown settings command.");
+				}
 				var monitors = command.Operation == "monitor list" || command.Operation.StartsWith("notification ", StringComparison.Ordinal)
 					? this._monitors() : Array.Empty<Monitor>();
 				if (command.Operation == "monitor list")
+				{
 					return CliResponse.Ok(command.Operation, new CliData
 					{
 						Monitors = monitors.Select((monitor, index) => new CliMonitor
@@ -99,26 +106,41 @@ namespace SylphyHorn.Services.Commands
 							Bounds = DescribeRectangle(monitor.MonitorArea), WorkArea = DescribeRectangle(monitor.WorkArea),
 						}).ToArray(),
 					});
+				}
 				if (!command.Operation.EndsWith(" configure", StringComparison.Ordinal))
+				{
 					return CliResponse.Ok(command.Operation, this.Describe(command.Operation, monitors.Length));
-				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
+				if (!this._available())
+				{
+					return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
 
 				if ((command.PerDesktopWallpaper.HasValue && this._nativeWallpaperSupported)
 					|| (command.OverrideOnStartup.HasValue && !this._nameSupported))
+				{
 					return CliResponse.Fail(command.Operation, "unsupported", "This setting is not available on this Windows build.");
+				}
 
 				uint? display = command.Monitor == null ? (uint?)null : command.Monitor == "current" ? 0u
 					: command.Monitor == "all" ? uint.MaxValue : uint.Parse(command.Monitor, CultureInfo.InvariantCulture);
 				if (display.HasValue && display != 0 && display != uint.MaxValue && display > monitors.Length)
+				{
 					return CliResponse.Fail(command.Operation, "monitor_unavailable", "The specified monitor number is not currently available.");
+				}
 
 				if (!ValidFontSize(command.HeaderFontSize) || !ValidFontSize(command.BodyFontSize))
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "The font size is outside the supported rendering range.");
+				}
 				if (command.FontFamily != null && command.FontFamily.Length != 0)
 				{
 					try
 					{
-						if (string.IsNullOrWhiteSpace(command.FontFamily)) throw new ArgumentException();
+						if (string.IsNullOrWhiteSpace(command.FontFamily))
+						{
+							throw new ArgumentException();
+						}
 						_ = new FontFamily(command.FontFamily);
 					}
 					catch (Exception ex) when (ex is ArgumentException || ex is FormatException)
@@ -174,9 +196,13 @@ namespace SylphyHorn.Services.Commands
 				// An unchanged request also retries persistence after an earlier save failure.
 				var saved = await this._save().WaitAsync(cancellation);
 				if (!saved.Succeeded)
+				{
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
+				}
 				if (!CliProtocol.Serialize(data).SequenceEqual(CliProtocol.Serialize(this.Describe(command.Operation, monitors.Length))))
+				{
 					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while saving. Read current settings before retrying.");
+				}
 				data.Changed = changed;
 				return CliResponse.Ok(command.Operation, data);
 			}
@@ -198,7 +224,10 @@ namespace SylphyHorn.Services.Commands
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
-				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				if (!this._available())
+				{
+					return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
 				submitted = true;
 				var result = await this._save().WaitAsync(cancellation);
 				return result.Succeeded
@@ -279,7 +308,10 @@ namespace SylphyHorn.Services.Commands
 				data.ShowDesktop = this._settings.TrayShowDesktop.Value;
 				data.CurrentNumberOnly = this._settings.TrayShowOnlyCurrentNumber.Value;
 			}
-			else data.Language = this._settings.Culture.Value ?? "auto";
+			else
+			{
+				data.Language = this._settings.Culture.Value ?? "auto";
+			}
 			return data;
 		}
 	}

@@ -25,7 +25,10 @@ namespace SylphyHorn.Tests
 			h.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "name", "wall")));
 			h.Operations.Creating = () =>
 			{
-				if (reentrant) h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", "")));
+				if (reentrant)
+				{
+					h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "", "")));
+				}
 				return B;
 			};
 			h.Provider.EnqueueResult(Batch(1, 4, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", reentrant ? Image("named.jpg") : "")));
@@ -47,7 +50,10 @@ namespace SylphyHorn.Tests
 			h.Runtime.Faulted += (_, fault) => faults.Add(fault.ToString());
 			h.Operations.BeforeWallpaper = () =>
 			{
-				if (h.Provider.IsPublishingStable) throw new InvalidOperationException("A setter cannot run inside a provider callback.");
+				if (h.Provider.IsPublishingStable)
+				{
+					throw new InvalidOperationException("A setter cannot run inside a provider callback.");
+				}
 			};
 
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
@@ -67,12 +73,19 @@ namespace SylphyHorn.Tests
 			h.Settings.WallpapersOnCreation = new[] { new DesktopWallpaperOnCreation(null, 2, this.Image("stale.bmp")) };
 			h.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "original")));
 			if (reconnect)
+			{
 				h.Provider.PublishStable(Batch(2, 1, A, Entry(A, 0, "name", "wall"), Entry(B, 1, "Work", "reconnected")));
+			}
 			else
+			{
 				h.Provider.PublishStable(Batch(1, 3, A, Entry(A, 0, "name", "wall")));
+			}
 			h.Owner.Drain();
 			Assert.Equal(0, h.Operations.WallpaperCalls);
-			if (reconnect) Assert.Equal("reconnected", h.Runtime.State.Records[B].WallpaperPath.Value);
+			if (reconnect)
+			{
+				Assert.Equal("reconnected", h.Runtime.State.Records[B].WallpaperPath.Value);
+			}
 		}
 
 		[Fact]
@@ -197,7 +210,10 @@ namespace SylphyHorn.Tests
 
 		public void Dispose()
 		{
-			if (Directory.Exists(this._directory)) Directory.Delete(this._directory, true);
+			if (Directory.Exists(this._directory))
+			{
+				Directory.Delete(this._directory, true);
+			}
 		}
 
 		[Theory]

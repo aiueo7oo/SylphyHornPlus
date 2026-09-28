@@ -364,9 +364,13 @@ namespace SylphyHorn.Tests
 			Assert.False(command.Follow);
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--desktop-number", "2" }));
 			if (kind == "next" || kind == "previous")
+			{
 				Assert.True(CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--wrap" }).Wrap);
+			}
 			else
+			{
 				Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "window", "move", "--id", id, option, "--wrap" }));
+			}
 		}
 
 		[Fact]

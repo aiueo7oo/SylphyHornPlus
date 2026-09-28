@@ -110,7 +110,10 @@ namespace SylphyHorn.Services.AppPlacement
 			foreach (var candidate in this._existing())
 			{
 				cancellation.ThrowIfCancellationRequested();
-				if (this._now() >= deadline) throw new TimeoutException("Preview exceeded its time limit.");
+				if (this._now() >= deadline)
+				{
+					throw new TimeoutException("Preview exceeded its time limit.");
+				}
 				if (!this._current(candidate)) continue;
 				var inspection = this._windows.Inspect(candidate.Window);
 				if (inspection.Identity == null) continue;
@@ -120,17 +123,35 @@ namespace SylphyHorn.Services.AppPlacement
 				var location = this._windows.Locate(candidate.Window);
 				var target = map.Resolve(rule.Destination);
 				PlacementOutcome? excluded = null;
-				if (inspection.Status != PlacementInspectionStatus.Ready || location == null) excluded = PlacementOutcome.Unavailable;
-				else if (location.Pinned) excluded = PlacementOutcome.Excluded;
-				else if (target.Status != PlacementResolutionStatus.Resolved) excluded = PlacementOutcome.DestinationUnavailable;
-				else if (location.Desktop == target.DesktopId) excluded = PlacementOutcome.AlreadyPlaced;
+				if (inspection.Status != PlacementInspectionStatus.Ready || location == null)
+				{
+					excluded = PlacementOutcome.Unavailable;
+				}
+				else if (location.Pinned)
+				{
+					excluded = PlacementOutcome.Excluded;
+				}
+				else if (target.Status != PlacementResolutionStatus.Resolved)
+				{
+					excluded = PlacementOutcome.DestinationUnavailable;
+				}
+				else if (location.Desktop == target.DesktopId)
+				{
+					excluded = PlacementOutcome.AlreadyPlaced;
+				}
 				if (!this._current(candidate)) continue;
-				if (items.Count == 256) throw new InvalidOperationException("Preview exceeds 256 matching windows.");
+				if (items.Count == 256)
+				{
+					throw new InvalidOperationException("Preview exceeds 256 matching windows.");
+				}
 				items.Add(new PlacementPreviewItem(candidate, inspection.Identity, rule, this._title(candidate.Window),
 					location?.Desktop ?? Guid.Empty, target.DesktopId, excluded));
 			}
 			cancellation.ThrowIfCancellationRequested();
-			if (this._now() >= deadline) throw new TimeoutException("Preview exceeded its time limit.");
+			if (this._now() >= deadline)
+			{
+				throw new TimeoutException("Preview exceeded its time limit.");
+			}
 			return this._preview = new PlacementPreview(items, this._now() + 60000);
 		}
 
@@ -160,12 +181,19 @@ namespace SylphyHorn.Services.AppPlacement
 			CancellationToken cancellation)
 		{
 			if (preview == null || !ReferenceEquals(preview, this._preview) || this._now() >= preview.ExpiresAt)
+			{
 				throw new InvalidOperationException("Preview is stale or already consumed.");
+			}
 			if (selection == null || selection.Length == 0 || selection.Length > 256 || selection.Distinct().Count() != selection.Length)
+			{
 				throw new ArgumentException("Select distinct preview items.", nameof(selection));
+			}
 			var selected = new HashSet<Guid>(selection);
 			var items = preview.Items.Where(item => selected.Contains(item.Id)).ToArray();
-			if (items.Length != selection.Length || items.Any(item => !item.CanApply)) throw new ArgumentException("Selection is not applicable.", nameof(selection));
+			if (items.Length != selection.Length || items.Any(item => !item.CanApply))
+			{
+				throw new ArgumentException("Selection is not applicable.", nameof(selection));
+			}
 			this._preview = null; // A reviewed selection is single-use, even when execution is cancelled.
 			var results = new List<PlacementResult>();
 			var batchDeadline = this._now() + 30000;

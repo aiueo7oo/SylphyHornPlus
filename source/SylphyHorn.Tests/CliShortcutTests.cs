@@ -82,7 +82,10 @@ namespace SylphyHorn.Tests
 				() => provider.SaveWithResultAsync(), () => available, () =>
 				{
 					reloads++;
-					if (failReload) throw new InvalidOperationException();
+					if (failReload)
+					{
+						throw new InvalidOperationException();
+					}
 				}, () => 1);
 			const string command = "shortcut set --device keyboard --action settings-show --trigger F8";
 			Assert.Equal("result_unconfirmed", (await Run(service, command)).Error.Code);

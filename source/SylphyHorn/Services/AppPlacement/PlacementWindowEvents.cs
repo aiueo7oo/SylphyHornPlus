@@ -73,7 +73,10 @@ namespace SylphyHorn.Services.AppPlacement
 				{
 					this._receive(this._pending.Dequeue());
 				}
-				if (this._overflowed) this._overflow();
+				if (this._overflowed)
+				{
+					this._overflow();
+				}
 			}
 			finally
 			{
@@ -120,7 +123,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal PlacementWindowEvents(int eventLimit, int trackingLimit, int candidateLimit)
 		{
-			if (eventLimit <= 0 || trackingLimit <= 0 || candidateLimit <= 0) throw new ArgumentOutOfRangeException();
+			if (eventLimit <= 0 || trackingLimit <= 0 || candidateLimit <= 0)
+			{
+				throw new ArgumentOutOfRangeException();
+			}
 			this._events = new PlacementWindowEvent[eventLimit];
 			this._trackingLimit = trackingLimit;
 			this._candidateLimit = candidateLimit;
@@ -175,7 +181,10 @@ namespace SylphyHorn.Services.AppPlacement
 				foreach (var window in baseline)
 				{
 					if (window == IntPtr.Zero || this._windows.ContainsKey(window)) continue;
-					if (!this.AddLifetime(window, initiallyHidden == null || !initiallyHidden.Contains(window))) return false;
+					if (!this.AddLifetime(window, initiallyHidden == null || !initiallyHidden.Contains(window)))
+					{
+						return false;
+					}
 				}
 				this._boundary = boundary;
 				this._lastEventTime = boundary;
@@ -192,7 +201,10 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			lock (this._gate)
 			{
-				if (this._state != PlacementMonitorState.Preparing && this._state != PlacementMonitorState.Running) return;
+				if (this._state != PlacementMonitorState.Preparing && this._state != PlacementMonitorState.Running)
+				{
+					return;
+				}
 				if (value.Window == IntPtr.Zero) return;
 				this._version++;
 				if (value.Kind == PlacementWindowEventKind.Show && this._count > 0)
@@ -216,7 +228,10 @@ namespace SylphyHorn.Services.AppPlacement
 		// Batches bound the time native callbacks can wait for this lock. No caller code runs under it.
 		internal void ProcessBatch(int maximum = 64)
 		{
-			if (maximum <= 0) throw new ArgumentOutOfRangeException(nameof(maximum));
+			if (maximum <= 0)
+			{
+				throw new ArgumentOutOfRangeException(nameof(maximum));
+			}
 			lock (this._gate)
 			{
 				while (maximum-- > 0 && this._count > 0 && this._state == PlacementMonitorState.Running)
@@ -247,7 +262,10 @@ namespace SylphyHorn.Services.AppPlacement
 							this.AddLifetime(value.Window, false);
 							break;
 						case PlacementWindowEventKind.Destroy:
-							if (lifetime != null) this.Cancel(lifetime);
+							if (lifetime != null)
+							{
+								this.Cancel(lifetime);
+							}
 							this._windows.Remove(value.Window);
 							this.RemoveCandidate(value.Window);
 							break;
@@ -292,7 +310,10 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			lock (this._gate)
 			{
-				if (this._state != PlacementMonitorState.Running || this._count != 0) throw new InvalidOperationException("Monitor is not current.");
+				if (this._state != PlacementMonitorState.Running || this._count != 0)
+				{
+					throw new InvalidOperationException("Monitor is not current.");
+				}
 				return this._windows.Where(pair => pair.Value.Completed && !pair.Value.Admitted && !pair.Value.Ambiguous)
 					.Select(pair => new PlacementCandidate(pair.Key, this._epoch, pair.Value.Id, now)).ToArray();
 			}
@@ -309,13 +330,19 @@ namespace SylphyHorn.Services.AppPlacement
 		internal void Complete(PlacementCandidate candidate)
 		{
 			lock (this._gate)
-				if (this.IsCurrentUnderLock(candidate)) this.Cancel(this._windows[candidate.Window]);
+				if (this.IsCurrentUnderLock(candidate))
+				{
+					this.Cancel(this._windows[candidate.Window]);
+				}
 		}
 
 		internal void Pause(string reason)
 		{
 			lock (this._gate)
-				if (this._state == PlacementMonitorState.Preparing || this._state == PlacementMonitorState.Running) this.PauseUnderLock(reason);
+				if (this._state == PlacementMonitorState.Preparing || this._state == PlacementMonitorState.Running)
+				{
+					this.PauseUnderLock(reason);
+				}
 		}
 
 		internal void Stop()
@@ -352,7 +379,10 @@ namespace SylphyHorn.Services.AppPlacement
 			while (count-- > 0)
 			{
 				var candidate = this._candidates.Dequeue();
-				if (candidate.Window != window) this._candidates.Enqueue(candidate);
+				if (candidate.Window != window)
+				{
+					this._candidates.Enqueue(candidate);
+				}
 			}
 		}
 

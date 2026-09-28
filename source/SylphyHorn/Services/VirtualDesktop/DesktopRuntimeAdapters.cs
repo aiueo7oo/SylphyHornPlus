@@ -100,15 +100,24 @@ namespace SylphyHorn.Services.DesktopTransitions
 		public void Remove(Guid desktopId, Guid? fallbackId = null)
 		{
 			var desktop = Resolve(desktopId);
-			if (fallbackId.HasValue) desktop.Remove(Resolve(fallbackId.Value));
-			else desktop.Remove();
+			if (fallbackId.HasValue)
+			{
+				desktop.Remove(Resolve(fallbackId.Value));
+			}
+			else
+			{
+				desktop.Remove();
+			}
 		}
 
 		public bool TryRemoveEmpty(Guid desktopId, Guid fallbackId, Func<bool> stillCurrent)
 		{
 			var desktops = VirtualDesktop.GetDesktops();
 			if (desktops.Length < 2 || desktops[desktops.Length - 1].Id != desktopId
-				|| desktops[desktops.Length - 2].Id != fallbackId) return false;
+				|| desktops[desktops.Length - 2].Id != fallbackId)
+			{
+				return false;
+			}
 			var observation = new AppPlacement.PlacementDesktopOccupancyReader().Read(CancellationToken.None, () => true);
 			if (!observation.Complete || observation.Occupied.Contains(desktopId)) return false;
 			// Recheck topology after COM-based occupancy inspection, which can pump native events.

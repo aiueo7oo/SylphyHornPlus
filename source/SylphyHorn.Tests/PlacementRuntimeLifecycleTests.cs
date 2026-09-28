@@ -87,7 +87,10 @@ namespace SylphyHorn.Tests
 			harness.Operations.Creating = () =>
 			{
 				var first = harness.Operations.CreateCalls == 1;
-				if (reentrant) harness.Provider.PublishStable(first ? intermediate : final);
+				if (reentrant)
+				{
+					harness.Provider.PublishStable(first ? intermediate : final);
+				}
 				return first ? B : C;
 			};
 			harness.Provider.EnqueueResult(intermediate);
@@ -117,8 +120,14 @@ namespace SylphyHorn.Tests
 			var request = session.Authorize(PlacementDestination.ByNumber(1), session.Cancellation.Token);
 			harness.Owner.Drain();
 			var result = await request;
-			if (change == "position") harness.Runtime.EditWallpaperPosition(A, SylphyHorn.Services.WallpaperPosition.Center);
-			else harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", change == "wallpaper" ? "updated" : "wall")));
+			if (change == "position")
+			{
+				harness.Runtime.EditWallpaperPosition(A, SylphyHorn.Services.WallpaperPosition.Center);
+			}
+			else
+			{
+				harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "name", change == "wallpaper" ? "updated" : "wall")));
+			}
 			Assert.True(result.Permit.TryStart());
 			Assert.Equal(0, session.DesktopChanges);
 			session.Release();
@@ -428,8 +437,14 @@ namespace SylphyHorn.Tests
 			Assert.Equal(enabled ? PlacementResolutionStatus.Resolved : PlacementResolutionStatus.Missing, result.Resolution.Status);
 			Assert.Equal(enabled ? (named ? 1 : 2) : 0, harness.Operations.CreateCalls);
 			Assert.Equal(enabled && named ? 1 : 0, harness.Operations.NameCalls);
-			if (enabled) Assert.Equal(named ? B : C, result.Resolution.DesktopId);
-			if (enabled && named) Assert.Equal("work", Assert.Single(harness.Operations.NameValues));
+			if (enabled)
+			{
+				Assert.Equal(named ? B : C, result.Resolution.DesktopId);
+			}
+			if (enabled && named)
+			{
+				Assert.Equal("work", Assert.Single(harness.Operations.NameValues));
+			}
 			Assert.Empty(harness.Operations.DesktopOperationNames);
 			Assert.Equal(A, harness.Runtime.State.CurrentDesktopId);
 			session.Release();
@@ -461,8 +476,14 @@ namespace SylphyHorn.Tests
 		{
 			var factory = new Factory();
 			var harness = await Create(factory);
-			if (failure == 0) harness.Operations.CreateFailure = new InvalidOperationException("synthetic");
-			if (failure == 1) harness.Operations.NameFailure = new InvalidOperationException("synthetic");
+			if (failure == 0)
+			{
+				harness.Operations.CreateFailure = new InvalidOperationException("synthetic");
+			}
+			if (failure == 1)
+			{
+				harness.Operations.NameFailure = new InvalidOperationException("synthetic");
+			}
 			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
 			var session = factory.Sessions[0];
 			var request = session.Authorize(failure == 1 ? PlacementDestination.ByName("work") : PlacementDestination.ByNumber(3), session.Cancellation.Token);
@@ -564,14 +585,20 @@ namespace SylphyHorn.Tests
 			var factory = new Factory();
 			long now = 0;
 			var harness = Harness.Create(Batch(1, 1, current ? B : A, Entry(A, 0, "home", ""), Entry(B, 1, "work", "")), factory, () => now);
-			if (created) harness.Settings.CreatedGroups = new[] { new PlacementCreatedGroup(new[] { B }, true) };
+			if (created)
+			{
+				harness.Settings.CreatedGroups = new[] { new PlacementCreatedGroup(new[] { B }, true) };
+			}
 			await harness.Runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
 			var configuration = new AppPlacementConfiguration(true, Array.Empty<AppPlacementRule>(), closeCreatedDesktops: created,
 				closingTargets: created ? null : new[] { PlacementDestination.ByName("work") });
 			await harness.Runtime.ConfigurePlacementAsync(configuration);
 			var session = Assert.Single(factory.Sessions);
 			Assert.NotNull(session.Close);
-			if (!created) await session.Close(new PlacementOccupancyObservation(true, new[] { B }, () => true), session.Cancellation.Token);
+			if (!created)
+			{
+				await session.Close(new PlacementOccupancyObservation(true, new[] { B }, () => true), session.Cancellation.Token);
+			}
 			Assert.True(await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token));
 			now = 999;
 			await session.Close(new PlacementOccupancyObservation(true, Array.Empty<Guid>(), () => true), session.Cancellation.Token);
@@ -664,7 +691,10 @@ namespace SylphyHorn.Tests
 				PlacementHistory history,
 				Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null)
 			{
-				if (this.FailStart) throw new InvalidOperationException("synthetic");
+				if (this.FailStart)
+				{
+					throw new InvalidOperationException("synthetic");
+				}
 				var session = new Session(configuration, authorize) { Close = closeDesktops };
 				this.Sessions.Add(session);
 				return session;

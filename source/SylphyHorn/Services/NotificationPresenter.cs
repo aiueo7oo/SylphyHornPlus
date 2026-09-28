@@ -146,14 +146,20 @@ namespace SylphyHorn.Services
 
 		internal static IReadOnlyList<Rect> ResolveSwitchAreas(uint display, IReadOnlyList<Monitor> monitors, Func<Rect> currentArea)
 		{
-			if (monitors.Count == 0) return Array.Empty<Rect>();
+			if (monitors.Count == 0)
+			{
+				return Array.Empty<Rect>();
+			}
 			if (display == uint.MaxValue)
 			{
 				var areas = new Rect[monitors.Count];
 				for (var index = 0; index < monitors.Count; index++) areas[index] = monitors[index].WorkArea;
 				return areas;
 			}
-			if (display == 0 || display > monitors.Count) return new[] { currentArea() };
+			if (display == 0 || display > monitors.Count)
+			{
+				return new[] { currentArea() };
+			}
 			return new[] { monitors[(int)display - 1].WorkArea };
 		}
 

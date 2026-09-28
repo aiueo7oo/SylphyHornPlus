@@ -188,7 +188,10 @@ namespace SylphyHorn.Tests
 					await typedProvider.LoadAsync();
 					await typedProvider.SaveAsync();
 				}
-				else await AtomicSettingsFile.WriteAsync(values, file, KnownTypes);
+				else
+				{
+					await AtomicSettingsFile.WriteAsync(values, file, KnownTypes);
+				}
 
 				// beta.16 knows only these primitive types and reads the entire dictionary at once.
 				var oldSerializer = new DataContractSerializer(typeof(IDictionary<string, object>), KnownTypes);

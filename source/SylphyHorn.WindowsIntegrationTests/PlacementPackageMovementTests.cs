@@ -81,6 +81,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 							processor.Step(work);
 							if (work.Result == null) continue;
 							if (work.Identity?.App.Value == appId)
+							{
 								this._output.WriteLine(
 									"Package candidate: {0}; {1}; {2}; owner={3}; app process={4}",
 									work.Candidate.Window,
@@ -88,11 +89,18 @@ namespace SylphyHorn.WindowsIntegrationTests
 									work.Result.Reason,
 									work.Identity.Owner.Id,
 									work.Identity.AppProcess?.Id);
-							if (work.Result.Outcome == PlacementOutcome.Moved) moved = work;
+							}
+							if (work.Result.Outcome == PlacementOutcome.Moved)
+							{
+								moved = work;
+							}
 							monitor.Events.Complete(work.Candidate);
 							pending.Remove(work);
 						}
-						if (moved == null) await Task.Delay(20, TestContext.Current.CancellationToken);
+						if (moved == null)
+						{
+							await Task.Delay(20, TestContext.Current.CancellationToken);
+						}
 					}
 					Assert.NotNull(moved);
 					Assert.Equal(appId, moved.Identity.App.Value);
@@ -121,9 +129,18 @@ namespace SylphyHorn.WindowsIntegrationTests
 					Assert.Equal(moved.Identity.Thread, after.Identity.Thread);
 					// UWP may detach its child from the frame after moving off the current desktop.
 					// Keep verified app identity, but do not pretend the missing process proves continuity.
-					if (after.Identity.AppProcess == null) Assert.False(moved.Identity.SameInstance(after.Identity));
-					else Assert.True(windows.Owns(after.Identity));
-					if (requireDirectWinUi) Assert.True(moved.Identity.SameInstance(after.Identity));
+					if (after.Identity.AppProcess == null)
+					{
+						Assert.False(moved.Identity.SameInstance(after.Identity));
+					}
+					else
+					{
+						Assert.True(windows.Owns(after.Identity));
+					}
+					if (requireDirectWinUi)
+					{
+						Assert.True(moved.Identity.SameInstance(after.Identity));
+					}
 					Assert.Equal(environment.Target, VirtualDesktop.FromHwnd(moved.Candidate.Window).Id);
 					Assert.Equal(environment.Source, environment.Location(ordinary));
 					Assert.Equal(1, windows.MoveRequests);
@@ -225,7 +242,9 @@ namespace SylphyHorn.WindowsIntegrationTests
 				if (result.Identity == null) return result;
 				if (this.Owns(result.Identity)) return result;
 				if (result.Identity.App.Value == this._appId && result.Identity.AppProcess == null)
+				{
 					return new PlacementWindowInspection(PlacementInspectionStatus.NotReady, "FixtureAppProcessNotReady");
+				}
 				return new PlacementWindowInspection(PlacementInspectionStatus.Excluded, "NotOwnedByFixture");
 			}
 
@@ -243,7 +262,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 			{
 				try
 				{
-					if (!this._process.HasExited) this._process.Kill();
+					if (!this._process.HasExited)
+					{
+						this._process.Kill();
+					}
 					Assert.True(this._process.WaitForExit(5000));
 				}
 				finally

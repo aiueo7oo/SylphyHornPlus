@@ -33,7 +33,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this._search;
 			set
 			{
-				if (this.SetProperty(ref this._search, value)) this.Filter();
+				if (this.SetProperty(ref this._search, value))
+				{
+					this.Filter();
+				}
 			}
 		}
 
@@ -97,7 +100,10 @@ namespace SylphyHorn.UI.Bindings
 				catch (OperationCanceledException) { }
 				catch (Exception)
 				{
-					if (!this._disposed && !query.IsCancellationRequested) this.Status = this.Text["QueryFailed"];
+					if (!this._disposed && !query.IsCancellationRequested)
+					{
+						this.Status = this.Text["QueryFailed"];
+					}
 				}
 				finally
 				{
@@ -131,7 +137,10 @@ namespace SylphyHorn.UI.Bindings
 				}
 				catch (Exception)
 				{
-					if (!this._disposed && !query.IsCancellationRequested) this.Status = this.Text["InvalidPath"];
+					if (!this._disposed && !query.IsCancellationRequested)
+					{
+						this.Status = this.Text["InvalidPath"];
+					}
 					return false;
 				}
 				finally

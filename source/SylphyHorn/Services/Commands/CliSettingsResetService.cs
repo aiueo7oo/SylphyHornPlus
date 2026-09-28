@@ -26,14 +26,18 @@ namespace SylphyHorn.Services.Commands
 		internal async Task<CliResponse> ExecuteAsync(CliCommand command, CancellationToken cancellation)
 		{
 			if (command.Operation != "settings reset" || !command.ConfirmReset)
+			{
 				return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify settings reset --yes.");
+			}
 
 			var submitted = false;
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
 				if (!this._available())
+				{
 					return CliResponse.Fail(command.Operation, "host_busy", "Settings are changing or input is being edited.", true);
+				}
 
 				using (this._suspendInput())
 				{

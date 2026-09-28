@@ -40,22 +40,40 @@ namespace SylphyHorn.Services.DesktopTransitions
 			foreach (var id in change.AddedIds)
 			{
 				var number = change.Snapshot.Order.ToList().IndexOf(id) + 1;
-				if (this._heldCreationWallpapers != null) this._heldCreationWallpapers[id] = number;
-				else this.ScheduleCreationWallpaper(id, number);
+				if (this._heldCreationWallpapers != null)
+				{
+					this._heldCreationWallpapers[id] = number;
+				}
+				else
+				{
+					this.ScheduleCreationWallpaper(id, number);
+				}
 			}
 			// Unobserved IDs may remain until shutdown; retaining them protects against late notifications.
 			// Observed IDs cannot be Added again without an intervening removal/reset.
-			if (this._heldCreationWallpapers == null) this._creationWallpaperSkipped.ExceptWith(change.Snapshot.Order);
+			if (this._heldCreationWallpapers == null)
+			{
+				this._creationWallpaperSkipped.ExceptWith(change.Snapshot.Order);
+			}
 		}
 
 		private void ScheduleCreationWallpaper(Guid id, int number, string assignedName = null)
 		{
 			if (this._creationWallpaperSkipped.Remove(id)) return;
-			if (!this._initialized || this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null) return;
+			if (!this._initialized || this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null)
+			{
+				return;
+			}
 			var entries = this._settings.ReadWallpapersOnCreation();
 			if (entries.Length == 0 || !this.State.Records.TryGetValue(id, out var record)) return;
-			if (record.WallpaperPath.ReadStatus == VirtualDesktopReadStatus.Unsupported && !this._settings.PerDesktopWallpaperEnabled) return;
-			if (assignedName == null && record.Name.ReadStatus != VirtualDesktopReadStatus.Unsupported && !record.Name.IsConfirmed) return;
+			if (record.WallpaperPath.ReadStatus == VirtualDesktopReadStatus.Unsupported && !this._settings.PerDesktopWallpaperEnabled)
+			{
+				return;
+			}
+			if (assignedName == null && record.Name.ReadStatus != VirtualDesktopReadStatus.Unsupported && !record.Name.IsConfirmed)
+			{
+				return;
+			}
 			var name = assignedName ?? (record.Name.HasValue ? record.Name.Value : null);
 			var setting = entries.FirstOrDefault(item => name != null && item.Name == name)
 				?? entries.FirstOrDefault(item => item.Number == number);
@@ -65,7 +83,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			// Do not use the deferred command queue: it marks the CLI busy while desktop creation is completing.
 			if (!this._owner.Post(() =>
 			{
-				if (this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null) return;
+				if (this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null)
+				{
+					return;
+				}
 				if (this.State.ProviderEpoch != epoch || !this.State.Records.ContainsKey(id)) return;
 				try
 				{
@@ -77,7 +98,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 					this.ReportFault(new DesktopRuntimeFault("WallpaperOnCreation", ex.GetType(), id));
 				}
 			}))
+			{
 				this.ReportFault(new DesktopRuntimeFault("OwnerPostRejected.WallpaperOnCreation", typeof(InvalidOperationException), id));
+			}
 		}
 	}
 }

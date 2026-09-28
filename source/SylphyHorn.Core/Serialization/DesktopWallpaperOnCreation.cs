@@ -31,10 +31,14 @@ namespace SylphyHorn.Serialization
 		{
 			if ((this.Name == null) == !this.Number.HasValue || (this.Name != null && string.IsNullOrWhiteSpace(this.Name))
 				|| (this.Number.HasValue && this.Number.Value < 1))
+			{
 				throw new SerializationException("Specify a desktop name or a positive number.");
+			}
 			if (string.IsNullOrWhiteSpace(this.WallpaperPath) || !Path.IsPathRooted(this.WallpaperPath)
 				|| Path.GetPathRoot(this.WallpaperPath).Length < 3 || this.WallpaperPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+			{
 				throw new SerializationException("Specify an absolute wallpaper path.");
+			}
 		}
 
 		[OnDeserialized]
@@ -46,7 +50,9 @@ namespace SylphyHorn.Serialization
 			if (!(value is DesktopWallpaperOnCreation[] entries) || entries.Any(item => item == null)
 				|| entries.GroupBy(item => item.Name, StringComparer.Ordinal).Any(group => group.Key != null && group.Count() > 1)
 				|| entries.GroupBy(item => item.Number).Any(group => group.Key.HasValue && group.Count() > 1))
+			{
 				throw new SerializationException("Invalid or duplicate creation wallpaper settings.");
+			}
 		}
 	}
 }

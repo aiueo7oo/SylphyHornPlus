@@ -189,7 +189,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this._enabled;
 			set
 			{
-				if (this.SetProperty(ref this._enabled, value)) this.Revision++;
+				if (this.SetProperty(ref this._enabled, value))
+				{
+					this.Revision++;
+				}
 			}
 		}
 
@@ -211,7 +214,10 @@ namespace SylphyHorn.UI.Bindings
 			set
 			{
 				// A combo box reports null while its items are being replaced; that is not a user choice.
-				if (value != null) this.FollowForeground = value.Value;
+				if (value != null)
+				{
+					this.FollowForeground = value.Value;
+				}
 			}
 		}
 
@@ -269,12 +275,18 @@ namespace SylphyHorn.UI.Bindings
 		{
 			var rule = this.Saved;
 			// Keep the icon and presence already read for the same application instead of dropping them on Esc.
-			if (rule != null && this._choice?.Identity != null && this._choice.Identity.Equals(rule.App)) this.Use(this._choice, this._presence);
-			else this.Use(rule == null ? null : new PlacementAppChoice(
-				rule.DisplayName ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? System.IO.Path.GetFileNameWithoutExtension(rule.App.Value) : this.Group.Owner.Text["UnknownApplication"]),
-				"",
-				rule.DisplayExecutablePath ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : null),
-				rule.App));
+			if (rule != null && this._choice?.Identity != null && this._choice.Identity.Equals(rule.App))
+			{
+				this.Use(this._choice, this._presence);
+			}
+			else
+			{
+				this.Use(rule == null ? null : new PlacementAppChoice(
+					rule.DisplayName ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? System.IO.Path.GetFileNameWithoutExtension(rule.App.Value) : this.Group.Owner.Text["UnknownApplication"]),
+					"",
+					rule.DisplayExecutablePath ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : null),
+					rule.App));
+			}
 			this.Destination = rule == null ? (this.Group.Kind == PlacementDestinationKind.Number ? "1" : "") : rule.Destination.Kind == PlacementDestinationKind.Number ? rule.Destination.Number.ToString(CultureInfo.InvariantCulture) : rule.Destination.Name;
 			this.Enabled = rule?.Enabled ?? true;
 			this.FollowForeground = rule?.FollowForeground;
@@ -323,7 +335,9 @@ namespace SylphyHorn.UI.Bindings
 			set
 			{
 				if (!this._disposed && value != this.IsEnabled)
+				{
 					_ = this.PublishAsync(this.Configuration(enabled: value));
+				}
 			}
 		}
 
@@ -332,7 +346,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this._settings.Configuration.Value.FollowForeground;
 			set
 			{
-				if (!this._disposed && value != this.FollowForeground) _ = this.PublishAsync(this.Configuration(followForeground: value));
+				if (!this._disposed && value != this.FollowForeground)
+				{
+					_ = this.PublishAsync(this.Configuration(followForeground: value));
+				}
 			}
 		}
 
@@ -351,7 +368,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this.DefaultFollowOptions[this.FollowForeground ? 0 : 1];
 			set
 			{
-				if (value?.Value != null) this.FollowForeground = value.Value.Value;
+				if (value?.Value != null)
+				{
+					this.FollowForeground = value.Value.Value;
+				}
 			}
 		}
 
@@ -366,7 +386,9 @@ namespace SylphyHorn.UI.Bindings
 			set
 			{
 				if (!this._disposed && value != this.CreateMissingDesktops)
+				{
 					_ = this.PublishAsync(this.Configuration(createMissing: value));
+				}
 			}
 		}
 
@@ -379,7 +401,10 @@ namespace SylphyHorn.UI.Bindings
 			get => this._settings.Configuration.Value.CloseCreatedDesktops;
 			set
 			{
-				if (!this._disposed && value != this.CloseCreatedDesktops) _ = this.PublishAsync(this.Configuration(closeCreated: value));
+				if (!this._disposed && value != this.CloseCreatedDesktops)
+				{
+					_ = this.PublishAsync(this.Configuration(closeCreated: value));
+				}
 			}
 		}
 
@@ -416,7 +441,10 @@ namespace SylphyHorn.UI.Bindings
 				}
 				row.Saved = PlacementDestination.ByNumber(number);
 			}
-			else row.Saved = PlacementDestination.ByName(row.Destination);
+			else
+			{
+				row.Saved = PlacementDestination.ByName(row.Destination);
+			}
 			row.Invalid(false);
 			return this.SaveClosingRowsAsync();
 		}
@@ -473,7 +501,10 @@ namespace SylphyHorn.UI.Bindings
 				this.Refresh();
 			}, () => this.IsPaused && !this._disposed);
 			this._subscription = settings.Configuration.Subscribe(_ => this.Reload());
-			if (this._generation == 0) this.Reload();
+			if (this._generation == 0)
+			{
+				this.Reload();
+			}
 			this.RefreshDestinationChoices();
 			ResourceService.Current.PropertyChanged += this.OnResourcesChanged;
 		}
@@ -565,7 +596,10 @@ namespace SylphyHorn.UI.Bindings
 		internal async Task CommitAsync(PlacementRuleRow row)
 		{
 			if (!this.Contains(row)) return;
-			if (this._reads.TryGetValue(row, out var previous)) previous.Cancel();
+			if (this._reads.TryGetValue(row, out var previous))
+			{
+				previous.Cancel();
+			}
 			var revision = row.Revision;
 			var generation = this._generation;
 			PlacementDestination destination;
@@ -605,7 +639,10 @@ namespace SylphyHorn.UI.Bindings
 				try
 				{
 					var choice = row.Choice ?? await this._catalog.ReadExecutableAsync(row.AppText, cancellation.Token);
-					if (!this.Contains(row) || cancellation.IsCancellationRequested || generation != this._generation || revision != row.Revision) return;
+					if (!this.Contains(row) || cancellation.IsCancellationRequested || generation != this._generation || revision != row.Revision)
+					{
+						return;
+					}
 					if (choice?.Identity == null)
 					{
 						row.SetErrorKey("IdentityUnavailable");
@@ -619,32 +656,51 @@ namespace SylphyHorn.UI.Bindings
 					}
 					var rule = new AppPlacementRule(row.Id, row.Enabled, choice.Identity, destination, choice.Name, choice.Path, row.FollowForeground);
 					var index = rules.FindIndex(existing => existing.Id == row.Id);
-					if (index < 0) rules.Add(rule); else rules[index] = rule;
+					if (index < 0)
+					{
+						rules.Add(rule);
+					}
+					else
+					{
+						rules[index] = rule;
+					}
 					row.Accept(rule, choice);
 					await this.PublishAsync(this.Configuration(rules: rules));
 				}
 				catch (OperationCanceledException) { }
 				catch (Exception)
 				{
-					if (this.Contains(row) && generation == this._generation && revision == row.Revision) row.SetErrorKey("InvalidPath");
+					if (this.Contains(row) && generation == this._generation && revision == row.Revision)
+					{
+						row.SetErrorKey("InvalidPath");
+					}
 				}
 				finally
 				{
-					if (this._reads.TryGetValue(row, out var read) && ReferenceEquals(read, cancellation)) this._reads.Remove(row);
+					if (this._reads.TryGetValue(row, out var read) && ReferenceEquals(read, cancellation))
+					{
+						this._reads.Remove(row);
+					}
 				}
 			}
 		}
 
 		internal void Revert(PlacementRuleRow row)
 		{
-			if (this._reads.TryGetValue(row, out var read)) read.Cancel();
+			if (this._reads.TryGetValue(row, out var read))
+			{
+				read.Cancel();
+			}
 			row.Restore();
 		}
 
 		internal async Task RemoveAsync(PlacementRuleRow row)
 		{
 			if (!this.Contains(row)) return;
-			if (this._reads.TryGetValue(row, out var read)) read.Cancel();
+			if (this._reads.TryGetValue(row, out var read))
+			{
+				read.Cancel();
+			}
 			row.Group.Rows.Remove(row);
 			if (row.Saved != null)
 			{

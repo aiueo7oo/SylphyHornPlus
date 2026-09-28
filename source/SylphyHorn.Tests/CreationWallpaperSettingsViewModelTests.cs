@@ -300,8 +300,14 @@ namespace SylphyHorn.Tests
 		{
 			var f = new CreationWallpaperUiFixture { Harness = await Harness.Initialized() };
 			f.Settings = new GeneralSettings(f.Harness.Settings.Provider);
-			if (entries != null) f.Settings.DesktopWallpapersOnCreation.Value = entries;
-			if (missing != null) f.Images.Missing.UnionWith(missing);
+			if (entries != null)
+			{
+				f.Settings.DesktopWallpapersOnCreation.Value = entries;
+			}
+			if (missing != null)
+			{
+				f.Images.Missing.UnionWith(missing);
+			}
 			f.Model = new CreationWallpaperSettingsViewModel(f.Settings, f.Harness.Runtime, f.Images,
 				() => f.Harness.Settings.Provider.SaveWithResultAsync(), () => f.Chosen, nameSupported, legacyWallpaper);
 			return f;
@@ -329,8 +335,14 @@ namespace SylphyHorn.Tests
 		public async Task ValidateAsync(string path, CancellationToken cancellation)
 		{
 			this.Validated.Add(path);
-			if (this.Pending != null) await this.Pending;
-			if (this.Failure != null) throw this.Failure;
+			if (this.Pending != null)
+			{
+				await this.Pending;
+			}
+			if (this.Failure != null)
+			{
+				throw this.Failure;
+			}
 		}
 
 		public Task<IReadOnlyCollection<string>> FindMissingAsync(IReadOnlyCollection<string> paths, CancellationToken cancellation)

@@ -104,9 +104,15 @@ namespace SylphyHorn.Commands
 			var parts = informational?.Split('+');
 			var version = parts?[0] ?? assembly.GetName().Version.ToString();
 			var extra = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(item => item.Key == "ExtraVersion")?.Value;
-			if (!string.IsNullOrEmpty(extra) && !version.EndsWith("-" + extra, StringComparison.Ordinal)) version += "-" + extra;
+			if (!string.IsNullOrEmpty(extra) && !version.EndsWith("-" + extra, StringComparison.Ordinal))
+			{
+				version += "-" + extra;
+			}
 			var revision = parts?.Length == 2 ? parts[1] : null;
-			if (revision != null && ((revision.Length != 40 && revision.Length != 64) || !revision.All(Uri.IsHexDigit))) revision = null;
+			if (revision != null && ((revision.Length != 40 && revision.Length != 64) || !revision.All(Uri.IsHexDigit)))
+			{
+				revision = null;
+			}
 			return new CliVersionInfo { Version = version, Revision = revision };
 		}
 
@@ -118,7 +124,10 @@ namespace SylphyHorn.Commands
 					Status = "unavailable",
 					ErrorCode = response?.Error?.Code ?? "result_unconfirmed",
 				};
-			if (host.Version != null) host.Status = "available";
+			if (host.Version != null)
+			{
+				host.Status = "available";
+			}
 			return CliResponse.Ok("version", new CliData { Cli = cli, Host = host });
 		}
 	}
@@ -648,7 +657,10 @@ namespace SylphyHorn.Commands
 		internal static async Task WriteAsync<T>(Stream stream, T value, CancellationToken cancellation)
 		{
 			var bytes = Serialize(value);
-			if (bytes.Length > MaximumFrameBytes) throw new InvalidDataException("Response exceeds the protocol limit.");
+			if (bytes.Length > MaximumFrameBytes)
+			{
+				throw new InvalidDataException("Response exceeds the protocol limit.");
+			}
 			var length = BitConverter.GetBytes(bytes.Length);
 			await stream.WriteAsync(length, 0, length.Length, cancellation).ConfigureAwait(false);
 			await stream.WriteAsync(bytes, 0, bytes.Length, cancellation).ConfigureAwait(false);
@@ -660,7 +672,10 @@ namespace SylphyHorn.Commands
 			var header = new byte[4];
 			await ReadExactlyAsync(stream, header, cancellation).ConfigureAwait(false);
 			var length = BitConverter.ToInt32(header, 0);
-			if (length < 1 || length > MaximumFrameBytes) throw new InvalidDataException("Invalid protocol frame length.");
+			if (length < 1 || length > MaximumFrameBytes)
+			{
+				throw new InvalidDataException("Invalid protocol frame length.");
+			}
 			var bytes = new byte[length];
 			await ReadExactlyAsync(stream, bytes, cancellation).ConfigureAwait(false);
 			return Deserialize<T>(bytes);
@@ -672,7 +687,10 @@ namespace SylphyHorn.Commands
 			while (offset < buffer.Length)
 			{
 				var count = await stream.ReadAsync(buffer, offset, buffer.Length - offset, cancellation).ConfigureAwait(false);
-				if (count == 0) throw new EndOfStreamException();
+				if (count == 0)
+				{
+					throw new EndOfStreamException();
+				}
 				offset += count;
 			}
 		}

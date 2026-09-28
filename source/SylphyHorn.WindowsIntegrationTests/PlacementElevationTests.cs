@@ -87,7 +87,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 					var work = new PlacementWorkItem(selected);
 					await PlacementTestEnvironment.Until(() =>
 					{
-						if (Now() >= work.NextAt) processor.Step(work);
+						if (Now() >= work.NextAt)
+						{
+							processor.Step(work);
+						}
 						return work.Result != null;
 					}, "elevated placement outcome");
 					this._output.WriteLine("Outcome={0}; reason={1}; move calls={2}; identity={3}", work.Result.Outcome, work.Result.Reason, windows.Moves, work.Identity?.App.Value);
@@ -100,8 +103,14 @@ namespace SylphyHorn.WindowsIntegrationTests
 							PlacementOutcome.MoveFailed,
 							PlacementOutcome.Unconfirmed
 						});
-					if (work.Result.Outcome == PlacementOutcome.Moved) Assert.Equal(environment.Target, VirtualDesktop.FromHwnd(selected.Window).Id);
-					else Assert.False(string.IsNullOrWhiteSpace(work.Result.Reason), "A denied or unconfirmed result must have diagnostic evidence.");
+					if (work.Result.Outcome == PlacementOutcome.Moved)
+					{
+						Assert.Equal(environment.Target, VirtualDesktop.FromHwnd(selected.Window).Id);
+					}
+					else
+					{
+						Assert.False(string.IsNullOrWhiteSpace(work.Result.Reason), "A denied or unconfirmed result must have diagnostic evidence.");
+					}
 					var moves = windows.Moves;
 					for (var n = 0; n < 10; n++) processor.Step(work);
 					Assert.InRange(moves, 0, 1);
@@ -174,15 +183,24 @@ namespace SylphyHorn.WindowsIntegrationTests
 		{
 			using (var process = OpenProcess(0x1000, false, pid))
 			{
-				if (process.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
-				if (!OpenProcessToken(process, 8, out var token)) throw new Win32Exception(Marshal.GetLastWin32Error());
+				if (process.IsInvalid)
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
+				if (!OpenProcessToken(process, 8, out var token))
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
 				using (token)
 				{
 					GetTokenInformation(token, 25, IntPtr.Zero, 0, out var size);
 					var buffer = Marshal.AllocHGlobal(size);
 					try
 					{
-						if (!GetTokenInformation(token, 25, buffer, size, out size)) throw new Win32Exception(Marshal.GetLastWin32Error());
+						if (!GetTokenInformation(token, 25, buffer, size, out size))
+						{
+							throw new Win32Exception(Marshal.GetLastWin32Error());
+						}
 						var sid = Marshal.ReadIntPtr(buffer);
 						return Marshal.ReadInt32(GetSidSubAuthority(sid, (uint)(Marshal.ReadByte(GetSidSubAuthorityCount(sid)) - 1)));
 					}

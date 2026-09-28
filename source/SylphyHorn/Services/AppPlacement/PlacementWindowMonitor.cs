@@ -36,7 +36,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal static PlacementWindowMonitor Start(int eventLimit = 2048, int trackingLimit = 4096, int candidateLimit = 256)
 		{
-			if (eventLimit <= 0 || trackingLimit <= 0 || candidateLimit <= 0) throw new ArgumentOutOfRangeException();
+			if (eventLimit <= 0 || trackingLimit <= 0 || candidateLimit <= 0)
+			{
+				throw new ArgumentOutOfRangeException();
+			}
 			var monitor = new PlacementWindowMonitor(eventLimit, trackingLimit, candidateLimit);
 			var thread = new Thread(monitor.Run)
 			{
@@ -60,7 +63,13 @@ namespace SylphyHorn.Services.AppPlacement
 		internal Task StopAsync()
 		{
 			this.Events.Stop();
-			lock (this._gate) if (!this._ended) this._stop.Set();
+			lock (this._gate)
+			{
+				if (!this._ended)
+				{
+					this._stop.Set();
+				}
+			}
 			return this.Completion;
 		}
 
@@ -75,7 +84,10 @@ namespace SylphyHorn.Services.AppPlacement
 				PeekMessage(out message, IntPtr.Zero, 0, 0, 0);
 				if (this._stop.WaitOne(0)) return;
 				hook = SetWinEventHook(0x8000, 0x8003, IntPtr.Zero, callback, 0, 0, 0);
-				if (hook == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+				if (hook == IntPtr.Zero)
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
 				var baseline = new List<IntPtr>();
 				var initiallyHidden = new HashSet<IntPtr>();
 				var overflow = false;
@@ -90,13 +102,19 @@ namespace SylphyHorn.Services.AppPlacement
 						}
 						baseline.Add(window);
 						// Minimized and Shell-cloaked windows still have WS_VISIBLE; preserve their placement.
-						if (!IsWindowVisible(window)) initiallyHidden.Add(window);
+						if (!IsWindowVisible(window))
+						{
+							initiallyHidden.Add(window);
+						}
 						return true;
 					},
 					IntPtr.Zero);
 				if (!enumerated)
 				{
-					if (!this._stop.WaitOne(0)) this.Events.Pause(overflow ? "BaselineCapacity" : "BaselineUnavailable");
+					if (!this._stop.WaitOne(0))
+					{
+						this.Events.Pause(overflow ? "BaselineCapacity" : "BaselineUnavailable");
+					}
 					this._ready.TrySetResult(false);
 					return;
 				}
@@ -118,7 +136,10 @@ namespace SylphyHorn.Services.AppPlacement
 					}
 					if (this.Events.State == PlacementMonitorState.Paused) break;
 					var result = MsgWaitForMultipleObjectsEx(1, handles, uint.MaxValue, 0x04FF, 4);
-					if (result == uint.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
+					if (result == uint.MaxValue)
+					{
+						throw new Win32Exception(Marshal.GetLastWin32Error());
+					}
 				}
 			}
 			catch (Exception ex)
@@ -142,13 +163,23 @@ namespace SylphyHorn.Services.AppPlacement
 					// Completion is the terminal signal. Consumers must stop using Changed before closing it.
 					this._changed.Set();
 				}
-				if (failure == null) this._completion.TrySetResult(true); else this._completion.TrySetException(failure);
+				if (failure == null)
+				{
+					this._completion.TrySetResult(true);
+				}
+				else
+				{
+					this._completion.TrySetException(failure);
+				}
 			}
 		}
 
 		public void Dispose()
 		{
-			if (!this.Completion.IsCompleted) throw new InvalidOperationException("Stop the monitor before releasing its consumer signal.");
+			if (!this.Completion.IsCompleted)
+			{
+				throw new InvalidOperationException("Stop the monitor before releasing its consumer signal.");
+			}
 			this._changed.Dispose();
 		}
 
@@ -173,8 +204,14 @@ namespace SylphyHorn.Services.AppPlacement
 			// A destroyed HWND may no longer be queryable, so DESTROY always reaches the tracker.
 			if (value.Kind != PlacementWindowEventKind.Destroy && GetAncestor(value.Window, 2) != value.Window) return;
 			var occurred = NormalizeRecentTime(unchecked((uint)value.OccurredAt), checked((long)GetTickCount64()), 5000);
-			if (!occurred.HasValue) this.Events.Pause("EventTimeUnavailable");
-			else this.Events.Receive(new PlacementWindowEvent(value.Kind, value.Window, occurred.Value));
+			if (!occurred.HasValue)
+			{
+				this.Events.Pause("EventTimeUnavailable");
+			}
+			else
+			{
+				this.Events.Receive(new PlacementWindowEvent(value.Kind, value.Window, occurred.Value));
+			}
 		}
 
 		internal static long? NormalizeRecentTime(uint value, long now, uint maximumAge)

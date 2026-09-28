@@ -119,19 +119,31 @@ namespace SylphyHorn.Services.Commands
 			{
 				cancellation.ThrowIfCancellationRequested();
 				if (command.Operation == "shortcut keys")
+				{
 					return CliResponse.Ok(command.Operation, new CliData { Keys = DescribeKeys(command.Device) });
+				}
 				if (command.Operation == "shortcut list")
+				{
 					return CliResponse.Ok(command.Operation, new CliData { Shortcuts = this.Describe(command.Device).ToArray() });
+				}
 				if (command.Operation != "shortcut set" && command.Operation != "shortcut clear")
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown shortcut command.");
+				}
 				if (!this._available())
+				{
 					return CliResponse.Fail(command.Operation, "host_busy", "Settings are changing or input is being edited.", true);
+				}
 
 				var definition = Definitions.FirstOrDefault(item => item.Action == command.Action);
 				if (definition == null || (definition.List != null) != command.Number.HasValue)
+				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "Use an action from shortcut list; numbered actions require --number.");
+				}
 				if (command.Operation == "shortcut set" && definition.Reorder && !this._reorderSupported)
+				{
 					return CliResponse.Fail(command.Operation, "unsupported", "Desktop reordering is unavailable on this Windows build.");
+				}
 				var desired = command.Operation == "shortcut clear" ? ShortcutKey.None : ParseTrigger(command.Device, command.Trigger);
 				var settings = command.Device == "keyboard" ? this._keyboard : this._mouse;
 				var list = definition.List?.Invoke(settings);
@@ -178,11 +190,15 @@ namespace SylphyHorn.Services.Commands
 				}
 				var saved = await this._save().WaitAsync(cancellation);
 				if (!saved.Succeeded)
+				{
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "The shortcut is active in memory but could not be saved.");
+				}
 				var currentProperty = definition.Property?.Invoke(settings)
 					?? (command.Number.Value <= list.Count ? list.Value[command.Number.Value - 1] : null);
 				if (currentProperty.ToShortcutKey() != desired)
+				{
 					return CliResponse.Fail(command.Operation, "state_changed", "The shortcut changed while saving. Read shortcuts before retrying.");
+				}
 				return CliResponse.Ok(command.Operation, new CliData
 				{
 					Changed = changed,
@@ -208,11 +224,13 @@ namespace SylphyHorn.Services.Commands
 		private static void AddDefaultConflict(List<CliShortcut> conflicts, ShortcutKey desired, ShortcutkeyProperty property, string action)
 		{
 			if (property.ToShortcutKey() == desired)
+			{
 				conflicts.Add(new CliShortcut
 				{
 					Device = "keyboard", Action = action,
 					Trigger = FormatTrigger("keyboard", desired), Supported = true,
 				});
+			}
 		}
 
 		private IEnumerable<CliShortcut> Describe(string device)
@@ -229,7 +247,10 @@ namespace SylphyHorn.Services.Commands
 					}
 					var list = definition.List(settings);
 					var count = Math.Max(list.Count, this._desktopCount());
-					if (count == 0) yield return this.DescribeOne(selected, definition, null, null);
+					if (count == 0)
+					{
+						yield return this.DescribeOne(selected, definition, null, null);
+					}
 					for (var index = 0; index < count; index++)
 						yield return this.DescribeOne(selected, definition, index < list.Count ? list.Value[index] : null, index + 1);
 				}
@@ -249,14 +270,23 @@ namespace SylphyHorn.Services.Commands
 		{
 			var names = trigger.Split('+');
 			var vocabulary = device == "keyboard" ? KeyboardKeys : MouseKeys;
-			if (names.Length == 0 || names.Any(name => !vocabulary.ContainsKey(name))) throw new ArgumentException();
+			if (names.Length == 0 || names.Any(name => !vocabulary.ContainsKey(name)))
+			{
+				throw new ArgumentException();
+			}
 			var codes = names.Select(name => vocabulary[name]).ToArray();
-			if (codes.Distinct().Count() != codes.Length) throw new ArgumentException();
+			if (codes.Distinct().Count() != codes.Length)
+			{
+				throw new ArgumentException();
+			}
 			var main = codes[codes.Length - 1];
 			var held = codes.Take(codes.Length - 1).ToArray();
 			if (device == "keyboard")
 			{
-				if (((Keys)main).IsModifyKey() || held.Any(code => !((Keys)code).IsModifyKey())) throw new ArgumentException();
+				if (((Keys)main).IsModifyKey() || held.Any(code => !((Keys)code).IsModifyKey()))
+				{
+					throw new ArgumentException();
+				}
 			}
 			else if (held.Any(code => code == WheelUp || code == WheelDown)
 				|| (held.Length == 0 && (main == (int)Keys.LButton || main == (int)Keys.RButton || main == WheelUp || main == WheelDown)))

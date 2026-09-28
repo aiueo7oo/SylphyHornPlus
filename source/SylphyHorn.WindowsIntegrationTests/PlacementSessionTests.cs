@@ -126,7 +126,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 							var results = history.Snapshot();
 							Assert.True(results.Length <= 200);
 							Assert.DoesNotContain(results, result => result.Outcome == PlacementOutcome.MonitorPaused);
-							if (windows.All(window => results.Any(result => result.Window == window && result.Time >= started && result.Reason == "OwnProcess"))) break;
+							if (windows.All(window => results.Any(result => result.Window == window && result.Time >= started && result.Reason == "OwnProcess")))
+							{
+								break;
+							}
 							Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), "The native burst did not finish within five seconds.");
 							await Task.Delay(10);
 						}

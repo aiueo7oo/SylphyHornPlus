@@ -55,32 +55,53 @@ namespace SylphyHorn.Services.AppPlacement
 			if (desktops == null) throw new ArgumentNullException(nameof(desktops));
 			if (selectedTargets == null) throw new ArgumentNullException(nameof(selectedTargets));
 			if (armedDesktops == null) throw new ArgumentNullException(nameof(armedDesktops));
-			if (automaticallyCreatedDesktops == null) throw new ArgumentNullException(nameof(automaticallyCreatedDesktops));
-			if (now < 0) throw new ArgumentOutOfRangeException(nameof(now));
+			if (automaticallyCreatedDesktops == null)
+			{
+				throw new ArgumentNullException(nameof(automaticallyCreatedDesktops));
+			}
+			if (now < 0)
+			{
+				throw new ArgumentOutOfRangeException(nameof(now));
+			}
 			if (!available || desktops.Count < 2 || !desktops.Any(item => item.Desktop.Id == currentDesktop))
 			{
 				this.Reset();
 				return null;
 			}
-			if (now < this._lastObservation) this.Reset();
+			if (now < this._lastObservation)
+			{
+				this.Reset();
+			}
 			this._lastObservation = now;
 			var map = new PlacementDesktopMap(desktops.Select(item => item.Desktop));
 			var targets = new HashSet<Guid>();
 			foreach (var target in selectedTargets)
 			{
 				var resolution = map.Resolve(target);
-				if (resolution.Status == PlacementResolutionStatus.Resolved) targets.Add(resolution.DesktopId.Value);
+				if (resolution.Status == PlacementResolutionStatus.Resolved)
+				{
+					targets.Add(resolution.DesktopId.Value);
+				}
 			}
-			if (closeAutomaticallyCreated) targets.UnionWith(automaticallyCreatedDesktops);
+			if (closeAutomaticallyCreated)
+			{
+				targets.UnionWith(automaticallyCreatedDesktops);
+			}
 
 			var stillEmpty = new HashSet<Guid>();
 			foreach (var item in desktops)
 			{
 				var id = item.Desktop.Id;
 				if (!targets.Contains(id) || !armedDesktops.Contains(id)
-					|| item.Occupancy != PlacementDesktopOccupancy.Empty) continue;
+					|| item.Occupancy != PlacementDesktopOccupancy.Empty)
+				{
+					continue;
+				}
 				stillEmpty.Add(id);
-				if (!this._emptySince.ContainsKey(id)) this._emptySince.Add(id, now);
+				if (!this._emptySince.ContainsKey(id))
+				{
+					this._emptySince.Add(id, now);
+				}
 			}
 			foreach (var id in this._emptySince.Keys.Where(id => !stillEmpty.Contains(id)).ToArray())
 				this._emptySince.Remove(id);

@@ -29,7 +29,10 @@ namespace SylphyHorn.Tests
 				serializer.WriteObject(stream, config);
 				stream.Position = 0;
 				var xml = XDocument.Load(stream);
-				if (legacy) xml.Descendants().Where(element => element.Name.LocalName == "FollowForeground").Remove();
+				if (legacy)
+				{
+					xml.Descendants().Where(element => element.Name.LocalName == "FollowForeground").Remove();
+				}
 				using (var reader = xml.CreateReader())
 				{
 					var restored = (AppPlacementConfiguration)serializer.ReadObject(reader);

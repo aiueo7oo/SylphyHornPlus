@@ -108,7 +108,10 @@ namespace SylphyHorn.Commands
 					arguments.Add(Desktop("--name"));
 					arguments.Add(Desktop("--number"));
 				}
-				if (verb == "set") arguments.Add(A("--path", "string", true, description: "Absolute readable image path."));
+				if (verb == "set")
+				{
+					arguments.Add(A("--path", "string", true, description: "Absolute readable image path."));
+				}
 				yield return C("desktop creation wallpaper " + verb, verb + " wallpaper settings applied to newly created desktops.",
 					"wallpapersOnCreation changed", arguments.ToArray(), verb == "list" ? null : new[] { One("--name --number") },
 					notes: "Names take priority over numbers. Destinations may be absent. Does not change existing wallpapers. " +
@@ -236,8 +239,11 @@ namespace SylphyHorn.Commands
 				{
 					arguments.Add(A("--action", "string", true, source: "shortcut list: shortcuts[].action, grouped by device"));
 					arguments.Add(A("--number", "integer", minimum: 1, maximum: 1000, description: "Required only when the selected action has numberRequired=true; forbidden for fixed actions."));
-					if (verb == "set") arguments.Add(A("--trigger", "string", true, description: "Plus-separated key names; last token is the trigger, preceding tokens are held keys. Left/right modifiers are distinct. Mouse LButton/RButton or " +
-						"wheel alone are rejected.", source: "shortcut keys --device keyboard|mouse: keys[].name, canHold, canTrigger"));
+					if (verb == "set")
+					{
+						arguments.Add(A("--trigger", "string", true, description: "Plus-separated key names; last token is the trigger, preceding tokens are held keys. Left/right modifiers are distinct. Mouse LButton/RButton or " +
+							"wheel alone are rejected.", source: "shortcut keys --device keyboard|mouse: keys[].name, canHold, canTrigger"));
+					}
 				}
 				yield return C("shortcut " + verb, verb == "keys" ? "List permitted key names and their trigger/hold roles." : verb + " keyboard or mouse shortcut bindings.",
 					verb == "keys" ? "keys" : "shortcuts changed", arguments.ToArray(),

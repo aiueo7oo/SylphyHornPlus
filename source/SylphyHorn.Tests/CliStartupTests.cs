@@ -22,9 +22,18 @@ namespace SylphyHorn.Tests
 			var response = await Run(service, mode);
 			Assert.True(response.Success);
 			Assert.Equal(mode, response.Data.Startup.Mode);
-			if (mode == "normal") Assert.Equal(new[] { "normal+", "task-" }, registration.Calls);
-			if (mode == "elevated") Assert.Equal(new[] { "task+", "normal-" }, registration.Calls);
-			if (mode == "disabled") Assert.Equal(new[] { "task-", "normal-" }, registration.Calls);
+			if (mode == "normal")
+			{
+				Assert.Equal(new[] { "normal+", "task-" }, registration.Calls);
+			}
+			if (mode == "elevated")
+			{
+				Assert.Equal(new[] { "task+", "normal-" }, registration.Calls);
+			}
+			if (mode == "disabled")
+			{
+				Assert.Equal(new[] { "task-", "normal-" }, registration.Calls);
+			}
 			var count = registration.Calls.Count;
 			Assert.False((await Run(service, mode)).Data.Changed);
 			Assert.Equal(count, registration.Calls.Count);
@@ -86,7 +95,10 @@ namespace SylphyHorn.Tests
 
 			public CliStartup Read()
 			{
-				if (this.FailRead) throw new InvalidOperationException();
+				if (this.FailRead)
+				{
+					throw new InvalidOperationException();
+				}
 				return new CliStartup
 				{
 					NormalRegistered = this.Normal, ElevatedRegistered = this.Elevated,
@@ -100,7 +112,10 @@ namespace SylphyHorn.Tests
 			public Task SetElevatedAsync(bool enabled, CancellationToken cancellation)
 			{
 				this.Calls.Add(enabled ? "task+" : "task-");
-				if (this.FailTask) throw new InvalidOperationException();
+				if (this.FailTask)
+				{
+					throw new InvalidOperationException();
+				}
 				this.Elevated = enabled;
 				return Task.CompletedTask;
 			}

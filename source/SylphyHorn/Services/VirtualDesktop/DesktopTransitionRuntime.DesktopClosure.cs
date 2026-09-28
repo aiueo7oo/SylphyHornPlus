@@ -29,7 +29,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this.LoadCreatedDesktopGroups();
 			var previous = request.CreatedGroup;
 			request.CreatedGroup = new PlacementCreatedGroup((previous?.Desktops ?? Array.Empty<Guid>()).Concat(new[] { id }), false);
-			if (previous != null) this._createdGroups.Remove(previous);
+			if (previous != null)
+			{
+				this._createdGroups.Remove(previous);
+			}
 			this._createdGroups.Add(request.CreatedGroup);
 			this.SaveCreatedDesktopGroups();
 		}
@@ -40,7 +43,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				this._settings.WriteCreatedDesktopGroups(this._createdGroups.ToArray());
 				var result = await this._settings.RequestSaveAsync(this._settings.SettingsRevision);
-				if (!result.Succeeded) this.ReportFault(new DesktopRuntimeFault("AppPlacement.CreatedDesktops.Save", typeof(InvalidOperationException)));
+				if (!result.Succeeded)
+				{
+					this.ReportFault(new DesktopRuntimeFault("AppPlacement.CreatedDesktops.Save", typeof(InvalidOperationException)));
+				}
 			}
 			catch (Exception ex) { this.ReportFault(new DesktopRuntimeFault("AppPlacement.CreatedDesktops.Save", ex.GetType())); }
 		}
@@ -68,8 +74,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 						completion.TrySetResult(false);
 					}
 				}
-				if (this._owner.CheckAccess()) Invoke();
-				else if (!this._owner.Post(Invoke)) completion.TrySetCanceled();
+				if (this._owner.CheckAccess())
+				{
+					Invoke();
+				}
+				else if (!this._owner.Post(Invoke))
+				{
+					completion.TrySetCanceled();
+				}
 				return await completion.Task.ConfigureAwait(false);
 			}
 		}
@@ -106,7 +118,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 					changed = true;
 				}
 			}
-			if (changed) this.SaveCreatedDesktopGroups();
+			if (changed)
+			{
+				this.SaveCreatedDesktopGroups();
+			}
 			this._closingArmed.IntersectWith(state.Order);
 			this._closingArmed.UnionWith(observation.Occupied);
 			this._closingArmed.UnionWith(observation.Used.Where(state.Records.ContainsKey));

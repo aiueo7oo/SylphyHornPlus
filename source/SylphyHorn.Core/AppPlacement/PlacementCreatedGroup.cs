@@ -29,7 +29,9 @@ namespace SylphyHorn.AppPlacement
 		{
 			if (this._desktops == null || this._desktops.Any(id => id == Guid.Empty)
 				|| this._desktops.Distinct().Count() != this._desktops.Length)
+			{
 				throw new SerializationException("Created desktops must have unique, nonempty IDs.");
+			}
 			this._view = Array.AsReadOnly(this._desktops);
 		}
 

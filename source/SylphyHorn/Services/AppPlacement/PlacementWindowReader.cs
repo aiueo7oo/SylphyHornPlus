@@ -14,17 +14,31 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal PlacementWindowInspection Read(IntPtr window)
 		{
-			if (window == IntPtr.Zero || !IsWindow(window)) return Result(PlacementInspectionStatus.Excluded, "WindowClosed");
+			if (window == IntPtr.Zero || !IsWindow(window))
+			{
+				return Result(PlacementInspectionStatus.Excluded, "WindowClosed");
+			}
 			var thread = GetWindowThreadProcessId(window, out var pid);
-			if (thread == 0 || pid == 0) return Result(PlacementInspectionStatus.Unavailable, "WindowOwnerUnavailable");
-			if (GetAncestor(window, 2) != window) return Result(PlacementInspectionStatus.Excluded, "ChildWindow");
+			if (thread == 0 || pid == 0)
+			{
+				return Result(PlacementInspectionStatus.Unavailable, "WindowOwnerUnavailable");
+			}
+			if (GetAncestor(window, 2) != window)
+			{
+				return Result(PlacementInspectionStatus.Excluded, "ChildWindow");
+			}
 			var style = unchecked((uint)GetWindowLong(window, -20));
 			if ((style & (0x80u | 0x08000000u)) != 0 || (GetWindow(window, 4) != IntPtr.Zero && (style & 0x40000u) == 0))
+			{
 				return Result(PlacementInspectionStatus.Excluded, "AuxiliaryWindow");
+			}
 			try
 			{
 				var name = new StringBuilder(256);
-				if (GetClassName(window, name, name.Capacity) == 0) return Result(PlacementInspectionStatus.Unavailable, "WindowClassUnavailable");
+				if (GetClassName(window, name, name.Capacity) == 0)
+				{
+					return Result(PlacementInspectionStatus.Unavailable, "WindowClassUnavailable");
+				}
 				var owner = ReadProcess(pid);
 				var explicitId = ReadWindowAppId(window);
 				var children = new List<PlacementProcessIdentity>();
@@ -43,7 +57,10 @@ namespace SylphyHorn.Services.AppPlacement
 								return false;
 							}
 							GetWindowThreadProcessId(child, out var childPid);
-							if (childPid != 0 && childPid != pid) childIds.Add(childPid);
+							if (childPid != 0 && childPid != pid)
+							{
+								childIds.Add(childPid);
+							}
 							if (childIds.Count > 8)
 							{
 								overflow = true;
@@ -52,18 +69,32 @@ namespace SylphyHorn.Services.AppPlacement
 							return true;
 						},
 						IntPtr.Zero);
-					if (overflow) return Result(PlacementInspectionStatus.Unavailable, "HostChildCapacity");
+					if (overflow)
+					{
+						return Result(PlacementInspectionStatus.Unavailable, "HostChildCapacity");
+					}
 					foreach (var child in childIds) children.Add(ReadProcess(child));
 				}
 				var resolved = PlacementAppIdentityResolver.Resolve(window, thread, name.ToString(), owner, explicitId, children, this._catalog.Contains);
 				if (GetWindowThreadProcessId(window, out var afterPid) != thread || afterPid != pid || !IsWindow(window))
+				{
 					return Result(PlacementInspectionStatus.Excluded, "WindowOwnerChanged");
+				}
 				if (resolved.Status != PlacementInspectionStatus.Ready) return resolved;
-				if (!IsWindowVisible(window)) return Result(PlacementInspectionStatus.NotReady, "WindowNotVisible", resolved.Identity);
+				if (!IsWindowVisible(window))
+				{
+					return Result(PlacementInspectionStatus.NotReady, "WindowNotVisible", resolved.Identity);
+				}
 				var status = DwmGetWindowAttribute(window, 14, out var cloaked, sizeof(int));
-				if (status < 0) return Result(PlacementInspectionStatus.Unavailable, "CloakStateUnavailable", resolved.Identity);
+				if (status < 0)
+				{
+					return Result(PlacementInspectionStatus.Unavailable, "CloakStateUnavailable", resolved.Identity);
+				}
 				// DWM_CLOAKED_SHELL (2) includes windows on another virtual desktop; do not reject those.
-				if ((cloaked & ~2) != 0) return Result(PlacementInspectionStatus.NotReady, "WindowPreparing", resolved.Identity);
+				if ((cloaked & ~2) != 0)
+				{
+					return Result(PlacementInspectionStatus.NotReady, "WindowPreparing", resolved.Identity);
+				}
 				return resolved;
 			}
 			catch (Win32Exception ex)
@@ -87,12 +118,24 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			using (var process = OpenProcess(0x1000, false, pid))
 			{
-				if (process.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+				if (process.IsInvalid)
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
 				uint length = 32768;
 				var path = new StringBuilder((int)length);
-				if (!QueryFullProcessImageName(process, 0, path, ref length)) throw new Win32Exception(Marshal.GetLastWin32Error());
-				if (!GetProcessTimes(process, out var created, out var exit, out var kernel, out var user)) throw new Win32Exception(Marshal.GetLastWin32Error());
-				if (exit != 0) throw new Win32Exception(6);
+				if (!QueryFullProcessImageName(process, 0, path, ref length))
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
+				if (!GetProcessTimes(process, out var created, out var exit, out var kernel, out var user))
+				{
+					throw new Win32Exception(Marshal.GetLastWin32Error());
+				}
+				if (exit != 0)
+				{
+					throw new Win32Exception(6);
+				}
 				var family = ReadProcessString(process, GetPackageFamilyName, 15700);
 				var appId = ReadProcessString(process, GetApplicationUserModelId, 15703);
 				return new PlacementProcessIdentity(pid, created, path.ToString(), family, appId);
@@ -106,10 +149,16 @@ namespace SylphyHorn.Services.AppPlacement
 			uint length = 0;
 			var status = read(process, ref length, null);
 			if (status == absent) return null;
-			if (status != 122 || length == 0 || length > 4096) throw new Win32Exception(status);
+			if (status != 122 || length == 0 || length > 4096)
+			{
+				throw new Win32Exception(status);
+			}
 			var value = new StringBuilder((int)length);
 			status = read(process, ref length, value);
-			if (status != 0) throw new Win32Exception(status);
+			if (status != 0)
+			{
+				throw new Win32Exception(status);
+			}
 			return value.ToString();
 		}
 
@@ -130,7 +179,10 @@ namespace SylphyHorn.Services.AppPlacement
 				{
 					Marshal.ThrowExceptionForHR(store.GetValue(ref key, out value));
 					if (value.Type == 0) return null;
-					if (value.Type != 31) throw new COMException("Unexpected AppUserModelId property type.");
+					if (value.Type != 31)
+					{
+						throw new COMException("Unexpected AppUserModelId property type.");
+					}
 					return value.Pointer == IntPtr.Zero ? null : Marshal.PtrToStringUni(value.Pointer);
 				}
 				finally
@@ -140,7 +192,10 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			finally
 			{
-				if (store != null) Marshal.ReleaseComObject(store);
+				if (store != null)
+				{
+					Marshal.ReleaseComObject(store);
+				}
 			}
 		}
 

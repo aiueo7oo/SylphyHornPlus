@@ -319,7 +319,9 @@ namespace SylphyHorn.Tests
 			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, new[] { factory.Session.Preview.Items[0].Rule }));
 			factory.Session.RuleApplication = _ => throw new PlacementRequestRejectedException();
 			if (accepted)
+			{
 				factory.Session.RuleApplicationPending = Task.FromException<PlacementRuleApplication>(new InvalidOperationException("synthetic"));
+			}
 			harness.Provider.EnqueueResult(Batch(1, 2, A, Entry(A, 0, "source", ""), Entry(B, 1, "Development", "")));
 			var response = await harness.Runtime.ApplyCliAssignmentsAsync(
 				CliCommand.Parse(new[] { "app", "assignment", "apply", "--all" }), CancellationToken.None);

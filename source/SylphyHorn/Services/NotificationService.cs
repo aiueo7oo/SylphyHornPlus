@@ -47,7 +47,10 @@ namespace SylphyHorn.Services
 			dispatcher.BeginInvoke(new Action(() =>
 			{
 				this._appearanceRefreshPending = false;
-				if (this._runtime != null && Settings.General.AlwaysShowDesktopNotification) this.ShowCurrentDesktop();
+				if (this._runtime != null && Settings.General.AlwaysShowDesktopNotification)
+				{
+					this.ShowCurrentDesktop();
+				}
 			}), DispatcherPriority.Background);
 		}
 

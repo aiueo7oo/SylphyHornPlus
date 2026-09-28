@@ -182,7 +182,14 @@ namespace SylphyHorn.Tests
 				var row = f.Model.AddRow(f.Model.Groups[1]);
 				row.AppText = @"C:\late\app.exe";
 				var commit = f.Model.CommitAsync(row);
-				if (dispose) f.Model.Dispose(); else await f.Model.RemoveAsync(row);
+				if (dispose)
+				{
+					f.Model.Dispose();
+				}
+				else
+				{
+					await f.Model.RemoveAsync(row);
+				}
 				gate.SetResult(PlacementUiCatalog.Choice(row.AppText));
 				await commit;
 				Assert.Empty(f.Settings.Configuration.Value.Rules);

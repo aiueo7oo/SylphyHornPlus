@@ -17,7 +17,9 @@ namespace SylphyHorn.Tests
 			receiver = new PlacementWindowEventReceiver(value =>
 			{
 				if (value.Kind == PlacementWindowEventKind.Create)
+				{
 					receiver.Receive(new PlacementWindowEvent(PlacementWindowEventKind.Show, value.Window, 102));
+				}
 				state.Receive(value);
 			}, () => state.Pause("EventCapacity"), 32);
 
@@ -142,7 +144,10 @@ namespace SylphyHorn.Tests
 		{
 			var state = new PlacementWindowEvents(32, 16, 4);
 			var hiddenWindows = new HashSet<IntPtr>();
-			if (hidden) hiddenWindows.Add(Window);
+			if (hidden)
+			{
+				hiddenWindows.Add(Window);
+			}
 			Assert.True(state.Ready(new[] { Window }, 100, hiddenWindows));
 			Send(state, PlacementWindowEventKind.Show, 10101);
 			state.ProcessBatch();
@@ -153,7 +158,10 @@ namespace SylphyHorn.Tests
 				Assert.Equal(15101, new PlacementWorkItem(candidate).Deadline);
 				state.Complete(candidate);
 			}
-			else Assert.Null(candidate);
+			else
+			{
+				Assert.Null(candidate);
+			}
 			Send(state, PlacementWindowEventKind.Hide, 10200);
 			Send(state, PlacementWindowEventKind.Show, 10300);
 			state.ProcessBatch();
@@ -295,7 +303,10 @@ namespace SylphyHorn.Tests
 		public void LifetimeCapacityPausesInsteadOfEvictingHistory(bool duringBaseline)
 		{
 			var state = new PlacementWindowEvents(8, 1, 1);
-			if (duringBaseline) Assert.False(state.Ready(new[] { Window, new IntPtr(102) }, 100));
+			if (duringBaseline)
+			{
+				Assert.False(state.Ready(new[] { Window, new IntPtr(102) }, 100));
+			}
 			else
 			{
 				Assert.True(state.Ready(new[] { Window }, 100));

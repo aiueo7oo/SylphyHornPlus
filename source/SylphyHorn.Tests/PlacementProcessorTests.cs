@@ -51,10 +51,22 @@ namespace SylphyHorn.Tests
 				id => { Assert.Equal(target, id); switches++; });
 			var follow = windows.PrepareFollow(identity, source, target, () => current);
 			foreground = IntPtr.Zero; // Moving the window can change foreground without new input.
-			if (scenario == 2) input++;
-			if (scenario == 3) desktop = Guid.NewGuid();
-			if (scenario == 4) current = false;
-			if (scenario == 5) input = null;
+			if (scenario == 2)
+			{
+				input++;
+			}
+			if (scenario == 3)
+			{
+				desktop = Guid.NewGuid();
+			}
+			if (scenario == 4)
+			{
+				current = false;
+			}
+			if (scenario == 5)
+			{
+				input = null;
+			}
 			follow?.Invoke();
 			Assert.Equal(scenario == 0 ? 1 : 0, switches);
 		}
@@ -105,10 +117,22 @@ namespace SylphyHorn.Tests
 		{
 			var fixture = new Fixture();
 			var denied = new COMException("Access denied", unchecked((int)0x80070005));
-			if (stage == 0) fixture.Windows.InspectFailure = denied;
-			if (stage == 1) fixture.Windows.LocationFailure = denied;
-			if (stage == 2) fixture.Windows.BeforeMove = _ => throw denied;
-			if (stage == 3) fixture.Windows.AfterMove = () => fixture.Windows.LocationFailure = denied;
+			if (stage == 0)
+			{
+				fixture.Windows.InspectFailure = denied;
+			}
+			if (stage == 1)
+			{
+				fixture.Windows.LocationFailure = denied;
+			}
+			if (stage == 2)
+			{
+				fixture.Windows.BeforeMove = _ => throw denied;
+			}
+			if (stage == 3)
+			{
+				fixture.Windows.AfterMove = () => fixture.Windows.LocationFailure = denied;
+			}
 			fixture.Step();
 			Assert.Equal(
 				stage == 3 ? PlacementOutcome.Unconfirmed : stage == 2 ? PlacementOutcome.MoveFailed : PlacementOutcome.Unavailable,
@@ -163,7 +187,14 @@ namespace SylphyHorn.Tests
 			var fixture = new Fixture();
 			fixture.Windows.Status = PlacementInspectionStatus.NotReady;
 			fixture.Step();
-			if (replaceProcess) fixture.Windows.Identity = Identity(2); else fixture.Windows.Location = Guid.NewGuid();
+			if (replaceProcess)
+			{
+				fixture.Windows.Identity = Identity(2);
+			}
+			else
+			{
+				fixture.Windows.Location = Guid.NewGuid();
+			}
 			fixture.Windows.Status = PlacementInspectionStatus.Ready;
 			fixture.Step();
 			Assert.Equal(PlacementOutcome.Changed, fixture.Work.Result.Outcome);
@@ -408,7 +439,10 @@ namespace SylphyHorn.Tests
 				{
 					Assert.True(current());
 					this.Follows++;
-					if (this.FollowFailure) throw new InvalidOperationException();
+					if (this.FollowFailure)
+					{
+						throw new InvalidOperationException();
+					}
 				};
 			}
 
@@ -425,14 +459,20 @@ namespace SylphyHorn.Tests
 			public PlacementWindowInspection Inspect(IntPtr window)
 			{
 				this.Inspections++;
-				if (this.InspectFailure != null) throw this.InspectFailure;
+				if (this.InspectFailure != null)
+				{
+					throw this.InspectFailure;
+				}
 				return new PlacementWindowInspection(this.Status, null, this.Identity);
 			}
 
 			public PlacementWindowLocation Locate(IntPtr window)
 			{
 				this.Locations++;
-				if (this.LocationFailure != null) throw this.LocationFailure;
+				if (this.LocationFailure != null)
+				{
+					throw this.LocationFailure;
+				}
 				return this.LocationAvailable ? new PlacementWindowLocation(this.Location, this.Pinned) : null;
 			}
 
@@ -444,8 +484,14 @@ namespace SylphyHorn.Tests
 				if (this.Location == target) return PlacementMoveStatus.AlreadyPlaced;
 				beforeMove?.Invoke();
 				this.Moves++;
-				if (this.FailMove) throw new COMException("synthetic");
-				if (this.ConfirmMove) this.Location = target;
+				if (this.FailMove)
+				{
+					throw new COMException("synthetic");
+				}
+				if (this.ConfirmMove)
+				{
+					this.Location = target;
+				}
 				this.AfterMove?.Invoke();
 				return PlacementMoveStatus.Requested;
 			}

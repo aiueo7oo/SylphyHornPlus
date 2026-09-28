@@ -123,7 +123,10 @@ namespace SylphyHorn
 			var window = this.CreateSettingsWindow();
 			window.Closed += (_, __) =>
 			{
-				if (ReferenceEquals(SettingsWindow.Instance, window)) SettingsWindow.Instance = null;
+				if (ReferenceEquals(SettingsWindow.Instance, window))
+				{
+					SettingsWindow.Instance = null;
+				}
 			};
 			SettingsWindow.Instance = window;
 			try { window.Show(); }
@@ -138,9 +141,13 @@ namespace SylphyHorn
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
 			if (command.Operation == "exit")
+			{
 				return Task.FromResult(CliResponse.Ok("exit", new CliData { Accepted = true }));
+			}
 			if (command.Operation == "version")
+			{
 				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData { Host = CliVersionInfo.Read(typeof(ApplicationPreparation).Assembly) }));
+			}
 			if (command.Operation == "logs")
 			{
 				var entries = LoggingService.Instance.GetRecent(command.Limit, out var totalCount);
@@ -157,40 +164,76 @@ namespace SylphyHorn
 				}));
 			}
 			if (command.Operation == "settings reset")
+			{
 				return this._cliSettingsReset.ExecuteAsync(command, cancellation);
+			}
 			if (command.Operation == "settings export" || command.Operation == "settings import")
+			{
 				return this._cliSettingsFiles.ExecuteAsync(command, cancellation);
+			}
 			if (command.Operation.StartsWith("startup ", StringComparison.Ordinal))
+			{
 				return this._cliStartup.ExecuteAsync(command, cancellation);
+			}
 			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
+			{
 				return this._cliShortcuts.ExecuteAsync(command, cancellation);
+			}
 			if (Services.Commands.CliSettingsService.Handles(command.Operation))
+			{
 				return this._cliSettings.ExecuteAsync(command, cancellation);
+			}
 			if (command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
+			{
 				return this._cliCreationWallpapers.ExecuteAsync(command, cancellation);
+			}
 			if (command.Operation == "app assignment resume")
+			{
 				return this._desktopRuntime.ResumeCliPlacementAsync(command, cancellation);
+			}
 			if (command.Operation == "app assignment apply")
+			{
 				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
+			}
 			if (command.Operation == "app list" || command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)
 				|| command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal))
+			{
 				return this._cliAssignments.ExecuteAsync(command, cancellation);
+			}
 			if (!command.Operation.StartsWith("ui ", StringComparison.Ordinal))
+			{
 				return this._desktopRuntime.ExecuteCliAsync(command, cancellation);
+			}
 			if (cancellation.IsCancellationRequested)
+			{
 				return Task.FromResult(CliResponse.Fail(command.Operation, "request_cancelled",
 					"The request expired before the UI action was submitted."));
+			}
 
 			if (command.Operation == "ui settings")
 			{
 				if (!this.ShowSettingsFromCli())
+				{
 					return Task.FromResult(CliResponse.Fail(command.Operation, "settings_unavailable",
 						"The settings window is unavailable."));
+				}
 			}
-			else if (command.Operation == "ui task-view") VirtualDesktopService.ShowTaskView();
-			else if (command.Operation == "ui window-switch") VirtualDesktopService.ShowWindowSwitch();
-			else if (command.Operation == "ui notification-toggle") NotificationService.Instance.ToggleCurrentDesktop();
-			else return Task.FromResult(CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown UI command."));
+			else if (command.Operation == "ui task-view")
+			{
+				VirtualDesktopService.ShowTaskView();
+			}
+			else if (command.Operation == "ui window-switch")
+			{
+				VirtualDesktopService.ShowWindowSwitch();
+			}
+			else if (command.Operation == "ui notification-toggle")
+			{
+				NotificationService.Instance.ToggleCurrentDesktop();
+			}
+			else
+			{
+				return Task.FromResult(CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown UI command."));
+			}
 			return Task.FromResult(CliResponse.Ok(command.Operation, new CliData()));
 		}
 #endif
@@ -262,8 +305,14 @@ namespace SylphyHorn
 				this.RegisterActions();
 				SettingsService.BindGeneralSettings(Settings.General, () => this._hookService.Reload(), alwaysShow =>
 				{
-					if (alwaysShow) NotificationService.Instance.ShowCurrentDesktop();
-					else NotificationService.Instance.HideCurrentDesktop();
+					if (alwaysShow)
+					{
+						NotificationService.Instance.ShowCurrentDesktop();
+					}
+					else
+					{
+						NotificationService.Instance.HideCurrentDesktop();
+					}
 				}, () => this._taskTrayIcon.Reload()).AddTo(this._disposable);
 				SettingsService.ObserveNotificationAppearance(Settings.General,
 					NotificationService.Instance.RefreshAppearance).AddTo(this._disposable);
@@ -334,9 +383,15 @@ namespace SylphyHorn
 		internal async Task ShutdownAsync()
 		{
 #if !NETFRAMEWORK
-			if (this._cliServer != null) await this._cliServer.StopAsync();
+			if (this._cliServer != null)
+			{
+				await this._cliServer.StopAsync();
+			}
 #endif
-			if (this._desktopRuntime != null) await this._desktopRuntime.ShutdownAsync();
+			if (this._desktopRuntime != null)
+			{
+				await this._desktopRuntime.ShutdownAsync();
+			}
 		}
 
 		private sealed class DesktopRuntimeLog : ILog

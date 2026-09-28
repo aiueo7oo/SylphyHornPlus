@@ -12,7 +12,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		internal bool Contains(string appId)
 		{
-			if (this._loadFailure != null) throw new InvalidOperationException("The installed app catalog is unavailable for this session.", this._loadFailure);
+			if (this._loadFailure != null)
+			{
+				throw new InvalidOperationException("The installed app catalog is unavailable for this session.", this._loadFailure);
+			}
 			if (this._ids == null)
 			{
 				try
@@ -38,10 +41,16 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application", true));
 				folder = ((dynamic)shell).NameSpace("shell:AppsFolder");
-				if (folder == null) throw new InvalidOperationException("The installed app catalog is unavailable.");
+				if (folder == null)
+				{
+					throw new InvalidOperationException("The installed app catalog is unavailable.");
+				}
 				items = ((dynamic)folder).Items();
 				int count = ((dynamic)items).Count;
-				if (count > 10000) throw new InvalidOperationException("The installed app catalog exceeds its limit.");
+				if (count > 10000)
+				{
+					throw new InvalidOperationException("The installed app catalog exceeds its limit.");
+				}
 				var result = new HashSet<string>(StringComparer.Ordinal);
 				for (var i = 0; i < count; i++)
 				{
@@ -50,7 +59,10 @@ namespace SylphyHorn.Services.AppPlacement
 					{
 						item = ((dynamic)items).Item(i);
 						string id = ((dynamic)item).ExtendedProperty("System.AppUserModel.ID") as string;
-						if (PlacementAppIdentityResolver.IsPackageApp(id, null)) result.Add(id);
+						if (PlacementAppIdentityResolver.IsPackageApp(id, null))
+						{
+							result.Add(id);
+						}
 					}
 					finally
 					{
@@ -69,7 +81,10 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private static void Release(object value)
 		{
-			if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
+			if (value != null && Marshal.IsComObject(value))
+			{
+				Marshal.ReleaseComObject(value);
+			}
 		}
 
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]

@@ -77,9 +77,18 @@ namespace SylphyHorn.Tests
 		{
 			var f = new Fixture();
 			var preview = f.Preview();
-			if (scenario == 0) f.Now = preview.ExpiresAt;
-			if (scenario == 1) f.Preview();
-			if (scenario == 2) preview = new Fixture().Preview();
+			if (scenario == 0)
+			{
+				f.Now = preview.ExpiresAt;
+			}
+			if (scenario == 1)
+			{
+				f.Preview();
+			}
+			if (scenario == 2)
+			{
+				preview = new Fixture().Preview();
+			}
 			Assert.Throws<InvalidOperationException>(() => f.Apply(preview, TestContext.Current.CancellationToken));
 			Assert.Equal(0, f.Windows.Moves);
 		}
@@ -110,11 +119,26 @@ namespace SylphyHorn.Tests
 			var preview = f.Preview();
 			using (var cancellation = new CancellationTokenSource())
 			{
-				if (scenario == 0) f.Windows.Location = Guid.NewGuid();
-				if (scenario == 1) f.Windows.ProcessVersion++;
-				if (scenario == 2) f.Target = Guid.NewGuid();
-				if (scenario == 3) f.Current = false;
-				if (scenario == 4) cancellation.Cancel();
+				if (scenario == 0)
+				{
+					f.Windows.Location = Guid.NewGuid();
+				}
+				if (scenario == 1)
+				{
+					f.Windows.ProcessVersion++;
+				}
+				if (scenario == 2)
+				{
+					f.Target = Guid.NewGuid();
+				}
+				if (scenario == 3)
+				{
+					f.Current = false;
+				}
+				if (scenario == 4)
+				{
+					cancellation.Cancel();
+				}
 				var result = Assert.Single(f.Apply(preview, cancellation.Token));
 				Assert.Equal(scenario < 3 ? PlacementOutcome.Changed : PlacementOutcome.Cancelled, result.Outcome);
 				Assert.Equal(0, f.Windows.Moves);
@@ -141,8 +165,14 @@ namespace SylphyHorn.Tests
 		public void PinnedAlreadyPlacedAndUnavailableDestinationsAreNotSelectable(int scenario)
 		{
 			var f = new Fixture();
-			if (scenario == 0) f.Windows.Pinned = true;
-			if (scenario == 1) f.Windows.Location = f.Target;
+			if (scenario == 0)
+			{
+				f.Windows.Pinned = true;
+			}
+			if (scenario == 1)
+			{
+				f.Windows.Location = f.Target;
+			}
 			var preview = scenario == 2 ? f.Engine.Preview(PlacementDesktopMap.Unavailable, CancellationToken.None) : f.Preview();
 			Assert.False(Assert.Single(preview.Items).CanApply);
 			Assert.Throws<ArgumentException>(() => f.Apply(preview, TestContext.Current.CancellationToken));
@@ -251,7 +281,10 @@ namespace SylphyHorn.Tests
 				if (!permit.TryStart()) return PlacementMoveStatus.Cancelled;
 				beforeMove?.Invoke();
 				this.Moves++;
-				if (this.ConfirmMove) this.Location = target;
+				if (this.ConfirmMove)
+				{
+					this.Location = target;
+				}
 				return PlacementMoveStatus.Requested;
 			}
 		}

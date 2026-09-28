@@ -232,7 +232,10 @@ namespace SylphyHorn.Tests
 		public async Task InvalidWallpaperDoesNotMutateDesktopOrSettings(string kind)
 		{
 			var harness = await Create();
-			if (kind == "unreadable") File.WriteAllText(this._imagePath, "not an image");
+			if (kind == "unreadable")
+			{
+				File.WriteAllText(this._imagePath, "not an image");
+			}
 			var path = kind == "relative" ? "wallpaper.bmp" : kind == "empty" ? "" : this._imagePath;
 			var before = harness.Runtime.State.Records[A].WallpaperPath.Value;
 			var response = await harness.Runtime.ExecuteCliAsync(

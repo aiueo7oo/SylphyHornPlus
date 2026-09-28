@@ -176,7 +176,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 				this.EnsureOwnerAccess();
 				if (!this._initialized || this._shutdownStarted || this._stopping || this._placementSuspended || this._preparedRuntime != null
 					|| this._activeImportSession != null || (this._activeImportCommit != null && !this._activeImportCommit.IsCompleted))
+				{
 					return PlacementDesktopMap.Unavailable;
+				}
 				var state = this.State;
 				if (!ReferenceEquals(state, this._placementProjectionSource))
 				{
@@ -380,8 +382,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 				DesktopLocalEdit.WallpaperPath(desktopId, value, this.State),
 				() =>
 				{
-					if (!unsupported) this._operations.SetWallpaperPath(desktopId, value);
-					else if (this.State.CurrentDesktopId == desktopId) this._operations.ApplyWallpaper(desktopId, value, record.WallpaperPosition);
+					if (!unsupported)
+					{
+						this._operations.SetWallpaperPath(desktopId, value);
+					}
+					else if (this.State.CurrentDesktopId == desktopId)
+					{
+						this._operations.ApplyWallpaper(desktopId, value, record.WallpaperPosition);
+					}
 				});
 		}
 
@@ -889,7 +897,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private void ScheduleDeferredCommands()
 		{
-			if (this._deferredDrainScheduled || this._deferredCommands.Count == 0 || this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._placementSuspended || this._shutdownStarted || this._stopping) return;
+			if (this._deferredDrainScheduled || this._deferredCommands.Count == 0 || this._publishing || this._preparedRuntime != null || this._activeImportSession != null || this._placementSuspended || this._shutdownStarted || this._stopping)
+			{
+				return;
+			}
 			this._deferredDrainScheduled = true;
 			if (!this._owner.Post(this.DrainDeferredCommands))
 			{

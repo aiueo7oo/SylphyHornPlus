@@ -23,9 +23,13 @@ namespace SylphyHorn.Serialization
 		internal static void ValidateEntry(string key, object value)
 		{
 			if (key == CreatedDesktopGroupsKey && (!(value is PlacementCreatedGroup[] groups) || Array.Exists(groups, group => group == null)))
+			{
 				throw new SerializationException("Invalid created desktop groups.");
+			}
 			if (key == ConfigurationKey && !(value is AppPlacementConfiguration))
+			{
 				throw new SerializationException("Invalid app placement configuration.");
+			}
 		}
 
 	}

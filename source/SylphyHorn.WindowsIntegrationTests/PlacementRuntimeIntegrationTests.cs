@@ -200,7 +200,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 			{
 				lock (this._gate)
 				{
-					if (!this._holding) return this._owner.Post(action);
+					if (!this._holding)
+					{
+						return this._owner.Post(action);
+					}
 					this._held.Enqueue(action);
 					return true;
 				}

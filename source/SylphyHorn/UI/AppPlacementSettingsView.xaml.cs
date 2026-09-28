@@ -38,7 +38,10 @@ namespace SylphyHorn.UI
 				(this.DataContext as AppPlacementSettingsViewModel)?.Refresh();
 				this._refresh.Start();
 			}
-			else this._refresh.Stop();
+			else
+			{
+				this._refresh.Stop();
+			}
 		}
 
 		private void FollowChanged(object sender, SelectionChangedEventArgs args)
@@ -46,13 +49,19 @@ namespace SylphyHorn.UI
 			// Only a choice made in this combo box saves; filling the items, Esc restoring the row
 			// or a reload replacing it does not.
 			var combo = (ComboBox)sender;
-			if (args.RemovedItems.Count == 0 || args.AddedItems.Count == 0 || !(combo.IsKeyboardFocusWithin || combo.IsDropDownOpen)) return;
+			if (args.RemovedItems.Count == 0 || args.AddedItems.Count == 0 || !(combo.IsKeyboardFocusWithin || combo.IsDropDownOpen))
+			{
+				return;
+			}
 			this.Commit(sender, args);
 		}
 
 		private void Add(object sender, RoutedEventArgs args)
 		{
-			if ((sender as FrameworkElement)?.DataContext is PlacementRuleGroup group) this.FocusRow(group.Owner.AddRow(group));
+			if ((sender as FrameworkElement)?.DataContext is PlacementRuleGroup group)
+			{
+				this.FocusRow(group.Owner.AddRow(group));
+			}
 		}
 
 		private void DestinationOpened(object sender, EventArgs args)
@@ -77,11 +86,17 @@ namespace SylphyHorn.UI
 
 		private async void Commit(object sender, EventArgs args)
 		{
-			if (sender is ComboBox combo && args is KeyboardFocusChangedEventArgs && (combo.IsDropDownOpen || combo.IsKeyboardFocusWithin)) return;
+			if (sender is ComboBox combo && args is KeyboardFocusChangedEventArgs && (combo.IsDropDownOpen || combo.IsKeyboardFocusWithin))
+			{
+				return;
+			}
 			if ((sender as FrameworkElement)?.DataContext is PlacementRuleRow row)
 			{
 				// Moving between fields of a new row must not show an error before the user has filled it in.
-				if (row.Saved == null && (string.IsNullOrWhiteSpace(row.AppText) || string.IsNullOrWhiteSpace(row.Destination))) return;
+				if (row.Saved == null && (string.IsNullOrWhiteSpace(row.AppText) || string.IsNullOrWhiteSpace(row.Destination)))
+				{
+					return;
+				}
 				await row.Group.Owner.CommitAsync(row);
 			}
 		}
@@ -94,8 +109,14 @@ namespace SylphyHorn.UI
 			TextBox textBox = null;
 			for (var source = args.OriginalSource as DependencyObject; source != null && source != sender; source = VisualTreeHelper.GetParent(source))
 			{
-				if (source is ComboBox box) combo = box;
-				if (source is TextBox editor) textBox = editor;
+				if (source is ComboBox box)
+				{
+					combo = box;
+				}
+				if (source is TextBox editor)
+				{
+					textBox = editor;
+				}
 			}
 			if (combo == null && textBox == null) return;
 			if (combo != null && combo.IsDropDownOpen)
@@ -166,7 +187,10 @@ namespace SylphyHorn.UI
 				}
 				row = row ?? group.Owner.AddRow(group);
 				row.Use(picker.Selected);
-				if (!string.IsNullOrWhiteSpace(row.Destination)) await group.Owner.CommitAsync(row);
+				if (!string.IsNullOrWhiteSpace(row.Destination))
+				{
+					await group.Owner.CommitAsync(row);
+				}
 				this.FocusRow(row);
 			}
 		}
@@ -197,7 +221,10 @@ namespace SylphyHorn.UI
 				dialog.SetResourceReference(Control.ForegroundProperty, "ActiveForegroundBrushKey");
 				dialog.Loaded += async (_, __) =>
 				{
-					if (model.RefreshCommand.CanExecute(null)) await model.RefreshCommand.ExecuteAsync(null);
+					if (model.RefreshCommand.CanExecute(null))
+					{
+						await model.RefreshCommand.ExecuteAsync(null);
+					}
 				};
 				dialog.Closing += (_, __) => model.Dispose();
 				EventHandler invalidate = (_, __) => dialog.Close();
@@ -222,7 +249,10 @@ namespace SylphyHorn.UI
 				var field = FindField(this, row, string.IsNullOrEmpty(row.Destination) ? "Destination" : "AppText");
 				field?.BringIntoView();
 				field?.Focus();
-				if (field is TextBox text) text.SelectAll();
+				if (field is TextBox text)
+				{
+					text.SelectAll();
+				}
 				else if (field is ComboBox combo && combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
 				{
 					editor.Focus();
@@ -237,8 +267,14 @@ namespace SylphyHorn.UI
 			for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
 			{
 				var child = VisualTreeHelper.GetChild(parent, index);
-				if (child is TextBox text && ReferenceEquals(text.DataContext, row) && text.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == property) return text;
-				if (child is ComboBox combo && ReferenceEquals(combo.DataContext, row) && combo.GetBindingExpression(ComboBox.TextProperty)?.ParentBinding.Path.Path == property) return combo;
+				if (child is TextBox text && ReferenceEquals(text.DataContext, row) && text.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == property)
+				{
+					return text;
+				}
+				if (child is ComboBox combo && ReferenceEquals(combo.DataContext, row) && combo.GetBindingExpression(ComboBox.TextProperty)?.ParentBinding.Path.Path == property)
+				{
+					return combo;
+				}
 				var found = FindField(child, row, property);
 				if (found != null) return found;
 			}

@@ -79,7 +79,10 @@ namespace SylphyHorn.Tests
 						await CliProtocol.WriteAsync(client, new CliRequest { Args = new[] { "exit" } }, deadline.Token);
 						await accepted.Task.WaitAsync(deadline.Token);
 						Assert.False(shutdown.Task.IsCompleted);
-						if (disconnect) client.Dispose();
+						if (disconnect)
+						{
+							client.Dispose();
+						}
 						release.SetResult(true);
 						if (!disconnect)
 						{

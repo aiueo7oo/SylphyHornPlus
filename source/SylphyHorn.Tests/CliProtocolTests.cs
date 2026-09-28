@@ -22,8 +22,10 @@ namespace SylphyHorn.Tests
 			assembly.SetCustomAttribute(new CustomAttributeBuilder(
 				typeof(AssemblyInformationalVersionAttribute).GetConstructor(new[] { typeof(string) }), new object[] { informational }));
 			if (extra != null)
+			{
 				assembly.SetCustomAttribute(new CustomAttributeBuilder(
 					typeof(AssemblyMetadataAttribute).GetConstructor(new[] { typeof(string), typeof(string) }), new object[] { "ExtraVersion", extra }));
+			}
 			var result = CliVersionInfo.Read(assembly);
 			Assert.Equal(version, result.Version);
 			Assert.Equal(revision, result.Revision);

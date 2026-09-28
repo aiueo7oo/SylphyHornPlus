@@ -28,9 +28,15 @@ namespace SylphyHorn.Services.Commands
 			try
 			{
 				cancellation.ThrowIfCancellationRequested();
-				if (!this._available()) return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				if (!this._available())
+				{
+					return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
+				}
 				var current = this._settings.DesktopWallpapersOnCreation.Value;
-				if (command.Operation.EndsWith(" list", StringComparison.Ordinal)) return Describe(command, current, null);
+				if (command.Operation.EndsWith(" list", StringComparison.Ordinal))
+				{
+					return Describe(command, current, null);
+				}
 				var name = command.TargetKind == "name" ? command.TargetValue : null;
 				int? number = command.TargetKind == "number" ? int.Parse(command.TargetValue, CultureInfo.InvariantCulture) : (int?)null;
 				var entries = current.ToList();
@@ -41,9 +47,19 @@ namespace SylphyHorn.Services.Commands
 					var entry = new DesktopWallpaperOnCreation(name, number, command.WallpaperPath);
 					WallpaperService.ValidateImage(entry.WallpaperPath);
 					changed = previous == null || previous.WallpaperPath != entry.WallpaperPath;
-					if (previous == null) entries.Add(entry); else entries[entries.IndexOf(previous)] = entry;
+					if (previous == null)
+					{
+						entries.Add(entry);
+					}
+					else
+					{
+						entries[entries.IndexOf(previous)] = entry;
+					}
 				}
-				else changed = entries.Remove(previous);
+				else
+				{
+					changed = entries.Remove(previous);
+				}
 				var updated = changed ? entries.ToArray() : current;
 				if (changed)
 				{
@@ -51,9 +67,14 @@ namespace SylphyHorn.Services.Commands
 					this._settings.DesktopWallpapersOnCreation.Value = updated;
 				}
 				var saved = await this._save().WaitAsync(cancellation);
-				if (!saved.Succeeded) return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
+				if (!saved.Succeeded)
+				{
+					return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
+				}
 				if (!ReferenceEquals(updated, this._settings.DesktopWallpapersOnCreation.Value))
+				{
 					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while saving. Read them again.");
+				}
 				return Describe(command, updated, changed);
 			}
 			catch (OperationCanceledException)

@@ -41,7 +41,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (this._placementChanging) return "Stopping";
 				if (this._shutdownStarted || this._stopping || this._placementSuspended) return "Suspended";
 				if (!this._placementConfiguration.Enabled) return "Disabled";
-				if (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets) return "NoRules";
+				if (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets)
+				{
+					return "NoRules";
+				}
 				if (this._placementSession == null || this._placementSession.Completion.IsCompleted) return "Paused";
 				return this._placementSession.IsReady ? "Active" : "Preparing";
 			}
@@ -69,7 +72,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private void EnsurePlacementAvailable()
 		{
-			if (this.PlacementStatus != "Active") throw new InvalidOperationException("Placement is not monitoring.");
+			if (this.PlacementStatus != "Active")
+			{
+				throw new InvalidOperationException("Placement is not monitoring.");
+			}
 		}
 
 		private readonly object _placementAuthorizationGate = new object();
@@ -81,7 +87,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			this.EnsureOwnerAccess();
 			if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-			if (this._shutdownStarted || this._stopping || ReferenceEquals(configuration, this._placementConfiguration)) return Task.CompletedTask;
+			if (this._shutdownStarted || this._stopping || ReferenceEquals(configuration, this._placementConfiguration))
+			{
+				return Task.CompletedTask;
+			}
 			this._placementConfiguration = configuration;
 			return this.ReconcilePlacementAsync();
 		}
@@ -105,11 +114,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 						await previous.StopAsync();
 					}
 					catch { /* ObservePlacementAsync reports the failure once. Completion still joins the worker. */ }
-					if (ReferenceEquals(previous, this._placementSession)) this._placementSession = null;
+					if (ReferenceEquals(previous, this._placementSession))
+					{
+						this._placementSession = null;
+					}
 				}
 				if (generation != this._placementGeneration || !this._initialized || this._shutdownStarted || this._stopping
 					|| this._placementSuspended || !this._placementConfiguration.Enabled
-					|| (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets)) return;
+					|| (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets))
+				{
+					return;
+				}
 				try
 				{
 					Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null;
@@ -132,7 +147,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 			finally
 			{
-				if (generation == this._placementGeneration) this._placementChanging = false;
+				if (generation == this._placementGeneration)
+				{
+					this._placementChanging = false;
+				}
 			}
 		}
 
@@ -229,7 +247,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this._placementPermit?.Cancel();
 			var permit = resolution.Status == PlacementResolutionStatus.Resolved ? new PlacementMovePermit() : null;
 			this._placementPermit = permit;
-			if (!request.Completion.TrySetResult(new PlacementAuthorization(resolution, permit))) permit?.Cancel();
+			if (!request.Completion.TrySetResult(new PlacementAuthorization(resolution, permit)))
+			{
+				permit?.Cancel();
+			}
 		}
 
 		private async Task CreatePlacementDestinationAsync(PlacementAuthorizationRequest request)
@@ -262,11 +283,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 						created = this.WithCreationWallpapersHeld(() =>
 						{
 							var id = this._operations.Create();
-							if (remaining > 0) this._creationWallpaperSkipped.Add(id);
+							if (remaining > 0)
+							{
+								this._creationWallpaperSkipped.Add(id);
+							}
 							this.RecordPlacementCreatedDesktop(request, id);
 							this.CheckPlacementCreation(request);
 							if (request.Destination.Kind == PlacementDestinationKind.Name)
+							{
 								this._operations.SetName(id, request.Destination.Name);
+							}
 							this.CheckPlacementCreation(request);
 							return id;
 						}, request.Destination.Kind == PlacementDestinationKind.Name ? request.Destination.Name : null);
@@ -277,10 +303,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					await this.OnPlacementOwnerAsync(request, () =>
 					{
 						if (result.Status != VirtualDesktopReconciliationStatus.Succeeded)
+						{
 							throw new InvalidOperationException("The created desktop could not be reconciled.");
+						}
 						this.ApplyStableBatch(result.Batch);
 						if (!this.State.Records.ContainsKey(created))
+						{
 							throw new InvalidOperationException("The created desktop is no longer available.");
+						}
 					}).ConfigureAwait(false);
 				}
 			}
@@ -294,7 +324,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 			finally
 			{
-				if (entered) this._placementCreationGate.Release();
+				if (entered)
+				{
+					this._placementCreationGate.Release();
+				}
 			}
 		}
 
@@ -305,7 +338,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 			if (request.Completion.Task.IsCompleted || request.Generation != this._placementGeneration
 				|| this._shutdownStarted || this._stopping || this._placementSuspended || this._placementChanging
 				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.CreateMissingDesktops)
+			{
 				throw new OperationCanceledException();
+			}
 		}
 
 		private async Task OnPlacementOwnerAsync(PlacementAuthorizationRequest request, Action action)
@@ -323,8 +358,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					}
 					catch (Exception ex) { completion.TrySetException(ex); }
 				}
-				if (this._owner.CheckAccess()) Invoke();
-				else if (!this._owner.Post(Invoke)) completion.TrySetCanceled();
+				if (this._owner.CheckAccess())
+				{
+					Invoke();
+				}
+				else if (!this._owner.Post(Invoke))
+				{
+					completion.TrySetCanceled();
+				}
 				await completion.Task.ConfigureAwait(false);
 			}
 		}

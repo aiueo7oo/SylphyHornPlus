@@ -205,7 +205,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 			public void Dispose()
 			{
 				var stopped = this.Session?.StopAsync();
-				if (stopped != null && !stopped.Wait(15000)) throw new TimeoutException("Placement worker did not join; provider was retained.");
+				if (stopped != null && !stopped.Wait(15000))
+				{
+					throw new TimeoutException("Placement worker did not join; provider was retained.");
+				}
 				this.Environment.Dispose();
 			}
 		}

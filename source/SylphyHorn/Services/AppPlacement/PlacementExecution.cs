@@ -52,7 +52,10 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			lock (this._gate)
 			{
-				if (this._results.Count == 200) this._results.Dequeue();
+				if (this._results.Count == 200)
+				{
+					this._results.Dequeue();
+				}
 				this._results.Enqueue(result);
 			}
 		}
@@ -292,8 +295,10 @@ namespace SylphyHorn.Services.AppPlacement
 						{
 							if (this._automatic && (work.Rule.FollowForeground ?? this._configuration.FollowForeground)
 								&& this._windows is IPlacementForeground foreground)
+							{
 								work.Follow = foreground.PrepareFollow(work.Identity, work.Source.Value, work.Target.Value,
 									() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline);
+							}
 						});
 				switch (moved)
 				{
@@ -332,8 +337,14 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private void Retry(PlacementWorkItem work)
 		{
-			if (work.Attempts >= 5 || this._now() >= work.Deadline) work.Finish(PlacementOutcome.TimedOut);
-			else work.NextAt = Math.Min(work.Deadline, this._now() + (250L << (work.Attempts - 1)));
+			if (work.Attempts >= 5 || this._now() >= work.Deadline)
+			{
+				work.Finish(PlacementOutcome.TimedOut);
+			}
+			else
+			{
+				work.NextAt = Math.Min(work.Deadline, this._now() + (250L << (work.Attempts - 1)));
+			}
 		}
 
 		private void Verify(PlacementWorkItem work)
@@ -365,8 +376,14 @@ namespace SylphyHorn.Services.AppPlacement
 				}
 				catch (Exception ex) { work.Finish(PlacementOutcome.Moved, "FollowFailed:" + ex.GetType().Name); }
 			}
-			else if (location != null && (location.Pinned || (location.Desktop != work.Source && location.Desktop != work.Target))) work.Finish(PlacementOutcome.Unconfirmed, "DesktopChanged");
-			else work.NextAt = Math.Min(work.Deadline, this._now() + 100);
+			else if (location != null && (location.Pinned || (location.Desktop != work.Source && location.Desktop != work.Target)))
+			{
+				work.Finish(PlacementOutcome.Unconfirmed, "DesktopChanged");
+			}
+			else
+			{
+				work.NextAt = Math.Min(work.Deadline, this._now() + 100);
+			}
 		}
 	}
 }

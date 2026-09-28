@@ -64,7 +64,10 @@ namespace SylphyHorn.PlacementTestHost
 							};
 							windows.Add(window);
 							window.Show();
-							if (window.ActivateOnShow) window.Activate();
+							if (window.ActivateOnShow)
+							{
+								window.Activate();
+							}
 							Console.WriteLine(window.Handle.ToInt64().ToString(CultureInfo.InvariantCulture));
 							Console.Out.Flush();
 						}));

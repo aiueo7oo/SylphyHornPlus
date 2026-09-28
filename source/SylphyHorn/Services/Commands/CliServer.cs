@@ -53,12 +53,17 @@ namespace SylphyHorn.Services.Commands
 							{
 								var request = await CliProtocol.ReadAsync<CliRequest>(pipe, deadline.Token).ConfigureAwait(false);
 								if (request == null || request.SchemaVersion != 1 || request.Args == null || request.Args.Length > 32)
+								{
 									throw new ArgumentException("Unsupported request version or arguments.");
+								}
 								operation = CliCommand.Recognize(request.Args);
 								var command = CliCommand.Parse(request.Args);
 								if (command.Operation == "app assignment apply" || command.Operation == "settings import"
 									|| command.Operation == "settings reset"
-									|| command.Operation.StartsWith("startup ", StringComparison.Ordinal)) deadline.CancelAfter(TimeSpan.FromSeconds(40));
+									|| command.Operation.StartsWith("startup ", StringComparison.Ordinal))
+								{
+									deadline.CancelAfter(TimeSpan.FromSeconds(40));
+								}
 								response = await this._execute(command, deadline.Token).ConfigureAwait(false);
 							}
 							catch (ArgumentException ex)
@@ -92,7 +97,9 @@ namespace SylphyHorn.Services.Commands
 								{
 									writeDeadline.CancelAfter(TimeSpan.FromSeconds(1));
 									if (CliProtocol.Serialize(response).Length > CliProtocol.MaximumFrameBytes)
+									{
 										response = CliResponse.Fail(operation, "response_too_large", "The result exceeds the protocol size limit.");
+									}
 									await CliProtocol.WriteAsync(pipe, response, writeDeadline.Token).ConfigureAwait(false);
 								}
 							}
@@ -105,7 +112,10 @@ namespace SylphyHorn.Services.Commands
 							}
 						}
 					}
-					if (!this._stop.IsCancellationRequested) pipe = this.CreatePipe();
+					if (!this._stop.IsCancellationRequested)
+					{
+						pipe = this.CreatePipe();
+					}
 				}
 			}
 			catch (OperationCanceledException) when (this._stop.IsCancellationRequested) { }
