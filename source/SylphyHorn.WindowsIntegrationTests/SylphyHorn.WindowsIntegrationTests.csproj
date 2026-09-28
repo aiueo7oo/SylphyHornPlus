@@ -8,7 +8,6 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<IsPackable>false</IsPackable>
-		<IsTestingPlatformApplication>false</IsTestingPlatformApplication>
 		<NoWarn>$(NoWarn);xUnit1069</NoWarn>
 	</PropertyGroup>
 

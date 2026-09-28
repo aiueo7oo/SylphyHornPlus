@@ -42,16 +42,23 @@ if ($LASTEXITCODE -ne 0) {
 	throw "Windows integration-test restore failed with exit code $LASTEXITCODE."
 }
 
-dotnet test $testProject `
-	-c Release `
-	-f $TargetFramework `
-	-p:Platform=$Platform `
-	-p:RunSylphyHornPostBuild=false `
-	-p:SolutionDir="$solutionDirectory" `
-	--no-restore `
-	--filter "ExecutionEnvironment=HostedCI" `
-	--logger "trx;LogFileName=HostedCI.trx" `
-	--results-directory $ResultsDirectory
+Push-Location $repositoryRoot
+try {
+	dotnet test --project $testProject `
+		-c Release `
+		-f $TargetFramework `
+		-p:Platform=$Platform `
+		-p:RunSylphyHornPostBuild=false `
+		-p:SolutionDir="$solutionDirectory" `
+		--no-restore `
+		--results-directory $ResultsDirectory `
+		--filter-trait "ExecutionEnvironment=HostedCI" `
+		--report-xunit-trx `
+		--report-xunit-trx-filename HostedCI.trx
+}
+finally {
+	Pop-Location
+}
 if ($LASTEXITCODE -ne 0) {
 	throw "Hosted-CI Windows integration tests failed with exit code $LASTEXITCODE."
 }
