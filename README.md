@@ -15,6 +15,11 @@ New features are below:
 * Can export and import settings.
   * Can also use this feature as backup of virtual desktops.
 * Add Mouse shortcuts (rocker and wheel gestures) on both Windows 11 and 10.
+* Can place app windows on specified desktops automatically (App placement).
+  * Can create missing destination desktops and close empty desktops after use.
+  * Can also rearrange windows that are already open.
+* Can set the wallpaper of newly created desktops by their name or number.
+* Add `sylphyhorn-cli`, a command-line tool to operate SylphyHornPlus from scripts and AI agents.
 
 
 ## Installation
@@ -39,15 +44,15 @@ To uninstall a WinGet-managed installation, run:
 winget uninstall --id hwtnb.SylphyHornPlus --exact
 ```
 
-The `SylphyHornPlus` command alias starts the WinGet-managed application.
-WinGet removes the managed application files and command alias when
-uninstalling, but it does not remove SylphyHornPlus settings stored in your
+The `SylphyHornPlus` command alias starts the WinGet-managed application, and
+the `sylphyhorn-cli` alias runs its command-line tool. WinGet removes the
+managed application files and command aliases when uninstalling, but it does not remove SylphyHornPlus settings stored in your
 user profile.
 
 ### Install from a ZIP
 
 Download the ZIP that matches your Windows CPU architecture from
-[Releases](https://github.com/hwtnb/SylphyHornPlusWin11/releases):
+[Releases](https://github.com/hwtnb/SylphyHornPlus/releases):
 
 * `SylphyHornPlus-v{version}-x86.zip` for 32-bit Windows
 * `SylphyHornPlus-v{version}-x64.zip` for 64-bit Intel/AMD Windows
@@ -115,6 +120,14 @@ if possible.
 (default key combination: <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Win</kbd> + <kbd>P</kbd>)  
 ![](https://user-images.githubusercontent.com/1779073/40626965-e400321e-62f6-11e8-8947-b2ded3ed8c77.gif)
 
+* Automatic app placement  
+Place new windows of registered apps on a desktop specified by its number or name.
+  * Create missing desktops, and close empty desktops after use
+  * Rearrange windows that are already open
+
+* Wallpaper for new desktops  
+Set the wallpaper of newly created desktops by their name or number.
+
 * Settings GUI (call from tasktray)  
 ![](https://user-images.githubusercontent.com/56633452/140468242-cac44131-b49e-4ed6-bb98-2be88c56b27e.png)
 ![](https://user-images.githubusercontent.com/56633452/140468237-33203a2f-fe08-4e20-8ffa-9c724e6e0a67.png)
@@ -126,6 +139,22 @@ Windows 11
 Windows 10
 ![](https://user-images.githubusercontent.com/56633452/141109503-a15bd99a-ba55-4e0a-a14e-d4a8b2edda73.png)
 ![](https://user-images.githubusercontent.com/56633452/141109493-4db1496e-e0ac-46b5-b483-d851651d7432.png)
+
+
+## Command-line tool
+
+`sylphyhorn-cli` lets you switch and manage desktops, move windows, and change
+settings from a terminal, a script, or an AI agent. It controls SylphyHornPlus
+running in the same Windows user session at the same elevation level, and
+prints its results as JSON.
+
+With WinGet, run `sylphyhorn-cli`. With a ZIP, run `sylphyhorn-cli.exe` in the
+extracted `SylphyHorn` folder by its full path. Run `sylphyhorn-cli --help` to
+list the commands, and `sylphyhorn-cli spec <command>` for the details of a
+command.
+
+An agent skill for AI coding assistants is included in the `skills/sylphyhorn`
+folder next to `SylphyHorn.exe`.
 
 
 ## Credits
