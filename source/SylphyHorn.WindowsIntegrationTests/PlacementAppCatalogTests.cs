@@ -14,7 +14,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 		[Trait(IntegrationTestExecutionEnvironment.TraitName, IntegrationTestExecutionEnvironment.InteractiveDesktop)]
 		public async Task OpenWindowCatalogReadsChoicesWithoutMovingOrActivatingWindows()
 		{
-			var choices = await new PlacementAppCatalog().ReadAsync(true, TestContext.Current.CancellationToken);
+			var choices = await new PlacementAppCatalog().ReadAsync(windows: true, TestContext.Current.CancellationToken);
 			Assert.All(
 				choices,
 				choice =>
@@ -36,7 +36,7 @@ namespace SylphyHorn.WindowsIntegrationTests
 		[Trait(IntegrationTestExecutionEnvironment.TraitName, IntegrationTestExecutionEnvironment.InteractiveDesktop)]
 		public async Task InstalledCatalogVerifiesUnstartedApps()
 		{
-			var choices = await new PlacementAppCatalog().ReadAsync(false, TestContext.Current.CancellationToken);
+			var choices = await new PlacementAppCatalog().ReadAsync(windows: false, TestContext.Current.CancellationToken);
 			Assert.NotEmpty(choices);
 			Assert.All(choices.Where(choice => choice.Identity?.Kind == PlacementAppKind.ExecutablePath), choice => Assert.True(choice.ConfirmPath));
 			Assert.All(choices.Where(choice => choice.Icon != null), choice => Assert.True(choice.Icon.IsFrozen));

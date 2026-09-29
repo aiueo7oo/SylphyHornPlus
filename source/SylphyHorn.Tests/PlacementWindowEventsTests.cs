@@ -42,7 +42,9 @@ namespace SylphyHorn.Tests
 			receiver = new PlacementWindowEventReceiver(value =>
 			{
 				for (var time = 102; time < 106; time++)
+				{
 					receiver.Receive(new PlacementWindowEvent(PlacementWindowEventKind.Show, value.Window, time));
+				}
 				state.Receive(value);
 			}, () => state.Pause("EventCapacity"), 2);
 
@@ -271,7 +273,10 @@ namespace SylphyHorn.Tests
 		{
 			var state = Running(events: 2);
 			Send(state, PlacementWindowEventKind.Create, 101);
-			for (var i = 0; i < 100000; i++) Send(state, PlacementWindowEventKind.Show, 102 + i);
+			for (var i = 0; i < 100000; i++)
+			{
+				Send(state, PlacementWindowEventKind.Show, 102 + i);
+			}
 			Assert.Equal(2, state.BufferedCount);
 			Assert.Equal(PlacementMonitorState.Running, state.State);
 			state.ProcessBatch(1);

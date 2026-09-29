@@ -18,31 +18,31 @@ namespace SylphyHorn.Tests
 		{
 			var config = new AppPlacementConfiguration(true, new[] { new AppPlacementRule(Guid.NewGuid(), true,
 				Identity(1).App, PlacementDestination.ByNumber(1), followForeground: rule) }, followForeground: global);
-			var f = new Fixture(config, automatic);
-			f.Windows.ConfirmMove = false;
-			f.Step();
-			Assert.Equal(0, f.Windows.Follows);
-			f.Windows.Location = f.Target;
-			f.Step();
-			f.Step();
-			Assert.Equal(PlacementOutcome.Moved, f.Work.Result.Outcome);
-			Assert.Equal(follows ? 1 : 0, f.Windows.Follows);
-			Assert.Equal(follows ? 1 : 0, f.Windows.FollowPreparations);
+			var fixture = new Fixture(config, automatic);
+			fixture.Windows.ConfirmMove = false;
+			fixture.Step();
+			Assert.Equal(0, fixture.Windows.Follows);
+			fixture.Windows.Location = fixture.Target;
+			fixture.Step();
+			fixture.Step();
+			Assert.Equal(PlacementOutcome.Moved, fixture.Work.Result.Outcome);
+			Assert.Equal(follows ? 1 : 0, fixture.Windows.Follows);
+			Assert.Equal(follows ? 1 : 0, fixture.Windows.FollowPreparations);
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		[InlineData(3)]
-		[InlineData(4)]
-		[InlineData(5)]
-		public void FollowGuardDistinguishesMoveFocusChangesFromNewInputAndDesktopChanges(int scenario)
+		[InlineData("None", 1)]
+		[InlineData("NotForegroundWhenPrepared", 0)]
+		[InlineData("NewInput", 0)]
+		[InlineData("DesktopChanged", 0)]
+		[InlineData("NoLongerCurrent", 0)]
+		[InlineData("InputUnavailable", 0)]
+		public void FollowGuardDistinguishesMoveFocusChangesFromNewInputAndDesktopChanges(string change, int expectedSwitches)
 		{
 			var identity = Identity(1);
 			var source = Guid.NewGuid();
 			var target = Guid.NewGuid();
-			var foreground = scenario == 1 ? IntPtr.Zero : identity.Window;
+			var foreground = change == "NotForegroundWhenPrepared" ? IntPtr.Zero : identity.Window;
 			uint? input = 10;
 			Guid? desktop = source;
 			var current = true;
@@ -51,43 +51,47 @@ namespace SylphyHorn.Tests
 				id => { Assert.Equal(target, id); switches++; });
 			var follow = windows.PrepareFollow(identity, source, target, () => current);
 			foreground = IntPtr.Zero; // Moving the window can change foreground without new input.
-			if (scenario == 2)
+			switch (change)
 			{
-				input++;
-			}
-			if (scenario == 3)
-			{
-				desktop = Guid.NewGuid();
-			}
-			if (scenario == 4)
-			{
-				current = false;
-			}
-			if (scenario == 5)
-			{
-				input = null;
+				case "None":
+				case "NotForegroundWhenPrepared":
+					break;
+				case "NewInput":
+					input++;
+					break;
+				case "DesktopChanged":
+					desktop = Guid.NewGuid();
+					break;
+				case "NoLongerCurrent":
+					current = false;
+					break;
+				case "InputUnavailable":
+					input = null;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(change));
 			}
 			follow?.Invoke();
-			Assert.Equal(scenario == 0 ? 1 : 0, switches);
+			Assert.Equal(expectedSwitches, switches);
 		}
 
 		[Fact]
 		public void FailedFollowKeepsConfirmedMoveAndDoesNotRetry()
 		{
-			var f = new Fixture(automatic: true);
-			f.Windows.FollowFailure = true;
-			f.Step();
-			f.Step();
-			Assert.Equal(PlacementOutcome.Moved, f.Work.Result.Outcome);
-			Assert.StartsWith("FollowFailed:", f.Work.Result.Reason);
-			Assert.Equal(1, f.Windows.Moves);
-			Assert.Equal(1, f.Windows.Follows);
+			var fixture = new Fixture(automatic: true);
+			fixture.Windows.FollowFailure = true;
+			fixture.Step();
+			fixture.Step();
+			Assert.Equal(PlacementOutcome.Moved, fixture.Work.Result.Outcome);
+			Assert.StartsWith("FollowFailed:", fixture.Work.Result.Reason);
+			Assert.Equal(1, fixture.Windows.Moves);
+			Assert.Equal(1, fixture.Windows.Follows);
 		}
 
 		[Theory]
-		[InlineData(false)]
-		[InlineData(true)]
-		public void HostedPackageLosingChildEvidenceDoesNotMoveOrResend(bool alreadyRequested)
+		[InlineData(false, nameof(PlacementOutcome.Changed), 0)]
+		[InlineData(true, nameof(PlacementOutcome.Unconfirmed), 1)]
+		public void HostedPackageLosingChildEvidenceDoesNotMoveOrResend(bool alreadyRequested, string expectedOutcome, int expectedMoves)
 		{
 			var host = new PlacementProcessIdentity(10, 100, @"C:\Windows\System32\ApplicationFrameHost.exe", null, null);
 			var child = new PlacementProcessIdentity(20, 200, @"C:\Packages\Calculator.exe", "Example_publisher", "Example_publisher!App");
@@ -103,57 +107,59 @@ namespace SylphyHorn.Tests
 			fixture.Windows.Status = PlacementInspectionStatus.Ready;
 			fixture.Now = fixture.Work.NextAt;
 			fixture.Step();
-			Assert.Equal(alreadyRequested ? PlacementOutcome.Unconfirmed : PlacementOutcome.Changed, fixture.Work.Result.Outcome);
+			Assert.Equal(expectedOutcome, fixture.Work.Result.Outcome.ToString());
 			fixture.Step();
-			Assert.Equal(alreadyRequested ? 1 : 0, fixture.Windows.Moves);
+			Assert.Equal(expectedMoves, fixture.Windows.Moves);
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		[InlineData(3)]
-		public void AccessDeniedAtEachNativeStageIsTerminal(int stage)
+		[InlineData("Inspect", nameof(PlacementOutcome.Unavailable), 0)]
+		[InlineData("Locate", nameof(PlacementOutcome.Unavailable), 0)]
+		[InlineData("BeforeMove", nameof(PlacementOutcome.MoveFailed), 0)]
+		[InlineData("Readback", nameof(PlacementOutcome.Unconfirmed), 1)]
+		public void AccessDeniedAtEachNativeStageIsTerminal(string stage, string expectedOutcome, int expectedMoves)
 		{
 			var fixture = new Fixture();
 			var denied = new COMException("Access denied", unchecked((int)0x80070005));
-			if (stage == 0)
+			switch (stage)
 			{
-				fixture.Windows.InspectFailure = denied;
-			}
-			if (stage == 1)
-			{
-				fixture.Windows.LocationFailure = denied;
-			}
-			if (stage == 2)
-			{
-				fixture.Windows.BeforeMove = _ => throw denied;
-			}
-			if (stage == 3)
-			{
-				fixture.Windows.AfterMove = () => fixture.Windows.LocationFailure = denied;
+				case "Inspect":
+					fixture.Windows.InspectFailure = denied;
+					break;
+				case "Locate":
+					fixture.Windows.LocationFailure = denied;
+					break;
+				case "BeforeMove":
+					fixture.Windows.BeforeMove = _ => throw denied;
+					break;
+				case "Readback":
+					fixture.Windows.AfterMove = () => fixture.Windows.LocationFailure = denied;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(stage));
 			}
 			fixture.Step();
-			Assert.Equal(
-				stage == 3 ? PlacementOutcome.Unconfirmed : stage == 2 ? PlacementOutcome.MoveFailed : PlacementOutcome.Unavailable,
-				fixture.Work.Result.Outcome);
+			Assert.Equal(expectedOutcome, fixture.Work.Result.Outcome.ToString());
 			Assert.Equal("COMException:80070005", fixture.Work.Result.Reason);
 			var inspections = fixture.Windows.Inspections;
 			var locations = fixture.Windows.Locations;
-			for (var i = 0; i < 10; i++) fixture.Step();
+			for (var i = 0; i < 10; i++)
+			{
+				fixture.Step();
+			}
 			Assert.Equal(inspections, fixture.Windows.Inspections);
 			Assert.Equal(locations, fixture.Windows.Locations);
-			Assert.Equal(stage == 3 ? 1 : 0, fixture.Windows.Moves);
+			Assert.Equal(expectedMoves, fixture.Windows.Moves);
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		public void UnusableReadbackCannotReportSuccessEvenWithRetainedIdentity(int scenario)
+		[InlineData(nameof(PlacementInspectionStatus.Unavailable))]
+		[InlineData(nameof(PlacementInspectionStatus.NotReady))]
+		[InlineData(nameof(PlacementInspectionStatus.Excluded))]
+		public void UnusableReadbackCannotReportSuccessEvenWithRetainedIdentity(string readbackStatus)
 		{
 			var fixture = new Fixture();
-			fixture.Windows.AfterMove = () => fixture.Windows.Status = scenario == 0 ? PlacementInspectionStatus.Unavailable : scenario == 1 ? PlacementInspectionStatus.NotReady : PlacementInspectionStatus.Excluded;
+			fixture.Windows.AfterMove = () => fixture.Windows.Status = (PlacementInspectionStatus)Enum.Parse(typeof(PlacementInspectionStatus), readbackStatus);
 			fixture.Step();
 			Assert.Equal(PlacementOutcome.Unconfirmed, fixture.Work.Result.Outcome);
 			Assert.Equal(1, fixture.Windows.Locations);
@@ -281,38 +287,36 @@ namespace SylphyHorn.Tests
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		[InlineData(3)]
-		[InlineData(4)]
-		public void IneligibleOrUncertainCandidatesNeverMove(int scenario)
+		[InlineData("Pinned", nameof(PlacementOutcome.Excluded))]
+		[InlineData("NoLongerCurrent", nameof(PlacementOutcome.Cancelled))]
+		[InlineData("DestinationUnavailable", nameof(PlacementOutcome.DestinationUnavailable))]
+		[InlineData("InspectionUnavailable", nameof(PlacementOutcome.Unavailable))]
+		[InlineData("StoppedDuringAuthorization", nameof(PlacementOutcome.Cancelled))]
+		public void IneligibleOrUncertainCandidatesNeverMove(string scenario, string expectedOutcome)
 		{
 			var fixture = new Fixture();
-			var expected = PlacementOutcome.Cancelled;
 			switch (scenario)
 			{
-				case 0:
+				case "Pinned":
 					fixture.Windows.Pinned = true;
-					expected = PlacementOutcome.Excluded;
 					break;
-				case 1:
+				case "NoLongerCurrent":
 					fixture.Current = false;
 					break;
-				case 2:
+				case "DestinationUnavailable":
 					fixture.Map = PlacementDesktopMap.Unavailable;
-					expected = PlacementOutcome.DestinationUnavailable;
 					break;
-				case 3:
+				case "InspectionUnavailable":
 					fixture.Windows.Status = PlacementInspectionStatus.Unavailable;
-					expected = PlacementOutcome.Unavailable;
 					break;
-				case 4:
+				case "StoppedDuringAuthorization":
 					fixture.BeforeAuthorization = () => fixture.Current = false;
 					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(scenario));
 			}
 			fixture.Step();
-			Assert.Equal(expected, fixture.Work.Result.Outcome);
+			Assert.Equal(expectedOutcome, fixture.Work.Result.Outcome.ToString());
 			Assert.Equal(0, fixture.Windows.Moves);
 		}
 
@@ -339,9 +343,9 @@ namespace SylphyHorn.Tests
 		}
 
 		[Theory]
-		[InlineData(false)]
-		[InlineData(true)]
-		public void FailedOrUnconfirmedNativeRequestIsTerminal(bool timeout)
+		[InlineData(false, nameof(PlacementOutcome.MoveFailed))]
+		[InlineData(true, nameof(PlacementOutcome.Unconfirmed))]
+		public void FailedOrUnconfirmedNativeRequestIsTerminal(bool timeout, string expectedOutcome)
 		{
 			var fixture = new Fixture();
 			fixture.Windows.ConfirmMove = false;
@@ -352,7 +356,7 @@ namespace SylphyHorn.Tests
 				fixture.Now = fixture.Work.Deadline;
 				fixture.Step();
 			}
-			Assert.Equal(timeout ? PlacementOutcome.Unconfirmed : PlacementOutcome.MoveFailed, fixture.Work.Result.Outcome);
+			Assert.Equal(expectedOutcome, fixture.Work.Result.Outcome.ToString());
 			fixture.Step();
 			Assert.Equal(1, fixture.Windows.Moves);
 		}
@@ -381,7 +385,10 @@ namespace SylphyHorn.Tests
 		public void HistoryRetainsOnlyLatestTwoHundredResults()
 		{
 			var history = new PlacementHistory();
-			for (var i = 0; i < 10000; i++) history.Add(new PlacementResult(new IntPtr(i), null, PlacementOutcome.Cancelled, null));
+			for (var i = 0; i < 10000; i++)
+			{
+				history.Add(new PlacementResult(new IntPtr(i), null, PlacementOutcome.Cancelled, null));
+			}
 			var snapshot = history.Snapshot();
 			Assert.Equal(200, snapshot.Length);
 			Assert.Equal(new IntPtr(9800), snapshot[0].Window);

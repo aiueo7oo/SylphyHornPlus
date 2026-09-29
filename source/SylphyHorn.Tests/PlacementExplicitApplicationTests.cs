@@ -14,42 +14,42 @@ namespace SylphyHorn.Tests
 		{
 			using (var cancellation = new CancellationTokenSource())
 			{
-				var f = new Fixture { Count = 2 };
-				f.Windows.ConfirmMove = false;
-				f.Waiting = () =>
+				var fixture = new Fixture { Count = 2 };
+				fixture.Windows.ConfirmMove = false;
+				fixture.Waiting = () =>
 				{
 					cancellation.Cancel();
 					cancellation.Token.ThrowIfCancellationRequested();
 				};
-				var application = f.Engine.ApplyRules(f.Map, null, false, f.Authorize, cancellation.Token);
+				var application = fixture.Engine.ApplyRules(fixture.Map, null, false, fixture.Authorize, cancellation.Token);
 				Assert.Equal(PlacementOutcome.Unconfirmed, application.Results[0].Outcome);
 				Assert.Equal(PlacementOutcome.Cancelled, application.Results[1].Outcome);
-				Assert.Equal(1, f.Windows.Moves);
+				Assert.Equal(1, fixture.Windows.Moves);
 			}
 		}
 
 		[Fact]
 		public void DryRunDoesNotMoveOrInvalidateTheGuiPreview()
 		{
-			var f = new Fixture();
-			var gui = f.Preview();
-			var query = f.Engine.ApplyRules(f.Map, null, true, f.Authorize, CancellationToken.None);
+			var fixture = new Fixture();
+			var gui = fixture.Preview();
+			var query = fixture.Engine.ApplyRules(fixture.Map, null, true, fixture.Authorize, CancellationToken.None);
 			Assert.Single(query.Preview.Items);
 			Assert.Empty(query.Results);
-			Assert.Equal(0, f.Windows.Moves);
-			Assert.Equal(PlacementOutcome.Moved, Assert.Single(f.Apply(gui, TestContext.Current.CancellationToken)).Outcome);
+			Assert.Equal(0, fixture.Windows.Moves);
+			Assert.Equal(PlacementOutcome.Moved, Assert.Single(fixture.Apply(gui, TestContext.Current.CancellationToken)).Outcome);
 		}
 
 		[Fact]
 		public void DirectApplyReenumeratesAndFiltersByApplication()
 		{
-			var f = new Fixture();
-			f.Engine.ApplyRules(f.Map, null, true, f.Authorize, CancellationToken.None);
-			f.Count = 2;
+			var fixture = new Fixture();
+			fixture.Engine.ApplyRules(fixture.Map, null, true, fixture.Authorize, CancellationToken.None);
+			fixture.Count = 2;
 			var other = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, @"C:\other.exe");
-			Assert.Empty(f.Engine.ApplyRules(f.Map, other, false, f.Authorize, CancellationToken.None).Preview.Items);
-			Assert.Equal(0, f.Windows.Moves);
-			var result = f.Engine.ApplyRules(f.Map, null, false, f.Authorize, CancellationToken.None);
+			Assert.Empty(fixture.Engine.ApplyRules(fixture.Map, other, false, fixture.Authorize, CancellationToken.None).Preview.Items);
+			Assert.Equal(0, fixture.Windows.Moves);
+			var result = fixture.Engine.ApplyRules(fixture.Map, null, false, fixture.Authorize, CancellationToken.None);
 			Assert.Equal(2, result.Preview.Items.Count);
 			Assert.Equal(2, result.Results.Length);
 			Assert.Equal(PlacementOutcome.Moved, result.Results[0].Outcome);
@@ -60,159 +60,182 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public void PreviewDoesNotMoveAndOnlyTheSelectedSnapshotCanBeUsedOnce()
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
 			Assert.True(Assert.Single(preview.Items).CanApply);
-			Assert.Equal(0, f.Windows.Moves);
-			Assert.Equal(PlacementOutcome.Moved, Assert.Single(f.Apply(preview, TestContext.Current.CancellationToken)).Outcome);
-			Assert.Equal(1, f.Windows.Moves);
-			Assert.Throws<InvalidOperationException>(() => f.Apply(preview, TestContext.Current.CancellationToken));
+			Assert.Equal(0, fixture.Windows.Moves);
+			Assert.Equal(PlacementOutcome.Moved, Assert.Single(fixture.Apply(preview, TestContext.Current.CancellationToken)).Outcome);
+			Assert.Equal(1, fixture.Windows.Moves);
+			Assert.Throws<InvalidOperationException>(() => fixture.Apply(preview, TestContext.Current.CancellationToken));
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		public void ExpiredReplacedOrForeignPreviewCannotMove(int scenario)
+		[InlineData("Expired")]
+		[InlineData("Replaced")]
+		[InlineData("Foreign")]
+		public void ExpiredReplacedOrForeignPreviewCannotMove(string scenario)
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
-			if (scenario == 0)
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
+			switch (scenario)
 			{
-				f.Now = preview.ExpiresAt;
+				case "Expired":
+					fixture.Now = preview.ExpiresAt;
+					break;
+				case "Replaced":
+					fixture.Preview();
+					break;
+				case "Foreign":
+					preview = new Fixture().Preview();
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(scenario));
 			}
-			if (scenario == 1)
-			{
-				f.Preview();
-			}
-			if (scenario == 2)
-			{
-				preview = new Fixture().Preview();
-			}
-			Assert.Throws<InvalidOperationException>(() => f.Apply(preview, TestContext.Current.CancellationToken));
-			Assert.Equal(0, f.Windows.Moves);
+			Assert.Throws<InvalidOperationException>(() => fixture.Apply(preview, TestContext.Current.CancellationToken));
+			Assert.Equal(0, fixture.Windows.Moves);
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		public void InvalidSelectionIsRejectedBeforeAnyMove(int scenario)
+		[InlineData("Empty")]
+		[InlineData("Duplicate")]
+		[InlineData("NotInPreview")]
+		public void InvalidSelectionIsRejectedBeforeAnyMove(string selection)
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
 			var id = preview.Items[0].Id;
-			var ids = scenario == 0 ? Array.Empty<Guid>() : scenario == 1 ? new[] { id, id } : new[] { id, Guid.NewGuid() };
-			Assert.Throws<ArgumentException>(() => f.Engine.Apply(preview, ids, f.Authorize, CancellationToken.None));
-			Assert.Equal(0, f.Windows.Moves);
+			Guid[] ids;
+			switch (selection)
+			{
+				case "Empty":
+					ids = Array.Empty<Guid>();
+					break;
+				case "Duplicate":
+					ids = new[] { id, id };
+					break;
+				case "NotInPreview":
+					ids = new[] { id, Guid.NewGuid() };
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(selection));
+			}
+			Assert.Throws<ArgumentException>(() => fixture.Engine.Apply(preview, ids, fixture.Authorize, CancellationToken.None));
+			Assert.Equal(0, fixture.Windows.Moves);
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		[InlineData(3)]
-		[InlineData(4)]
-		public void ChangedOrCancelledTargetsAreNotMoved(int scenario)
+		[InlineData("SourceDesktopChanged", nameof(PlacementOutcome.Changed))]
+		[InlineData("ProcessReplaced", nameof(PlacementOutcome.Changed))]
+		[InlineData("TargetDesktopReplaced", nameof(PlacementOutcome.Changed))]
+		[InlineData("NoLongerCurrent", nameof(PlacementOutcome.Cancelled))]
+		[InlineData("Cancelled", nameof(PlacementOutcome.Cancelled))]
+		public void ChangedOrCancelledTargetsAreNotMoved(string change, string expectedOutcome)
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
 			using (var cancellation = new CancellationTokenSource())
 			{
-				if (scenario == 0)
+				switch (change)
 				{
-					f.Windows.Location = Guid.NewGuid();
+					case "SourceDesktopChanged":
+						fixture.Windows.Location = Guid.NewGuid();
+						break;
+					case "ProcessReplaced":
+						fixture.Windows.ProcessVersion++;
+						break;
+					case "TargetDesktopReplaced":
+						fixture.Target = Guid.NewGuid();
+						break;
+					case "NoLongerCurrent":
+						fixture.Current = false;
+						break;
+					case "Cancelled":
+						cancellation.Cancel();
+						break;
+					default:
+						throw new ArgumentOutOfRangeException(nameof(change));
 				}
-				if (scenario == 1)
-				{
-					f.Windows.ProcessVersion++;
-				}
-				if (scenario == 2)
-				{
-					f.Target = Guid.NewGuid();
-				}
-				if (scenario == 3)
-				{
-					f.Current = false;
-				}
-				if (scenario == 4)
-				{
-					cancellation.Cancel();
-				}
-				var result = Assert.Single(f.Apply(preview, cancellation.Token));
-				Assert.Equal(scenario < 3 ? PlacementOutcome.Changed : PlacementOutcome.Cancelled, result.Outcome);
-				Assert.Equal(0, f.Windows.Moves);
+				var result = Assert.Single(fixture.Apply(preview, cancellation.Token));
+				Assert.Equal(expectedOutcome, result.Outcome.ToString());
+				Assert.Equal(0, fixture.Windows.Moves);
 			}
 		}
 
 		[Fact]
 		public void CancellationBetweenValidationAndNativeAcceptanceCancelsThePermit()
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
 			using (var cancellation = new CancellationTokenSource())
 			{
-				f.Windows.BeforePermit = () => cancellation.Cancel();
-				Assert.Equal(PlacementOutcome.Cancelled, Assert.Single(f.Apply(preview, cancellation.Token)).Outcome);
-				Assert.Equal(0, f.Windows.Moves);
+				fixture.Windows.BeforePermit = () => cancellation.Cancel();
+				Assert.Equal(PlacementOutcome.Cancelled, Assert.Single(fixture.Apply(preview, cancellation.Token)).Outcome);
+				Assert.Equal(0, fixture.Windows.Moves);
 			}
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		public void PinnedAlreadyPlacedAndUnavailableDestinationsAreNotSelectable(int scenario)
+		[InlineData("Pinned")]
+		[InlineData("AlreadyPlaced")]
+		[InlineData("DestinationUnavailable")]
+		public void PinnedAlreadyPlacedAndUnavailableDestinationsAreNotSelectable(string scenario)
 		{
-			var f = new Fixture();
-			if (scenario == 0)
+			var fixture = new Fixture();
+			var map = fixture.Map;
+			switch (scenario)
 			{
-				f.Windows.Pinned = true;
+				case "Pinned":
+					fixture.Windows.Pinned = true;
+					break;
+				case "AlreadyPlaced":
+					fixture.Windows.Location = fixture.Target;
+					break;
+				case "DestinationUnavailable":
+					map = PlacementDesktopMap.Unavailable;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(scenario));
 			}
-			if (scenario == 1)
-			{
-				f.Windows.Location = f.Target;
-			}
-			var preview = scenario == 2 ? f.Engine.Preview(PlacementDesktopMap.Unavailable, CancellationToken.None) : f.Preview();
+			var preview = fixture.Engine.Preview(map, CancellationToken.None);
 			Assert.False(Assert.Single(preview.Items).CanApply);
-			Assert.Throws<ArgumentException>(() => f.Apply(preview, TestContext.Current.CancellationToken));
-			Assert.Equal(0, f.Windows.Moves);
+			Assert.Throws<ArgumentException>(() => fixture.Apply(preview, TestContext.Current.CancellationToken));
+			Assert.Equal(0, fixture.Windows.Moves);
 		}
 
 		[Fact]
 		public void MissingReadbackIsBoundedAndNeverRetriesTheMove()
 		{
-			var f = new Fixture();
-			var preview = f.Preview();
-			f.Windows.ConfirmMove = false;
-			Assert.Equal(PlacementOutcome.Unconfirmed, Assert.Single(f.Apply(preview, TestContext.Current.CancellationToken)).Outcome);
-			Assert.Equal(1, f.Windows.Moves);
-			Assert.Equal(6000, f.Now);
+			var fixture = new Fixture();
+			var preview = fixture.Preview();
+			fixture.Windows.ConfirmMove = false;
+			Assert.Equal(PlacementOutcome.Unconfirmed, Assert.Single(fixture.Apply(preview, TestContext.Current.CancellationToken)).Outcome);
+			Assert.Equal(1, fixture.Windows.Moves);
+			Assert.Equal(6000, fixture.Now);
 		}
 
 		[Fact]
 		public void PreviewCapacityAndDeadlineNeverReturnAPartialSelection()
 		{
-			var f = new Fixture();
-			f.Count = 257;
-			Assert.Throws<InvalidOperationException>(() => f.Preview());
-			f.Count = 1;
-			f.Windows.AfterInspect = () => f.Now += 5000;
-			Assert.Throws<TimeoutException>(() => f.Preview());
-			Assert.Equal(0, f.Windows.Moves);
+			var fixture = new Fixture();
+			fixture.Count = 257;
+			Assert.Throws<InvalidOperationException>(() => fixture.Preview());
+			fixture.Count = 1;
+			fixture.Windows.AfterInspect = () => fixture.Now += 5000;
+			Assert.Throws<TimeoutException>(() => fixture.Preview());
+			Assert.Equal(0, fixture.Windows.Moves);
 		}
 
 		[Fact]
 		public void BatchStopsAfterThirtySecondsAndDoesNotMoveRemainingWindows()
 		{
-			var f = new Fixture();
-			f.Count = 10;
-			var preview = f.Preview();
-			f.Windows.ConfirmMove = false;
-			var results = f.Apply(preview, TestContext.Current.CancellationToken);
+			var fixture = new Fixture();
+			fixture.Count = 10;
+			var preview = fixture.Preview();
+			fixture.Windows.ConfirmMove = false;
+			var results = fixture.Apply(preview, TestContext.Current.CancellationToken);
 			Assert.Equal(10, results.Length);
-			Assert.Equal(6, f.Windows.Moves);
-			Assert.Equal(31000, f.Now);
+			Assert.Equal(6, fixture.Windows.Moves);
+			Assert.Equal(31000, fixture.Now);
 			Assert.All(results.Skip(6), result => Assert.Equal(PlacementOutcome.Cancelled, result.Outcome));
 		}
 
