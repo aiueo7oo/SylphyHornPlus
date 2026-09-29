@@ -29,7 +29,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AssemblyMetadata Include="ExtraVersion" Value="beta.16" />
+    <AssemblyMetadata Include="ExtraVersion" Value="beta.17" />
     <AssemblyMetadata Include="OriginalCompany" Value="grabacr.net" />
     <AssemblyMetadata Include="OriginalProduct" Value="SylphyHorn" />
   </ItemGroup>
