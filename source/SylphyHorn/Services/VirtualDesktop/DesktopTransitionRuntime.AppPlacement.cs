@@ -38,17 +38,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 			get
 			{
 				this.EnsureOwnerAccess();
-				if (this._placementChanging) return "Stopping";
-				if (this._shutdownStarted || this._stopping || this._placementSuspended) return "Suspended";
-				if (!this._placementConfiguration.Enabled) return "Disabled";
-				if (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets)
-				{
-					return "NoRules";
-				}
-				if (this._placementSession == null || this._placementSession.Completion.IsCompleted) return "Paused";
-				return this._placementSession.IsReady ? "Active" : "Preparing";
+				if (this._placementChanging) return PlacementStatuses.Stopping;
+				if (this.IsPlacementHalted) return PlacementStatuses.Suspended;
+				if (!this._placementConfiguration.Enabled) return PlacementStatuses.Disabled;
+				if (!this.HasEnabledRulesOrClosingTargets) return PlacementStatuses.NoRules;
+				if (this._placementSession == null || this._placementSession.Completion.IsCompleted) return PlacementStatuses.Paused;
+				return this._placementSession.IsReady ? PlacementStatuses.Active : PlacementStatuses.Preparing;
 			}
 		}
+
+		private bool HasEnabledRulesOrClosingTargets
+			=> this._placementConfiguration.Rules.Any(rule => rule.Enabled) || this._placementConfiguration.HasClosingTargets;
 
 		internal Task RestartPlacementAsync()
 		{
@@ -72,7 +72,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 
 		private void EnsurePlacementAvailable()
 		{
-			if (this.PlacementStatus != "Active")
+			if (this.PlacementStatus != PlacementStatuses.Active)
 			{
 				throw new InvalidOperationException("Placement is not monitoring.");
 			}
@@ -87,7 +87,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			this.EnsureOwnerAccess();
 			if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-			if (this._shutdownStarted || this._stopping || ReferenceEquals(configuration, this._placementConfiguration))
+			if (this.IsShuttingDown || ReferenceEquals(configuration, this._placementConfiguration))
 			{
 				return Task.CompletedTask;
 			}
@@ -119,9 +119,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 						this._placementSession = null;
 					}
 				}
-				if (generation != this._placementGeneration || !this._initialized || this._shutdownStarted || this._stopping
-					|| this._placementSuspended || !this._placementConfiguration.Enabled
-					|| (!this._placementConfiguration.Rules.Any(rule => rule.Enabled) && !this._placementConfiguration.HasClosingTargets))
+				if (generation != this._placementGeneration || !this._initialized || this.IsPlacementHalted
+					|| !this._placementConfiguration.Enabled || !this.HasEnabledRulesOrClosingTargets)
 				{
 					return;
 				}
@@ -336,7 +335,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			this.EnsureOwnerAccess();
 			request.Cancellation.ThrowIfCancellationRequested();
 			if (request.Completion.Task.IsCompleted || request.Generation != this._placementGeneration
-				|| this._shutdownStarted || this._stopping || this._placementSuspended || this._placementChanging
+				|| this.IsPlacementHalted || this._placementChanging
 				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.CreateMissingDesktops)
 			{
 				throw new OperationCanceledException();
@@ -368,6 +367,18 @@ namespace SylphyHorn.Services.DesktopTransitions
 				}
 				await completion.Task.ConfigureAwait(false);
 			}
+		}
+
+		// Values of PlacementStatus. The UI and CLI services compare against these literal strings.
+		private static class PlacementStatuses
+		{
+			internal const string Stopping = "Stopping";
+			internal const string Suspended = "Suspended";
+			internal const string Disabled = "Disabled";
+			internal const string NoRules = "NoRules";
+			internal const string Paused = "Paused";
+			internal const string Active = "Active";
+			internal const string Preparing = "Preparing";
 		}
 
 		private sealed class PlacementAuthorizationRequest

@@ -89,14 +89,19 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private bool ObserveDesktopClosure(PlacementOccupancyObservation observation)
 		{
 			this.EnsureOwnerAccess();
-			if (!this._initialized || this._shutdownStarted || this._stopping || this._placementSuspended || this._placementChanging
+			if (!this._initialized || this.IsPlacementHalted || this._placementChanging
 				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.HasClosingTargets
 				|| !observation.Complete || !observation.StillCurrent() || ReferenceEquals(this.PlacementDestinations, PlacementDesktopMap.Unavailable))
 			{
 				this._desktopClosure.Reset();
 				return false;
 			}
-			if (this._placementCreationGate.CurrentCount == 0) { this._desktopClosure.Reset(); return true; }
+			// A placement request is creating destination desktops; check again after the grace period.
+			if (this._placementCreationGate.CurrentCount == 0)
+			{
+				this._desktopClosure.Reset();
+				return true;
+			}
 			var state = this.State;
 			var generation = this._placementGeneration;
 			if (!state.CurrentDesktopId.HasValue || observation.Occupied.Any(id => !state.Records.ContainsKey(id)))
@@ -104,6 +109,38 @@ namespace SylphyHorn.Services.DesktopTransitions
 				this._desktopClosure.Reset();
 				return false;
 			}
+			this.UpdateCreatedDesktopGroups(state, observation);
+			this.ArmClosingDesktops(state, observation);
+			var created = new HashSet<Guid>(this._createdGroups.SelectMany(group => group.Desktops));
+			var candidate = this._desktopClosure.Observe(
+				ClosureDesktops(state, observation),
+				state.CurrentDesktopId.Value,
+				this._placementConfiguration.ClosingTargets,
+				this._closingArmed,
+				created,
+				closeAutomaticallyCreated: this._placementConfiguration.CloseCreatedDesktops,
+				available: true,
+				now: this._closureClock());
+			if (!candidate.HasValue || !observation.StillCurrent() || !ReferenceEquals(state, this.State))
+			{
+				return this._desktopClosure.Waiting;
+			}
+			// The candidate is always the last desktop, so Windows falls back to the desktop before it.
+			var fallback = state.Order[state.Order.Count - 2];
+			var removed = this._operations.TryRemoveEmpty(candidate.Value, fallback,
+				() => generation == this._placementGeneration && ReferenceEquals(state, this.State)
+					&& !this.IsPlacementHalted && observation.StillCurrent());
+			this._desktopClosure.Reset();
+			if (removed)
+			{
+				_ = this.RequestReconciliationAsync();
+			}
+			return removed;
+		}
+
+		// Drops closed desktops from the persisted groups and records groups whose desktops were used.
+		private void UpdateCreatedDesktopGroups(DesktopRuntimeState state, PlacementOccupancyObservation observation)
+		{
 			this.LoadCreatedDesktopGroups();
 			var changed = false;
 			for (var i = this._createdGroups.Count - 1; i >= 0; i--)
@@ -111,7 +148,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 				var group = this._createdGroups[i];
 				var live = group.Desktops.Where(id => state.Records.ContainsKey(id)).ToArray();
 				var used = group.Used || live.Any(id => observation.Occupied.Contains(id) || observation.Used.Contains(id));
-				if (live.Length == 0) { this._createdGroups.RemoveAt(i); changed = true; }
+				if (live.Length == 0)
+				{
+					this._createdGroups.RemoveAt(i);
+					changed = true;
+				}
 				else if (live.Length != group.Desktops.Count || used != group.Used)
 				{
 					this._createdGroups[i] = new PlacementCreatedGroup(live, used);
@@ -122,34 +163,28 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				this.SaveCreatedDesktopGroups();
 			}
+		}
+
+		// Only a desktop that has held a window can be closed after it becomes empty.
+		private void ArmClosingDesktops(DesktopRuntimeState state, PlacementOccupancyObservation observation)
+		{
 			this._closingArmed.IntersectWith(state.Order);
 			this._closingArmed.UnionWith(observation.Occupied);
 			this._closingArmed.UnionWith(observation.Used.Where(state.Records.ContainsKey));
-			foreach (var group in this._createdGroups.Where(group => group.Used)) this._closingArmed.UnionWith(group.Desktops);
-			var created = new HashSet<Guid>(this._createdGroups.SelectMany(group => group.Desktops));
-			var desktops = state.Order.Select(id =>
+			foreach (var group in this._createdGroups.Where(group => group.Used))
+			{
+				this._closingArmed.UnionWith(group.Desktops);
+			}
+		}
+
+		private static PlacementClosureDesktop[] ClosureDesktops(DesktopRuntimeState state, PlacementOccupancyObservation observation)
+		{
+			return state.Order.Select(id =>
 			{
 				var name = state.Records[id].Name;
-				return new PlacementClosureDesktop(new PlacementDesktop(id, name.Value, name.HasValue && name.ReadStatus == WindowsDesktop.VirtualDesktopReadStatus.Success),
-					observation.Occupied.Contains(id) ? PlacementDesktopOccupancy.Occupied : PlacementDesktopOccupancy.Empty);
+				var occupancy = observation.Occupied.Contains(id) ? PlacementDesktopOccupancy.Occupied : PlacementDesktopOccupancy.Empty;
+				return new PlacementClosureDesktop(new PlacementDesktop(id, name.Value, IsAvailableName(name)), occupancy);
 			}).ToArray();
-			var candidate = this._desktopClosure.Observe(desktops, state.CurrentDesktopId.Value,
-				this._placementConfiguration.ClosingTargets, this._closingArmed, created,
-				this._placementConfiguration.CloseCreatedDesktops, true, this._closureClock());
-			if (candidate.HasValue && observation.StillCurrent() && ReferenceEquals(state, this.State))
-			{
-				if (this._operations.TryRemoveEmpty(candidate.Value, state.Order[state.Order.Count - 2],
-					() => generation == this._placementGeneration && ReferenceEquals(state, this.State)
-						&& !this._shutdownStarted && !this._stopping && !this._placementSuspended && observation.StillCurrent()))
-				{
-					this._desktopClosure.Reset();
-					_ = this.RequestReconciliationAsync();
-					return true;
-				}
-				this._desktopClosure.Reset();
-				return false;
-			}
-			return this._desktopClosure.Waiting;
 		}
 	}
 }

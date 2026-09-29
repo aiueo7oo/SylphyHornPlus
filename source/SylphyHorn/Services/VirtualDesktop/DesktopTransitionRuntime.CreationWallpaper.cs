@@ -28,7 +28,10 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (id != Guid.Empty)
 				{
 					foreach (var entry in held)
-						this.ScheduleCreationWallpaper(entry.Key, entry.Value, entry.Key == id ? name : null);
+					{
+						var assignedName = entry.Key == id ? name : null;
+						this.ScheduleCreationWallpaper(entry.Key, entry.Value, assignedName);
+					}
 				}
 			}
 		}
@@ -60,10 +63,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		private void ScheduleCreationWallpaper(Guid id, int number, string assignedName = null)
 		{
 			if (this._creationWallpaperSkipped.Remove(id)) return;
-			if (!this._initialized || this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null)
-			{
-				return;
-			}
+			if (!this._initialized || this.IsShuttingDown || this.IsTransactionPending) return;
 			var entries = this._settings.ReadWallpapersOnCreation();
 			if (entries.Length == 0 || !this.State.Records.TryGetValue(id, out var record)) return;
 			if (record.WallpaperPath.ReadStatus == VirtualDesktopReadStatus.Unsupported && !this._settings.PerDesktopWallpaperEnabled)
@@ -83,10 +83,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			// Do not use the deferred command queue: it marks the CLI busy while desktop creation is completing.
 			if (!this._owner.Post(() =>
 			{
-				if (this._shutdownStarted || this._stopping || this._activeImportSession != null || this._preparedRuntime != null)
-				{
-					return;
-				}
+				if (this.IsShuttingDown || this.IsTransactionPending) return;
 				if (this.State.ProviderEpoch != epoch || !this.State.Records.ContainsKey(id)) return;
 				try
 				{
