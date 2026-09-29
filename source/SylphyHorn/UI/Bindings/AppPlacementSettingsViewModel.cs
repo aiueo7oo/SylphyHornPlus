@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,14 @@ namespace SylphyHorn.UI.Bindings
 	public sealed class PlacementText
 	{
 		public string this[string key] => Resources.ResourceManager.GetString("Placement_" + key, Resources.Culture) ?? key;
+	}
+
+	// DesktopTransitionRuntime.PlacementStatus values that the settings pages act on.
+	internal static class PlacementStatuses
+	{
+		internal const string Active = "Active";
+
+		internal const string Paused = "Paused";
 	}
 
 	// One choice of the per-rule / global switch setting. The instances are shared by every combo box and keep
@@ -78,54 +87,10 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.Title));
 			this.OnPropertyChanged(nameof(this.Description));
 			this.OnPropertyChanged(nameof(this.DestinationLabel));
-			foreach (var row in this.Rows) row.RefreshLanguage();
-		}
-	}
-
-	public sealed class PlacementClosingGroup : ObservableObject
-	{
-		internal PlacementClosingGroup(AppPlacementSettingsViewModel owner, PlacementDestinationKind kind)
-		{
-			this.Owner = owner;
-			this.Kind = kind;
-		}
-
-		public AppPlacementSettingsViewModel Owner { get; }
-		internal PlacementDestinationKind Kind { get; }
-		public string Title => this.Owner.Text[this.Kind == PlacementDestinationKind.Name ? "CloseByName" : "CloseByNumber"];
-		public ObservableCollection<PlacementClosingRow> Rows { get; } = new ObservableCollection<PlacementClosingRow>();
-		internal void RefreshLanguage()
-		{
-			this.OnPropertyChanged(nameof(this.Title));
-			foreach (var row in this.Rows) row.RefreshLanguage();
-		}
-	}
-
-	public sealed class PlacementClosingRow : ObservableObject
-	{
-		private string _destination;
-		private bool _invalid;
-
-		internal PlacementClosingRow(PlacementClosingGroup group, PlacementDestination saved = null)
-		{
-			this.Group = group;
-			this.Saved = saved;
-			this.Restore();
-			this.RemoveCommand = new AsyncRelayCommand(() => group.Owner.RemoveClosingAsync(this));
-		}
-
-		public PlacementClosingGroup Group { get; }
-		public AsyncRelayCommand RemoveCommand { get; }
-		internal PlacementDestination Saved { get; set; }
-		public string Destination { get => this._destination; set => this.SetProperty(ref this._destination, value); }
-		public string Error => this._invalid ? this.Group.Owner.Text[this.Group.Kind == PlacementDestinationKind.Name ? "InvalidName" : "InvalidNumber"] : "";
-		internal void Invalid(bool value) { this._invalid = value; this.RefreshLanguage(); }
-		internal void RefreshLanguage() => this.OnPropertyChanged(nameof(this.Error));
-		internal void Restore()
-		{
-			this.Destination = this.Saved == null ? "" : this.Saved.Kind == PlacementDestinationKind.Name
-				? this.Saved.Name : this.Saved.Number.ToString(CultureInfo.InvariantCulture);
-			this.Invalid(false);
+			foreach (var row in this.Rows)
+			{
+				row.RefreshLanguage();
+			}
 		}
 	}
 
@@ -246,6 +211,9 @@ namespace SylphyHorn.UI.Bindings
 
 		internal PlacementAppChoice Choice => this.AppText == this._choiceText ? this._choice : null;
 
+		// A new number rule starts at the first desktop; a new name rule starts empty.
+		private string NewDestination => this.Group.Kind == PlacementDestinationKind.Number ? "1" : "";
+
 		internal void Use(PlacementAppChoice choice, PlacementAppPresence presence = PlacementAppPresence.Unknown)
 		{
 			this._choice = choice;
@@ -279,18 +247,46 @@ namespace SylphyHorn.UI.Bindings
 			{
 				this.Use(this._choice, this._presence);
 			}
+			else if (rule != null)
+			{
+				this.Use(new PlacementAppChoice(this.DisplayNameOf(rule), "", DisplayPathOf(rule), rule.App));
+			}
 			else
 			{
-				this.Use(rule == null ? null : new PlacementAppChoice(
-					rule.DisplayName ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? System.IO.Path.GetFileNameWithoutExtension(rule.App.Value) : this.Group.Owner.Text["UnknownApplication"]),
-					"",
-					rule.DisplayExecutablePath ?? (rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : null),
-					rule.App));
+				this.Use(null);
 			}
-			this.Destination = rule == null ? (this.Group.Kind == PlacementDestinationKind.Number ? "1" : "") : rule.Destination.Kind == PlacementDestinationKind.Number ? rule.Destination.Number.ToString(CultureInfo.InvariantCulture) : rule.Destination.Name;
+			this.Destination = rule == null ? this.NewDestination : AppPlacementSettingsViewModel.FormatDestination(rule.Destination);
 			this.Enabled = rule?.Enabled ?? true;
 			this.FollowForeground = rule?.FollowForeground;
 			this.SetErrorKey("");
+		}
+
+		// Whether committing the row with this destination would save exactly the rule already saved.
+		internal bool IsUnchanged(PlacementDestination destination)
+		{
+			var saved = this.Saved;
+			return saved != null
+				&& this.Choice != null
+				&& saved.Enabled == this.Enabled
+				&& saved.FollowForeground == this.FollowForeground
+				&& saved.App.Equals(this.Choice.Identity)
+				&& saved.Destination.Kind == destination.Kind
+				&& saved.Destination.Number == destination.Number
+				&& saved.Destination.Name == destination.Name;
+		}
+
+		private string DisplayNameOf(AppPlacementRule rule)
+		{
+			if (rule.DisplayName != null) return rule.DisplayName;
+			return rule.App.Kind == PlacementAppKind.ExecutablePath
+				? Path.GetFileNameWithoutExtension(rule.App.Value)
+				: this.Group.Owner.Text["UnknownApplication"];
+		}
+
+		private static string DisplayPathOf(AppPlacementRule rule)
+		{
+			if (rule.DisplayExecutablePath != null) return rule.DisplayExecutablePath;
+			return rule.App.Kind == PlacementAppKind.ExecutablePath ? rule.App.Value : null;
 		}
 	}
 
@@ -311,7 +307,17 @@ namespace SylphyHorn.UI.Bindings
 
 		public PlacementText Text { get; } = new PlacementText();
 
+		internal PlacementRuleGroup NameGroup { get; }
+
+		internal PlacementRuleGroup NumberGroup { get; }
+
 		public IReadOnlyList<PlacementRuleGroup> Groups { get; }
+
+		internal PlacementClosingGroup NameClosingGroup { get; }
+
+		internal PlacementClosingGroup NumberClosingGroup { get; }
+
+		public IReadOnlyList<PlacementClosingGroup> ClosingGroups { get; }
 
 		public AsyncRelayCommand RetrySaveCommand { get; }
 
@@ -329,6 +335,8 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		public bool IsPaused => this._runtime.PlacementStatus == PlacementStatuses.Paused;
+
 		public bool IsEnabled
 		{
 			get => this._settings.Configuration.Value.Enabled;
@@ -336,7 +344,7 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this._disposed && value != this.IsEnabled)
 				{
-					_ = this.PublishAsync(this.Configuration(enabled: value));
+					_ = this.PublishAsync(this.ConfigurationWith(enabled: value));
 				}
 			}
 		}
@@ -348,7 +356,7 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this._disposed && value != this.FollowForeground)
 				{
-					_ = this.PublishAsync(this.Configuration(followForeground: value));
+					_ = this.PublishAsync(this.ConfigurationWith(followForeground: value));
 				}
 			}
 		}
@@ -375,11 +383,6 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
-		private void RefreshFollowOptions()
-		{
-			foreach (var option in this.FollowOptions.Concat(this.FollowWidthSamples)) option.Refresh();
-		}
-
 		public bool CreateMissingDesktops
 		{
 			get => this._settings.Configuration.Value.CreateMissingDesktops;
@@ -387,14 +390,12 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this._disposed && value != this.CreateMissingDesktops)
 				{
-					_ = this.PublishAsync(this.Configuration(createMissing: value));
+					_ = this.PublishAsync(this.ConfigurationWith(createMissing: value));
 				}
 			}
 		}
 
 		public bool CanConfigureCreatedDesktopClosing => this.IsEnabled && this.CreateMissingDesktops;
-
-		public IReadOnlyList<PlacementClosingGroup> ClosingGroups { get; }
 
 		public bool CloseCreatedDesktops
 		{
@@ -403,62 +404,10 @@ namespace SylphyHorn.UI.Bindings
 			{
 				if (!this._disposed && value != this.CloseCreatedDesktops)
 				{
-					_ = this.PublishAsync(this.Configuration(closeCreated: value));
+					_ = this.PublishAsync(this.ConfigurationWith(closeCreated: value));
 				}
 			}
 		}
-
-		private AppPlacementConfiguration Configuration(bool? enabled = null, bool? createMissing = null,
-			bool? closeCreated = null, IEnumerable<AppPlacementRule> rules = null, IEnumerable<PlacementDestination> closingTargets = null, bool? followForeground = null)
-		{
-			var current = this._settings.Configuration.Value;
-			return new AppPlacementConfiguration(enabled ?? current.Enabled, rules ?? current.Rules,
-				createMissing ?? current.CreateMissingDesktops, closeCreated ?? current.CloseCreatedDesktops, closingTargets ?? current.ClosingTargets,
-				followForeground ?? current.FollowForeground);
-		}
-
-		internal PlacementClosingRow AddClosingRow(PlacementClosingGroup group)
-		{
-			var row = new PlacementClosingRow(group);
-			group.Rows.Add(row);
-			return row;
-		}
-
-		internal Task CommitClosingAsync(PlacementClosingRow row)
-		{
-			if (this._disposed || !row.Group.Rows.Contains(row)) return Task.CompletedTask;
-			if (string.IsNullOrWhiteSpace(row.Destination))
-			{
-				row.Invalid(row.Saved != null);
-				return Task.CompletedTask;
-			}
-			if (row.Group.Kind == PlacementDestinationKind.Number)
-			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
-				{
-					row.Invalid(true);
-					return Task.CompletedTask;
-				}
-				row.Saved = PlacementDestination.ByNumber(number);
-			}
-			else
-			{
-				row.Saved = PlacementDestination.ByName(row.Destination);
-			}
-			row.Invalid(false);
-			return this.SaveClosingRowsAsync();
-		}
-
-		internal Task RemoveClosingAsync(PlacementClosingRow row)
-		{
-			if (this._disposed || !row.Group.Rows.Remove(row)) return Task.CompletedTask;
-			return row.Saved == null ? Task.CompletedTask : this.SaveClosingRowsAsync();
-		}
-
-		private Task SaveClosingRowsAsync() => this.PublishAsync(this.Configuration(closingTargets:
-			this.ClosingGroups.SelectMany(group => group.Rows).Select(row => row.Saved).Where(target => target != null)));
-
-		public bool IsPaused => this._runtime.PlacementStatus == "Paused";
 
 		internal AppPlacementSettingsViewModel(
 			AppPlacementSettings settings,
@@ -484,16 +433,12 @@ namespace SylphyHorn.UI.Bindings
 				new PlacementFollowOption(this, true),
 				new PlacementFollowOption(this, false)
 			});
-			this.Groups = Array.AsReadOnly(new[]
-			{
-				new PlacementRuleGroup(this, PlacementDestinationKind.Name),
-				new PlacementRuleGroup(this, PlacementDestinationKind.Number)
-			});
-			this.ClosingGroups = Array.AsReadOnly(new[]
-			{
-				new PlacementClosingGroup(this, PlacementDestinationKind.Name),
-				new PlacementClosingGroup(this, PlacementDestinationKind.Number)
-			});
+			this.NameGroup = new PlacementRuleGroup(this, PlacementDestinationKind.Name);
+			this.NumberGroup = new PlacementRuleGroup(this, PlacementDestinationKind.Number);
+			this.Groups = Array.AsReadOnly(new[] { this.NameGroup, this.NumberGroup });
+			this.NameClosingGroup = new PlacementClosingGroup(this, PlacementDestinationKind.Name);
+			this.NumberClosingGroup = new PlacementClosingGroup(this, PlacementDestinationKind.Number);
+			this.ClosingGroups = Array.AsReadOnly(new[] { this.NameClosingGroup, this.NumberClosingGroup });
 			this.RetrySaveCommand = new AsyncRelayCommand(this.SaveAsync, () => this.SaveFailed && !this._disposed);
 			this.RestartCommand = new AsyncRelayCommand(async () =>
 			{
@@ -509,7 +454,21 @@ namespace SylphyHorn.UI.Bindings
 			ResourceService.Current.PropertyChanged += this.OnResourcesChanged;
 		}
 
+		internal static string FormatDestination(PlacementDestination destination)
+			=> destination.Kind == PlacementDestinationKind.Number ? destination.Number.ToString(CultureInfo.InvariantCulture) : destination.Name;
+
+		internal PlacementRuleGroup GroupFor(PlacementDestinationKind kind)
+			=> kind == PlacementDestinationKind.Name ? this.NameGroup : this.NumberGroup;
+
 		private void SetMessageKey(string key) => this.SetProperty(ref this._messageKey, key, nameof(this.Message));
+
+		private void RefreshFollowOptions()
+		{
+			foreach (var option in this.FollowOptions.Concat(this.FollowWidthSamples))
+			{
+				option.Refresh();
+			}
+		}
 
 		private void OnResourcesChanged(object sender, PropertyChangedEventArgs args)
 		{
@@ -517,18 +476,30 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.Text));
 			this.OnPropertyChanged(nameof(this.Message));
 			this.RefreshFollowOptions();
-			foreach (var group in this.Groups) group.RefreshLanguage();
-			foreach (var group in this.ClosingGroups) group.RefreshLanguage();
+			foreach (var group in this.Groups)
+			{
+				group.RefreshLanguage();
+			}
+			foreach (var group in this.ClosingGroups)
+			{
+				group.RefreshLanguage();
+			}
+		}
+
+		internal void Refresh()
+		{
+			this.OnPropertyChanged(nameof(this.IsPaused));
+			this.RestartCommand.NotifyCanExecuteChanged();
 		}
 
 		internal void RefreshDestinationChoices()
 		{
 			var map = this._runtime.PlacementDestinations;
 			var state = this._runtime.State;
-			this.Groups[0].Choices = state.Order.Select(id => state.Records[id].Name.Value)
+			this.NameGroup.Choices = state.Order.Select(id => state.Records[id].Name.Value)
 				.Where(name => !string.IsNullOrWhiteSpace(name) && map.Resolve(PlacementDestination.ByName(name)).Status == PlacementResolutionStatus.Resolved)
 				.Distinct(StringComparer.Ordinal).ToArray();
-			this.Groups[1].Choices = Enumerable.Range(1, state.Order.Count)
+			this.NumberGroup.Choices = Enumerable.Range(1, state.Order.Count)
 				.Where(number => map.Resolve(PlacementDestination.ByNumber(number)).Status == PlacementResolutionStatus.Resolved)
 				.Select(number => number.ToString(CultureInfo.InvariantCulture)).ToArray();
 		}
@@ -545,17 +516,26 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.CloseCreatedDesktops));
 			if (this._publishing) return;
 			this._generation++;
-			foreach (var read in this._reads.Values) read.Cancel();
+			foreach (var read in this._reads.Values)
+			{
+				read.Cancel();
+			}
+			var configuration = this._settings.Configuration.Value;
 			foreach (var group in this.Groups)
 			{
 				group.Rows.Clear();
-				foreach (var rule in this._settings.Configuration.Value.Rules.Where(rule => rule.Destination.Kind == group.Kind)) group.Rows.Add(new PlacementRuleRow(group, rule));
+				foreach (var rule in configuration.Rules.Where(rule => rule.Destination.Kind == group.Kind))
+				{
+					group.Rows.Add(new PlacementRuleRow(group, rule));
+				}
 			}
 			foreach (var group in this.ClosingGroups)
 			{
 				group.Rows.Clear();
-				foreach (var target in this._settings.Configuration.Value.ClosingTargets.Where(target => target.Kind == group.Kind))
+				foreach (var target in configuration.ClosingTargets.Where(target => target.Kind == group.Kind))
+				{
 					group.Rows.Add(new PlacementClosingRow(group, target));
+				}
 			}
 			if (this._generation > 1)
 			{
@@ -575,10 +555,13 @@ namespace SylphyHorn.UI.Bindings
 				var icons = await this._catalog.ReadIconsAsync(choices.Values.Select(choice => choice.Identity).Distinct().ToArray(), this._lifetime.Token);
 				if (this._disposed || generation != this._generation) return;
 				// A row edited or re-chosen while the Shell was reading keeps its newer state.
-				foreach (var row in rows) if (this.Contains(row) && ReferenceEquals(row.Choice, choices[row]) && icons.TryGetValue(choices[row].Identity, out var read))
+				foreach (var row in rows)
 				{
 					var choice = choices[row];
-					row.Use(new PlacementAppChoice(choice.Name, choice.Detail, choice.Path, choice.Identity, read.Icon ?? choice.Icon), read.Presence);
+					if (this.Contains(row) && ReferenceEquals(row.Choice, choice) && icons.TryGetValue(choice.Identity, out var read))
+					{
+						row.Use(new PlacementAppChoice(choice.Name, choice.Detail, choice.Path, choice.Identity, read.Icon ?? choice.Icon), read.Presence);
+					}
 				}
 			}
 			catch (Exception) { /* Missing icons do not prevent registration or editing. */ }
@@ -602,33 +585,13 @@ namespace SylphyHorn.UI.Bindings
 			}
 			var revision = row.Revision;
 			var generation = this._generation;
-			PlacementDestination destination;
-			if (row.Group.Kind == PlacementDestinationKind.Number)
-			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
-				{
-					row.SetErrorKey("InvalidNumber");
-					return;
-				}
-				destination = PlacementDestination.ByNumber(number);
-			}
-			else
-			{
-				if (string.IsNullOrWhiteSpace(row.Destination))
-				{
-					row.SetErrorKey("InvalidName");
-					return;
-				}
-
-				destination = PlacementDestination.ByName(row.Destination);
-			}
+			if (!TryReadDestination(row, out var destination)) return;
 			if (string.IsNullOrWhiteSpace(row.AppText))
 			{
 				row.SetErrorKey("EnterPath");
 				return;
 			}
-			if (row.Saved != null && row.Choice != null && row.Saved.Enabled == row.Enabled && row.Saved.FollowForeground == row.FollowForeground && row.Saved.App.Equals(row.Choice.Identity)
-				&& row.Saved.Destination.Kind == destination.Kind && row.Saved.Destination.Number == destination.Number && row.Saved.Destination.Name == destination.Name)
+			if (row.IsUnchanged(destination))
 			{
 				row.SetErrorKey("");
 				return;
@@ -665,7 +628,7 @@ namespace SylphyHorn.UI.Bindings
 						rules[index] = rule;
 					}
 					row.Accept(rule, choice);
-					await this.PublishAsync(this.Configuration(rules: rules));
+					await this.PublishAsync(this.ConfigurationWith(rules: rules));
 				}
 				catch (OperationCanceledException) { }
 				catch (Exception)
@@ -683,6 +646,30 @@ namespace SylphyHorn.UI.Bindings
 					}
 				}
 			}
+		}
+
+		private static bool TryReadDestination(PlacementRuleRow row, out PlacementDestination destination)
+		{
+			destination = null;
+			if (row.Group.Kind == PlacementDestinationKind.Number)
+			{
+				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+				{
+					row.SetErrorKey("InvalidNumber");
+					return false;
+				}
+				destination = PlacementDestination.ByNumber(number);
+			}
+			else
+			{
+				if (string.IsNullOrWhiteSpace(row.Destination))
+				{
+					row.SetErrorKey("InvalidName");
+					return false;
+				}
+				destination = PlacementDestination.ByName(row.Destination);
+			}
+			return true;
 		}
 
 		internal void Revert(PlacementRuleRow row)
@@ -705,8 +692,71 @@ namespace SylphyHorn.UI.Bindings
 			if (row.Saved != null)
 			{
 				var rules = this._settings.Configuration.Value.Rules.Where(rule => rule.Id != row.Id);
-				await this.PublishAsync(this.Configuration(rules: rules));
+				await this.PublishAsync(this.ConfigurationWith(rules: rules));
 			}
+		}
+
+		internal PlacementClosingRow AddClosingRow(PlacementClosingGroup group)
+		{
+			var row = new PlacementClosingRow(group);
+			group.Rows.Add(row);
+			return row;
+		}
+
+		internal Task CommitClosingAsync(PlacementClosingRow row)
+		{
+			if (this._disposed || !row.Group.Rows.Contains(row)) return Task.CompletedTask;
+			if (string.IsNullOrWhiteSpace(row.Destination))
+			{
+				row.SetInvalid(row.Saved != null);
+				return Task.CompletedTask;
+			}
+			if (row.Group.Kind == PlacementDestinationKind.Number)
+			{
+				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+				{
+					row.SetInvalid(true);
+					return Task.CompletedTask;
+				}
+				row.Saved = PlacementDestination.ByNumber(number);
+			}
+			else
+			{
+				row.Saved = PlacementDestination.ByName(row.Destination);
+			}
+			row.SetInvalid(false);
+			return this.SaveClosingRowsAsync();
+		}
+
+		internal Task RemoveClosingAsync(PlacementClosingRow row)
+		{
+			if (this._disposed || !row.Group.Rows.Remove(row)) return Task.CompletedTask;
+			return row.Saved == null ? Task.CompletedTask : this.SaveClosingRowsAsync();
+		}
+
+		private Task SaveClosingRowsAsync()
+		{
+			var targets = this.ClosingGroups.SelectMany(group => group.Rows).Select(row => row.Saved).Where(target => target != null);
+			return this.PublishAsync(this.ConfigurationWith(closingTargets: targets));
+		}
+
+		// The current configuration with only the given values replaced.
+		private AppPlacementConfiguration ConfigurationWith(
+			bool? enabled = null,
+			IEnumerable<AppPlacementRule> rules = null,
+			bool? createMissing = null,
+			bool? closeCreated = null,
+			IEnumerable<PlacementDestination> closingTargets = null,
+			bool? followForeground = null)
+		{
+			var current = this._settings.Configuration.Value;
+			return new AppPlacementConfiguration(
+				enabled ?? current.Enabled,
+				rules ?? current.Rules,
+				createMissingDesktops: createMissing ?? current.CreateMissingDesktops,
+				closeCreatedDesktops: closeCreated ?? current.CloseCreatedDesktops,
+				closingTargets: closingTargets ?? current.ClosingTargets,
+				followForeground: followForeground ?? current.FollowForeground);
 		}
 
 		private Task PublishAsync(AppPlacementConfiguration configuration)
@@ -748,12 +798,6 @@ namespace SylphyHorn.UI.Bindings
 		internal PlacementAppPickerViewModel CreatePicker() => new PlacementAppPickerViewModel(this._catalog);
 
 		internal PlacementApplyViewModel CreateApplyViewModel() => new PlacementApplyViewModel(this._runtime);
-
-		internal void Refresh()
-		{
-			this.OnPropertyChanged(nameof(this.IsPaused));
-			this.RestartCommand.NotifyCanExecuteChanged();
-		}
 
 		public void Dispose()
 		{

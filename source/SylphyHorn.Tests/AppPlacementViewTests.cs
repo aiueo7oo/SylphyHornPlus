@@ -114,7 +114,9 @@ namespace SylphyHorn.Tests
 								Assert.True(detail.IsReadOnly && detail.Focusable);
 								Assert.Equal(ScrollBarVisibility.Auto, detail.HorizontalScrollBarVisibility);
 								foreach (var button in Descendants(selection).OfType<Button>().Where(button => button.IsDefault || button.IsCancel))
+								{
 									Assert.InRange(button.TransformToAncestor(selection).TransformBounds(new Rect(button.RenderSize)).Bottom, 1, selection.Height);
+								}
 							}
 							using (var applyFixture = await PlacementApplyFixture.Create())
 							{
@@ -143,10 +145,10 @@ namespace SylphyHorn.Tests
 								var title = Assert.Single(Descendants(applyView).OfType<TextBlock>(), text => text.Text == applyFixture.Model.Rows[0].Title);
 								Assert.True(title.ActualWidth > 100, "Window title width: " + title.ActualWidth);
 							}
-							var edited = fixture.Model.Groups[1].Rows[0];
+							var edited = fixture.Model.NumberGroup.Rows[0];
 							edited.Destination = "invalid";
 							await fixture.Model.CommitAsync(edited);
-							var closing = fixture.Model.AddClosingRow(fixture.Model.ClosingGroups[1]);
+							var closing = fixture.Model.AddClosingRow(fixture.Model.NumberClosingGroup);
 							closing.Destination = "3";
 							await fixture.Model.CommitClosingAsync(closing);
 							var originalSetting = SylphyHorn.Serialization.Settings.General.Culture.Value;
@@ -171,7 +173,7 @@ namespace SylphyHorn.Tests
 										Assert.True(width >= required - 0.5, $"Delete button width {width} is smaller than its content width {required}.");
 									}
 									Assert.Contains(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["InvalidNumber"]);
-									Assert.Same(edited, fixture.Model.Groups[1].Rows[0]);
+									Assert.Same(edited, fixture.Model.NumberGroup.Rows[0]);
 									Assert.Equal("invalid", edited.Destination);
 								}
 							}
@@ -273,7 +275,9 @@ namespace SylphyHorn.Tests
 				"MetroTrilithon.Desktop;component/Styles/Controls.xaml",
 				"SylphyHorn;component/Styles/Controls.xaml"
 			})
+			{
 				view.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/" + resource) });
+			}
 			view.SetResourceReference(Control.BackgroundProperty, "ThemeBrushKey");
 			view.SetResourceReference(Control.ForegroundProperty, "ActiveForegroundBrushKey");
 		}
@@ -285,7 +289,10 @@ namespace SylphyHorn.Tests
 			view.UpdateLayout();
 			Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
 			// Off-screen visuals need repainting for each bitmap, including unchanged, trimmed text.
-			foreach (var element in Descendants(view).OfType<UIElement>()) element.InvalidateVisual();
+			foreach (var element in Descendants(view).OfType<UIElement>())
+			{
+				element.InvalidateVisual();
+			}
 			view.UpdateLayout();
 			var bitmap = new RenderTargetBitmap(
 				(int)(view.Width * scale), (int)(view.Height * scale),
@@ -299,7 +306,10 @@ namespace SylphyHorn.Tests
 			{
 				var child = VisualTreeHelper.GetChild(root, i);
 				yield return child;
-				foreach (var nested in Descendants(child)) yield return nested;
+				foreach (var nested in Descendants(child))
+				{
+					yield return nested;
+				}
 			}
 		}
 
