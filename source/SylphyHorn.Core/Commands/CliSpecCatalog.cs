@@ -209,7 +209,8 @@ namespace SylphyHorn.Commands
 					area == "settings" ? "Language changes may require restart; inspect restartRequired."
 						: area == "desktop" ? "override-on-startup affects the next launch and can change desktop count. per-desktop-wallpaper is editable only without native OS wallpaper " +
 							"support. override-on-startup requires OS name support."
-						: area == "notification" ? "Font sizes also require WPF rendering validation. Dimensions and offsets are logical pixels. Unsupported appearance options fail without " +
+						: area == "notification" ? "Font sizes also require WPF rendering validation. Dimensions and offsets are logical pixels. Corner styles are saved on every build; " +
+							"cornersSupported reports whether Windows can display them. An invalid font family or font size, or an unavailable monitor, fails without " +
 							"applying the other supplied settings. Empty font-family restores the default."
 						: "Omitted settings remain unchanged.",
 					"persist-settings", area == "settings" ? "--language en" : area == "desktop" ? "--loop true" : area == "tray" ? "--show-desktop true" : "--duration-ms 1000",
