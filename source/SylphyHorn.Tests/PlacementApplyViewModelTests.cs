@@ -58,7 +58,10 @@ namespace SylphyHorn.Tests
 			using (var f = await PlacementApplyFixture.Create())
 			{
 				await f.Model.RefreshCommand.ExecuteAsync(null);
-				foreach (var row in f.Model.Rows.Take(2)) row.Selected = true;
+				foreach (var row in f.Model.Rows.Take(2))
+				{
+					row.Selected = true;
+				}
 				var gate = new TaskCompletionSource<PlacementResult[]>();
 				f.Session.ApplyPending = gate.Task;
 				var applying = f.Model.ApplyCommand.ExecuteAsync(null);
@@ -228,15 +231,21 @@ namespace SylphyHorn.Tests
 			var process = new PlacementProcessIdentity(42, 1, @"C:\Applications\Editor\Editor.exe", null, null);
 			var app = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, process.Path);
 			var rule = new AppPlacementRule(Guid.NewGuid(), true, app, PlacementDestination.ByName("Development"), "Editor", process.Path);
+			PlacementPreviewItem EditorWindow(int handle, string title, Guid source, PlacementOutcome? excluded) => new PlacementPreviewItem(
+				new PlacementCandidate(new IntPtr(handle), Guid.NewGuid(), handle, 0),
+				new PlacementWindowIdentity(new IntPtr(handle), 1, process, process, app),
+				rule,
+				title,
+				source,
+				B,
+				excluded);
 			this.Preview = new PlacementPreview(
-				Enumerable.Range(1, 3).Select(n => new PlacementPreviewItem(
-					new PlacementCandidate(new IntPtr(n), Guid.NewGuid(), n, 0),
-					new PlacementWindowIdentity(new IntPtr(n), 1, process, process, app),
-					rule,
-					n == 1 ? "Project notes — Editor" : n == 2 ? "README.md — Editor" : "Settings — Editor",
-					n == 3 ? B : A,
-					B,
-					n == 3 ? PlacementOutcome.AlreadyPlaced : (PlacementOutcome?)null)),
+				new[]
+				{
+					EditorWindow(1, "Project notes — Editor", A, null),
+					EditorWindow(2, "README.md — Editor", A, null),
+					EditorWindow(3, "Settings — Editor", B, PlacementOutcome.AlreadyPlaced)
+				},
 				long.MaxValue);
 		}
 
@@ -250,7 +259,7 @@ namespace SylphyHorn.Tests
 
 		public void DesktopChanged() { }
 
-			public Task Completion => this._end.Task;
+		public Task Completion => this._end.Task;
 
 		public Task StopAsync()
 		{

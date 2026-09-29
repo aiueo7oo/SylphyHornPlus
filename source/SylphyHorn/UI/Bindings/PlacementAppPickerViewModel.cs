@@ -70,7 +70,15 @@ namespace SylphyHorn.UI.Bindings
 
 		public string Details => this.Selected?.Path ?? (this.Selected == null ? "" : this.Text["PathUnavailable"]);
 
-		public string Warning => this.Selected?.Problem != null ? this.Text[this.Selected.Problem] : this.Selected?.ConfirmPath == true ? this.Text["LauncherWarning"] : "";
+		public string Warning
+		{
+			get
+			{
+				var selected = this.Selected;
+				if (selected?.Problem != null) return this.Text[selected.Problem];
+				return selected?.ConfirmPath == true ? this.Text["LauncherWarning"] : "";
+			}
+		}
 
 		internal PlacementAppPickerViewModel(IPlacementAppCatalog catalog)
 		{
@@ -158,7 +166,18 @@ namespace SylphyHorn.UI.Bindings
 		{
 			this.Candidates.Clear();
 			this.Selected = null;
-			foreach (var choice in this._all.Where(choice => string.IsNullOrEmpty(this.Search) || (choice.Name + " " + choice.Detail + " " + choice.Path).IndexOf(this.Search, StringComparison.CurrentCultureIgnoreCase) >= 0)) this.Candidates.Add(choice);
+			foreach (var choice in this._all.Where(this.Matches))
+			{
+				this.Candidates.Add(choice);
+			}
+		}
+
+		// The search text matches the name, the description or the path.
+		private bool Matches(PlacementAppChoice choice)
+		{
+			if (string.IsNullOrEmpty(this.Search)) return true;
+			var text = choice.Name + " " + choice.Detail + " " + choice.Path;
+			return text.IndexOf(this.Search, StringComparison.CurrentCultureIgnoreCase) >= 0;
 		}
 
 		public void Dispose()

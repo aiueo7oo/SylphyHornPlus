@@ -42,7 +42,7 @@ namespace SylphyHorn.Tests
 				number.WallpaperPath = " ";
 				await f.Model.CommitAsync(number);
 				Assert.Equal(f.Model.Text["EnterPath"], number.Error);
-				var blank = f.Model.AddRow(f.Model.Groups[0]);
+				var blank = f.Model.AddRow(f.Model.NameGroup);
 				blank.WallpaperPath = @"C:\Wallpapers\blank.jpg";
 				await f.Model.CommitAsync(blank);
 				Assert.Equal(f.Model.Text["InvalidName"], blank.Error);
@@ -59,7 +59,7 @@ namespace SylphyHorn.Tests
 				await work.RemoveCommand.ExecuteAsync(null);
 				await number.RemoveCommand.ExecuteAsync(null);
 				Assert.Equal(3, Assert.Single(f.Settings.DesktopWallpapersOnCreation.Value).Number);
-				Assert.Equal(new[] { "3" }, f.Model.Groups[1].Rows.Select(row => row.Destination));
+				Assert.Equal(new[] { "3" }, f.Model.NumberGroup.Rows.Select(row => row.Destination));
 				Assert.Empty(f.Harness.Operations.DesktopOperationNames);
 				Assert.Equal(0, f.Harness.Operations.WallpaperCalls);
 			}
@@ -120,10 +120,10 @@ namespace SylphyHorn.Tests
 				new DesktopWallpaperOnCreation(null, 2, @"C:\Wallpapers\second.jpg")
 			}, missing: new[] { missing }))
 			{
-				var row = Assert.Single(f.Model.Groups[0].Rows);
+				var row = Assert.Single(f.Model.NameGroup.Rows);
 				await Until(() => row.Error.Length > 0);
 				Assert.Equal(f.Model.Text["MissingImage"], row.Error);
-				Assert.Equal("", Assert.Single(f.Model.Groups[1].Rows).Error);
+				Assert.Equal("", Assert.Single(f.Model.NumberGroup.Rows).Error);
 				Assert.Empty(f.Images.Validated);
 
 				row.WallpaperPath = @"C:\Wallpapers\fixed.jpg";
@@ -152,7 +152,7 @@ namespace SylphyHorn.Tests
 				var work = await f.Add(true, "Work", @"C:\Wallpapers\work.jpg");
 				var third = await f.Add(false, "3", @"C:\Wallpapers\third.jpg");
 				work.WallpaperPath = @"C:\Wallpapers\typing";
-				var draft = f.Model.AddRow(f.Model.Groups[1]);
+				var draft = f.Model.AddRow(f.Model.NumberGroup);
 				draft.Destination = "5";
 
 				// Like "desktop creation wallpaper set --number 3": the other rows keep what is being typed.
@@ -162,17 +162,17 @@ namespace SylphyHorn.Tests
 					new DesktopWallpaperOnCreation(null, 3, @"C:\Wallpapers\cli.jpg"),
 					new DesktopWallpaperOnCreation(null, 4, @"C:\Wallpapers\fourth.jpg")
 				};
-				Assert.Same(work, Assert.Single(f.Model.Groups[0].Rows));
+				Assert.Same(work, Assert.Single(f.Model.NameGroup.Rows));
 				Assert.Equal(@"C:\Wallpapers\typing", work.WallpaperPath);
-				Assert.Equal(new[] { "3", "4", "5" }, f.Model.Groups[1].Rows.Select(row => row.Destination));
-				Assert.NotSame(third, f.Model.Groups[1].Rows[0]);
-				Assert.Equal(@"C:\Wallpapers\cli.jpg", f.Model.Groups[1].Rows[0].WallpaperPath);
-				Assert.Same(draft, f.Model.Groups[1].Rows[2]);
+				Assert.Equal(new[] { "3", "4", "5" }, f.Model.NumberGroup.Rows.Select(row => row.Destination));
+				Assert.NotSame(third, f.Model.NumberGroup.Rows[0]);
+				Assert.Equal(@"C:\Wallpapers\cli.jpg", f.Model.NumberGroup.Rows[0].WallpaperPath);
+				Assert.Same(draft, f.Model.NumberGroup.Rows[2]);
 				Assert.Equal("", f.Model.EditDiscardedMessage);
 
 				// The entry being edited is removed elsewhere: its edit is discarded and reported.
 				f.Settings.DesktopWallpapersOnCreation.Value = f.Settings.DesktopWallpapersOnCreation.Value.Where(item => item.Name == null).ToArray();
-				Assert.Empty(f.Model.Groups[0].Rows);
+				Assert.Empty(f.Model.NameGroup.Rows);
 				Assert.Equal(f.Model.Text["ConfigurationChanged"], f.Model.EditDiscardedMessage);
 
 				// Import and reset go through the same notification.
@@ -180,11 +180,11 @@ namespace SylphyHorn.Tests
 				f.Harness.Settings.Provider.NextImport = new Dictionary<string, object> { [DesktopWallpaperOnCreation.SettingsKey] = imported };
 				var stage = await f.Harness.Settings.PrepareImportAsync("synthetic");
 				Assert.True((await f.Harness.Runtime.CommitPreparedImportAsync(stage, false, TestContext.Current.CancellationToken)).Succeeded);
-				Assert.Equal("Imported", Assert.Single(f.Model.Groups[0].Rows).Destination);
-				Assert.Equal(new[] { "5" }, f.Model.Groups[1].Rows.Select(row => row.Destination));
+				Assert.Equal("Imported", Assert.Single(f.Model.NameGroup.Rows).Destination);
+				Assert.Equal(new[] { "5" }, f.Model.NumberGroup.Rows.Select(row => row.Destination));
 				Assert.True((await f.Harness.Runtime.ResetSettingsAsync(TestContext.Current.CancellationToken)).Succeeded);
-				Assert.Empty(f.Model.Groups[0].Rows);
-				Assert.Same(draft, Assert.Single(f.Model.Groups[1].Rows));
+				Assert.Empty(f.Model.NameGroup.Rows);
+				Assert.Same(draft, Assert.Single(f.Model.NumberGroup.Rows));
 			}
 		}
 
@@ -195,7 +195,7 @@ namespace SylphyHorn.Tests
 			{
 				f.Harness.Settings.Provider.SaveFailure = new IOException("synthetic");
 				f.Chosen = @"C:\Wallpapers\chosen.png";
-				var row = f.Model.AddRow(f.Model.Groups[1]);
+				var row = f.Model.AddRow(f.Model.NumberGroup);
 				await f.Model.ChooseImageAsync(row);
 				Assert.Equal(@"C:\Wallpapers\chosen.png", row.WallpaperPath);
 				Assert.Empty(f.Settings.DesktopWallpapersOnCreation.Value);
@@ -230,7 +230,7 @@ namespace SylphyHorn.Tests
 
 				// The entry being edited is removed elsewhere while the save failure is still unresolved.
 				work.WallpaperPath = @"C:\Wallpapers\typing";
-				var draft = f.Model.AddRow(f.Model.Groups[1]);
+				var draft = f.Model.AddRow(f.Model.NumberGroup);
 				draft.Destination = "7";
 				f.Settings.DesktopWallpapersOnCreation.Value = f.Settings.DesktopWallpapersOnCreation.Value.Where(item => item.Name == null).ToArray();
 				Assert.Equal(f.Model.Text["ConfigurationChanged"], f.Model.EditDiscardedMessage);
@@ -249,7 +249,7 @@ namespace SylphyHorn.Tests
 				Assert.Same(entries, f.Settings.DesktopWallpapersOnCreation.Value);
 				Assert.Equal(3, Assert.Single(entries).Number);
 				Assert.Null(draft.Saved);
-				Assert.Contains(draft, f.Model.Groups[1].Rows);
+				Assert.Contains(draft, f.Model.NumberGroup.Rows);
 				Assert.Equal(0, f.Harness.Operations.WallpaperCalls);
 
 				// A later successful save also leaves the discarded-edit notice in place.
@@ -267,8 +267,8 @@ namespace SylphyHorn.Tests
 				f.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Work", ""), Entry(B, 1, "", ""), Entry(C, 2, "Work", "")));
 				f.Harness.Owner.Drain();
 				f.Model.RefreshDestinationChoices();
-				Assert.Equal(new[] { "Work" }, f.Model.Groups[0].Choices);
-				Assert.Equal(new[] { "1", "2", "3" }, f.Model.Groups[1].Choices);
+				Assert.Equal(new[] { "Work" }, f.Model.NameGroup.Choices);
+				Assert.Equal(new[] { "1", "2", "3" }, f.Model.NumberGroup.Choices);
 				Assert.Equal("", f.Model.LegacyNote);
 			}
 			using (var f = await CreationWallpaperUiFixture.Create(nameSupported: false, legacyWallpaper: true))
@@ -283,7 +283,10 @@ namespace SylphyHorn.Tests
 
 		private static async Task Until(Func<bool> condition)
 		{
-			for (var waited = 0; waited < 5000 && !condition(); waited += 10) await Task.Delay(10);
+			for (var waited = 0; waited < 5000 && !condition(); waited += 10)
+			{
+				await Task.Delay(10);
+			}
 		}
 	}
 
@@ -315,7 +318,7 @@ namespace SylphyHorn.Tests
 
 		internal async Task<CreationWallpaperRow> Add(bool byName, string destination, string path)
 		{
-			var row = this.Model.AddRow(this.Model.Groups[byName ? 0 : this.Model.Groups.Count - 1]);
+			var row = this.Model.AddRow(byName ? this.Model.NameGroup : this.Model.NumberGroup);
 			row.Destination = destination;
 			row.WallpaperPath = path;
 			await this.Model.CommitAsync(row);

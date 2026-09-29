@@ -52,7 +52,7 @@ namespace SylphyHorn.Tests
 							f.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Development", ""), Entry(B, 1, "Web", "")));
 							f.Harness.Owner.Drain();
 							f.Model.RefreshDestinationChoices();
-							var draft = f.Model.AddRow(f.Model.Groups[1]);
+							var draft = f.Model.AddRow(f.Model.NumberGroup);
 							var view = new CreationWallpaperSettingsView
 							{
 								DataContext = f.Model,
@@ -62,11 +62,11 @@ namespace SylphyHorn.Tests
 							};
 							Theme(view, theme);
 							AddHeaderStyle(view);
-							await Until(() => f.Model.Groups[0].Rows[0].Error.Length > 0);
+							await Until(() => f.Model.NameGroup.Rows[0].Error.Length > 0);
 							var saved = f.Settings.DesktopWallpapersOnCreation.Value;
 							Render(view, scale);
 							AssertLayout(view, f.Model);
-							var longRow = f.Model.Groups[0].Rows[1];
+							var longRow = f.Model.NameGroup.Rows[1];
 							var longBox = PathBox(view, longRow);
 							Assert.Equal(longRow.Saved.WallpaperPath, longBox.Text);
 							Assert.Equal(longRow.WallpaperPath, longBox.ToolTip);
@@ -106,7 +106,10 @@ namespace SylphyHorn.Tests
 							Assert.True(Shown(discarded));
 
 							// An empty list shows neither its column captions nor its top rule.
-							foreach (var row in f.Model.Groups[0].Rows.ToArray()) await f.Model.RemoveAsync(row);
+							foreach (var row in f.Model.NameGroup.Rows.ToArray())
+							{
+								await f.Model.RemoveAsync(row);
+							}
 							Render(view, scale);
 							Assert.DoesNotContain(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == f.Model.Text["NameColumn"]);
 							Assert.Contains(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == f.Model.Text["NumberColumn"]);
@@ -192,13 +195,18 @@ namespace SylphyHorn.Tests
 		private static bool Shown(DependencyObject element)
 		{
 			for (; element != null; element = VisualTreeHelper.GetParent(element))
+			{
 				if (element is UIElement visual && visual.Visibility != Visibility.Visible) return false;
+			}
 			return true;
 		}
 
 		private static async Task Until(Func<bool> condition)
 		{
-			for (var waited = 0; waited < 5000 && !condition(); waited += 10) await Task.Delay(10);
+			for (var waited = 0; waited < 5000 && !condition(); waited += 10)
+			{
+				await Task.Delay(10);
+			}
 		}
 	}
 }

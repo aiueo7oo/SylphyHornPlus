@@ -29,6 +29,32 @@ namespace SylphyHorn.UI.Bindings
 	{
 		private static string _exportOrImportFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
+		// Properties that read the notification and pin window appearance settings.
+		private static readonly string[] _notificationAppearanceProperties =
+		{
+			nameof(Display),
+			nameof(Placement),
+			nameof(NotificationOffsetX),
+			nameof(NotificationOffsetY),
+			nameof(NotificationMinWidth),
+			nameof(SimpleNotificationMinWidth),
+			nameof(NotificationMinHeight),
+			nameof(PinWindowMinWidth),
+			nameof(PinWindowOffsetX),
+			nameof(PinWindowOffsetY),
+			nameof(PreviewNotificationText),
+			nameof(PreviewNotificationHeaderVisibility),
+			nameof(NotificationWindowStyle),
+			nameof(NotificationCornerStyle),
+			nameof(NotificationFontFamily),
+			nameof(NotificationFontFamilyOrDefault),
+			nameof(NotificationHeaderFontSize),
+			nameof(NotificationBodyFontSize),
+			nameof(NotificationHeaderAlignment),
+			nameof(NotificationBodyAlignment),
+			nameof(NotificationLineSpacing)
+		};
+
 		private readonly HookService _hookService;
 		private readonly DesktopTransitionRuntime _desktopRuntime;
 		private readonly ISettingsDialogService _dialogService;
@@ -929,32 +955,18 @@ namespace SylphyHorn.UI.Bindings
 
 			SettingsService.ObserveWallpaperSettings(Settings.General, () =>
 			{
-				foreach (var desktop in this._Desktops) desktop.RefreshWallpaperEnabled();
+				foreach (var desktop in this._Desktops)
+				{
+					desktop.RefreshWallpaperEnabled();
+				}
 			}).AddTo(this);
 
 			SettingsService.ObserveNotificationAppearance(Settings.General, () =>
 			{
-				this.OnPropertyChanged(nameof(this.Display));
-				this.OnPropertyChanged(nameof(this.Placement));
-				this.OnPropertyChanged(nameof(this.NotificationOffsetX));
-				this.OnPropertyChanged(nameof(this.NotificationOffsetY));
-				this.OnPropertyChanged(nameof(this.NotificationMinWidth));
-				this.OnPropertyChanged(nameof(this.SimpleNotificationMinWidth));
-				this.OnPropertyChanged(nameof(this.NotificationMinHeight));
-				this.OnPropertyChanged(nameof(this.PinWindowMinWidth));
-				this.OnPropertyChanged(nameof(this.PinWindowOffsetX));
-				this.OnPropertyChanged(nameof(this.PinWindowOffsetY));
-				this.OnPropertyChanged(nameof(this.PreviewNotificationText));
-				this.OnPropertyChanged(nameof(this.PreviewNotificationHeaderVisibility));
-				this.OnPropertyChanged(nameof(this.NotificationWindowStyle));
-				this.OnPropertyChanged(nameof(this.NotificationCornerStyle));
-				this.OnPropertyChanged(nameof(this.NotificationFontFamily));
-				this.OnPropertyChanged(nameof(this.NotificationFontFamilyOrDefault));
-				this.OnPropertyChanged(nameof(this.NotificationHeaderFontSize));
-				this.OnPropertyChanged(nameof(this.NotificationBodyFontSize));
-				this.OnPropertyChanged(nameof(this.NotificationHeaderAlignment));
-				this.OnPropertyChanged(nameof(this.NotificationBodyAlignment));
-				this.OnPropertyChanged(nameof(this.NotificationLineSpacing));
+				foreach (var property in _notificationAppearanceProperties)
+				{
+					this.OnPropertyChanged(property);
+				}
 				this.UpdateNotificationColor(this.NotificationWindowStyle);
 				this.UpdateNotificationCornerRadius(this.NotificationCornerStyle);
 			}).AddTo(this);

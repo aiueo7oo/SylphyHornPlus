@@ -95,7 +95,10 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.Title));
 			this.OnPropertyChanged(nameof(this.Description));
 			this.OnPropertyChanged(nameof(this.DestinationLabel));
-			foreach (var row in this.Rows) row.RefreshLanguage();
+			foreach (var row in this.Rows)
+			{
+				row.RefreshLanguage();
+			}
 		}
 	}
 
@@ -143,9 +146,16 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
-		// A saved image that no longer exists is reported while the row shows that path; the entry itself is kept.
-		public string Error => !string.IsNullOrEmpty(this._errorKey) ? this.Group.Owner.Text[this._errorKey]
-			: this._missingPath != null && this.WallpaperPath == this._missingPath ? this.Group.Owner.Text["MissingImage"] : "";
+		public string Error
+		{
+			get
+			{
+				if (!string.IsNullOrEmpty(this._errorKey)) return this.Group.Owner.Text[this._errorKey];
+				// A saved image that no longer exists is reported while the row shows that path; the entry itself is kept.
+				var showsMissingPath = this._missingPath != null && this.WallpaperPath == this._missingPath;
+				return showsMissingPath ? this.Group.Owner.Text["MissingImage"] : "";
+			}
+		}
 
 		internal string SavedDestination => this.Saved == null ? ""
 			: this.Saved.Name ?? this.Saved.Number.Value.ToString(CultureInfo.InvariantCulture);
@@ -198,6 +208,11 @@ namespace SylphyHorn.UI.Bindings
 
 		public CreationWallpaperText Text { get; } = new CreationWallpaperText();
 
+		// null on Windows builds without desktop names.
+		internal CreationWallpaperGroup NameGroup { get; }
+
+		internal CreationWallpaperGroup NumberGroup { get; }
+
 		public IReadOnlyList<CreationWallpaperGroup> Groups { get; }
 
 		public AsyncRelayCommand RetrySaveCommand { get; }
@@ -238,9 +253,9 @@ namespace SylphyHorn.UI.Bindings
 			this._save = save;
 			this._chooseImage = chooseImage;
 			this._legacyWallpaper = legacyWallpaper;
-			this.Groups = Array.AsReadOnly(nameSupported
-				? new[] { new CreationWallpaperGroup(this, true), new CreationWallpaperGroup(this, false) }
-				: new[] { new CreationWallpaperGroup(this, false) });
+			this.NameGroup = nameSupported ? new CreationWallpaperGroup(this, true) : null;
+			this.NumberGroup = new CreationWallpaperGroup(this, false);
+			this.Groups = Array.AsReadOnly(nameSupported ? new[] { this.NameGroup, this.NumberGroup } : new[] { this.NumberGroup });
 			this.RetrySaveCommand = new AsyncRelayCommand(this.SaveAsync, () => this.SaveFailed && !this._disposed);
 			this._subscription = settings.DesktopWallpapersOnCreation.Subscribe(_ => this.Reload());
 			if (!this._loaded)
@@ -259,20 +274,23 @@ namespace SylphyHorn.UI.Bindings
 			this.OnPropertyChanged(nameof(this.SaveMessage));
 			this.OnPropertyChanged(nameof(this.EditDiscardedMessage));
 			this.OnPropertyChanged(nameof(this.LegacyNote));
-			foreach (var group in this.Groups) group.RefreshLanguage();
+			foreach (var group in this.Groups)
+			{
+				group.RefreshLanguage();
+			}
 		}
 
 		internal void RefreshDestinationChoices()
 		{
 			var state = this._runtime.State;
-			foreach (var group in this.Groups)
+			if (this.NameGroup != null)
 			{
-				group.Choices = group.ByName
-					? state.Order.Select(id => state.Records[id].Name)
-						.Where(name => name.HasValue && !string.IsNullOrWhiteSpace(name.Value))
-						.Select(name => name.Value).Distinct(StringComparer.Ordinal).ToArray()
-					: Enumerable.Range(1, state.Order.Count).Select(number => number.ToString(CultureInfo.InvariantCulture)).ToArray();
+				this.NameGroup.Choices = state.Order.Select(id => state.Records[id].Name)
+					.Where(name => name.HasValue && !string.IsNullOrWhiteSpace(name.Value))
+					.Select(name => name.Value).Distinct(StringComparer.Ordinal).ToArray();
 			}
+			this.NumberGroup.Choices = Enumerable.Range(1, state.Order.Count)
+				.Select(number => number.ToString(CultureInfo.InvariantCulture)).ToArray();
 		}
 
 		private static bool SameTarget(DesktopWallpaperOnCreation left, DesktopWallpaperOnCreation right)
@@ -316,10 +334,12 @@ namespace SylphyHorn.UI.Bindings
 				}
 				ordered.AddRange(group.Rows.Where(row => row.Saved == null));
 				for (var index = group.Rows.Count - 1; index >= 0; index--)
+				{
 					if (!ordered.Contains(group.Rows[index]))
 					{
 						group.Rows.RemoveAt(index);
 					}
+				}
 				for (var index = 0; index < ordered.Count; index++)
 				{
 					var current = group.Rows.IndexOf(ordered[index]);
@@ -387,95 +407,25 @@ namespace SylphyHorn.UI.Bindings
 		{
 			if (!this.Contains(row)) return;
 			this.CancelValidation(row);
-			var trimmed = (row.WallpaperPath ?? "").Trim().Trim('"').Trim();
-			if (trimmed != row.WallpaperPath)
+			var path = (row.WallpaperPath ?? "").Trim().Trim('"').Trim();
+			if (path != row.WallpaperPath)
 			{
-				row.WallpaperPath = trimmed;
+				row.WallpaperPath = path;
 			}
 			var revision = row.Revision;
-			string name = null;
-			int? number = null;
-			if (row.Group.ByName)
-			{
-				if (string.IsNullOrWhiteSpace(row.Destination))
-				{
-					row.SetErrorKey("InvalidName");
-					return;
-				}
-				name = row.Destination;
-			}
-			else
-			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value <= 0)
-				{
-					row.SetErrorKey("InvalidNumber");
-					return;
-				}
-				number = value;
-			}
-			if (trimmed.Length == 0)
-			{
-				row.SetErrorKey("EnterPath");
-				return;
-			}
-			DesktopWallpaperOnCreation entry;
-			try
-			{
-				entry = new DesktopWallpaperOnCreation(name, number, trimmed);
-			}
-			catch (SerializationException)
-			{
-				row.SetErrorKey("AbsolutePath");
-				return;
-			}
+			if (!TryCreateEntry(row, path, out var entry)) return;
 			if (row.Saved != null && Same(row.Saved, entry))
 			{
 				row.Restore();
 				return;
 			}
-			if (this.IsDuplicate(entry, row.Saved))
-			{
-				row.SetErrorKey(row.Group.ByName ? "DuplicateName" : "DuplicateNumber");
-				return;
-			}
+			if (this.RejectDuplicate(row, entry)) return;
 			// Only a new or changed image is read; a saved image that is missing does not block editing the destination.
 			if (row.Saved == null || row.Saved.WallpaperPath != entry.WallpaperPath)
 			{
-				using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(this._lifetime.Token))
-				{
-					this._validations[row] = cancellation;
-					try
-					{
-						await this._images.ValidateAsync(entry.WallpaperPath, cancellation.Token);
-					}
-					catch (OperationCanceledException)
-					{
-						return;
-					}
-					catch (Exception)
-					{
-						if (this.Contains(row) && revision == row.Revision && !cancellation.IsCancellationRequested)
-						{
-							row.SetErrorKey("UnreadableImage");
-						}
-						return;
-					}
-					finally
-					{
-						if (this._validations.TryGetValue(row, out var current) && ReferenceEquals(current, cancellation))
-						{
-							this._validations.Remove(row);
-						}
-					}
-					// Input edited, restored or removed while the image was read keeps its newer state.
-					if (!this.Contains(row) || revision != row.Revision || cancellation.IsCancellationRequested) return;
-				}
+				if (!await this.ValidateImageAsync(row, entry.WallpaperPath, revision)) return;
 				// The entries may have changed elsewhere while the image was read.
-				if (this.IsDuplicate(entry, row.Saved))
-				{
-					row.SetErrorKey(row.Group.ByName ? "DuplicateName" : "DuplicateNumber");
-					return;
-				}
+				if (this.RejectDuplicate(row, entry)) return;
 			}
 			var entries = this.Entries.ToList();
 			var index = row.Saved == null ? -1 : entries.FindIndex(existing => Same(existing, row.Saved));
@@ -489,6 +439,88 @@ namespace SylphyHorn.UI.Bindings
 			}
 			row.Accept(entry);
 			await this.PublishAsync(entries.ToArray());
+		}
+
+		// Reads the row's destination and the trimmed image path into an entry, or shows why they are invalid.
+		private static bool TryCreateEntry(CreationWallpaperRow row, string path, out DesktopWallpaperOnCreation entry)
+		{
+			entry = null;
+			string name = null;
+			int? number = null;
+			if (row.Group.ByName)
+			{
+				if (string.IsNullOrWhiteSpace(row.Destination))
+				{
+					row.SetErrorKey("InvalidName");
+					return false;
+				}
+				name = row.Destination;
+			}
+			else
+			{
+				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value <= 0)
+				{
+					row.SetErrorKey("InvalidNumber");
+					return false;
+				}
+				number = value;
+			}
+			if (path.Length == 0)
+			{
+				row.SetErrorKey("EnterPath");
+				return false;
+			}
+			try
+			{
+				entry = new DesktopWallpaperOnCreation(name, number, path);
+				return true;
+			}
+			catch (SerializationException)
+			{
+				row.SetErrorKey("AbsolutePath");
+				return false;
+			}
+		}
+
+		private bool RejectDuplicate(CreationWallpaperRow row, DesktopWallpaperOnCreation entry)
+		{
+			if (!this.IsDuplicate(entry, row.Saved)) return false;
+			row.SetErrorKey(row.Group.ByName ? "DuplicateName" : "DuplicateNumber");
+			return true;
+		}
+
+		// Returns whether the image could be read and the row still holds the input being committed.
+		private async Task<bool> ValidateImageAsync(CreationWallpaperRow row, string path, long revision)
+		{
+			using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(this._lifetime.Token))
+			{
+				this._validations[row] = cancellation;
+				try
+				{
+					await this._images.ValidateAsync(path, cancellation.Token);
+				}
+				catch (OperationCanceledException)
+				{
+					return false;
+				}
+				catch (Exception)
+				{
+					if (this.Contains(row) && revision == row.Revision && !cancellation.IsCancellationRequested)
+					{
+						row.SetErrorKey("UnreadableImage");
+					}
+					return false;
+				}
+				finally
+				{
+					if (this._validations.TryGetValue(row, out var current) && ReferenceEquals(current, cancellation))
+					{
+						this._validations.Remove(row);
+					}
+				}
+				// Input edited, restored or removed while the image was read keeps its newer state.
+				return this.Contains(row) && revision == row.Revision && !cancellation.IsCancellationRequested;
+			}
 		}
 
 		internal void Revert(CreationWallpaperRow row)

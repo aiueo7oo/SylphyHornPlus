@@ -30,7 +30,7 @@ namespace SylphyHorn.UI.Bindings
 			this.Path = item.Identity.AppProcess?.Path ?? item.Rule.DisplayExecutablePath
 				?? (item.Rule.App.Kind == PlacementAppKind.ExecutablePath ? item.Rule.App.Value : text["PathUnavailable"]);
 			this._selectable = item.CanApply;
-			this._result = text[item.Excluded.HasValue ? "Outcome" + item.Excluded.Value : "ReadyToApply"];
+			this._result = text[item.Excluded.HasValue ? OutcomeKey(item.Excluded.Value) : "ReadyToApply"];
 		}
 
 		public string Title { get; }
@@ -56,6 +56,9 @@ namespace SylphyHorn.UI.Bindings
 		public bool Selectable { get => this._selectable; internal set => this.SetProperty(ref this._selectable, value); }
 
 		public string Result { get => this._result; internal set => this.SetProperty(ref this._result, value); }
+
+		// Placement_OutcomeMoved, Placement_OutcomeAlreadyPlaced, ...: one resource for each PlacementOutcome value.
+		internal static string OutcomeKey(PlacementOutcome outcome) => "Outcome" + outcome;
 	}
 
 	public sealed class PlacementApplyViewModel : ObservableObject, IDisposable
@@ -86,17 +89,26 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
-		public string Status => this._runtime.PlacementStatus == "Active" ? this._message : this.Text["Apply" + this._runtime.PlacementStatus];
+		public string Status
+		{
+			get
+			{
+				var status = this._runtime.PlacementStatus;
+				// While placement is not active: Placement_ApplyDisabled, ApplyNoRules, ApplyPaused, ApplyPreparing,
+				// ApplyStopping or ApplySuspended.
+				return status == PlacementStatuses.Active ? this._message : this.Text["Apply" + status];
+			}
+		}
 
 		public string ApplyLabel => string.Format(CultureInfo.CurrentCulture, this.Text["ApplySelection"], this.Rows.Count(row => row.Selected));
+
+		private bool IsPlacementActive => this._runtime.PlacementStatus == PlacementStatuses.Active;
 
 		internal PlacementApplyViewModel(DesktopTransitionRuntime runtime)
 		{
 			this._runtime = runtime;
-			this.RefreshCommand = new AsyncRelayCommand(this.LoadAsync, () => !this._disposed && !this.IsBusy && this._runtime.PlacementStatus == "Active");
-			this.ApplyCommand = new AsyncRelayCommand(
-				this.ApplyAsync,
-				() => !this._disposed && !this.IsBusy && this._preview != null && this._runtime.PlacementStatus == "Active" && this.Rows.Any(row => row.Selected && row.Selectable));
+			this.RefreshCommand = new AsyncRelayCommand(this.LoadAsync, this.CanRefresh);
+			this.ApplyCommand = new AsyncRelayCommand(this.ApplyAsync, this.CanApply);
 			this.StopCommand = new RelayCommand(
 				() =>
 				{
@@ -106,6 +118,18 @@ namespace SylphyHorn.UI.Bindings
 				},
 				() => this.IsBusy && this._request?.IsCancellationRequested == false);
 			this._runtime.StateChanged += this.StateChanged;
+		}
+
+		private bool CanRefresh() => !this._disposed && !this.IsBusy && this.IsPlacementActive;
+
+		// Only a current preview can be applied, and only to windows the user checked.
+		private bool CanApply()
+		{
+			return !this._disposed
+				&& !this.IsBusy
+				&& this._preview != null
+				&& this.IsPlacementActive
+				&& this.Rows.Any(row => row.Selected && row.Selectable);
 		}
 
 		private void NotifyCommands()
@@ -127,7 +151,10 @@ namespace SylphyHorn.UI.Bindings
 		{
 			this._preview = null;
 			this._request?.Cancel();
-			foreach (var row in this.Rows) row.Selectable = false;
+			foreach (var row in this.Rows)
+			{
+				row.Selectable = false;
+			}
 			this.NotifyCommands();
 		}
 
@@ -140,7 +167,7 @@ namespace SylphyHorn.UI.Bindings
 		internal void RefreshStatus()
 		{
 			if (this._disposed) return;
-			if (this._runtime.PlacementStatus != "Active")
+			if (!this.IsPlacementActive)
 			{
 				this.Invalidate();
 			}
@@ -171,9 +198,7 @@ namespace SylphyHorn.UI.Bindings
 					this._preview = preview;
 					foreach (var item in preview.Items)
 					{
-						var target = item.Target.HasValue ? this.DesktopLabel(state, item.Target.Value) : item.Rule.Destination.Kind == PlacementDestinationKind.Name
-							? item.Rule.Destination.Name : string.Format(CultureInfo.CurrentCulture, this.Text["DesktopNumber"], item.Rule.Destination.Number);
-						this.Rows.Add(new PlacementApplyRow(item, this.DesktopLabel(state, item.Source), target, this.Text, this.NotifyCommands));
+						this.Rows.Add(new PlacementApplyRow(item, this.DesktopLabel(state, item.Source), this.TargetLabel(state, item), this.Text, this.NotifyCommands));
 					}
 					this.Message(this.Rows.Count == 0 ? "ApplyEmpty" : "ApplyReview");
 				}
@@ -202,6 +227,16 @@ namespace SylphyHorn.UI.Bindings
 			}
 		}
 
+		// The resolved target desktop, or the rule's destination when it did not resolve to one.
+		private string TargetLabel(DesktopRuntimeState state, PlacementPreviewItem item)
+		{
+			if (item.Target.HasValue) return this.DesktopLabel(state, item.Target.Value);
+			var destination = item.Rule.Destination;
+			return destination.Kind == PlacementDestinationKind.Name
+				? destination.Name
+				: string.Format(CultureInfo.CurrentCulture, this.Text["DesktopNumber"], destination.Number);
+		}
+
 		private string DesktopLabel(DesktopRuntimeState state, Guid id)
 		{
 			var index = state.Order.ToList().IndexOf(id);
@@ -211,7 +246,15 @@ namespace SylphyHorn.UI.Bindings
 			}
 			var number = string.Format(CultureInfo.CurrentCulture, this.Text["DesktopNumber"], index + 1);
 			var name = state.Records[id].Name;
-			return name.IsConfirmed && name.HasValue && name.ReadStatus == WindowsDesktop.VirtualDesktopReadStatus.Success && !string.IsNullOrWhiteSpace(name.Value) ? number + " — " + name.Value : number;
+			return HasReadableName(name) ? number + " — " + name.Value : number;
+		}
+
+		private static bool HasReadableName(DesktopPropertyState name)
+		{
+			return name.IsConfirmed
+				&& name.HasValue
+				&& name.ReadStatus == WindowsDesktop.VirtualDesktopReadStatus.Success
+				&& !string.IsNullOrWhiteSpace(name.Value);
 		}
 
 		private async Task ApplyAsync()
@@ -228,7 +271,10 @@ namespace SylphyHorn.UI.Bindings
 				}
 				row.Selectable = false;
 			}
-			foreach (var row in selected) row.Result = this.Text["Applying"];
+			foreach (var row in selected)
+			{
+				row.Result = this.Text["Applying"];
+			}
 			this.IsBusy = true;
 			this.Message("ApplyRunning");
 			using (var request = new CancellationTokenSource())
@@ -242,7 +288,7 @@ namespace SylphyHorn.UI.Bindings
 					foreach (var row in selected)
 					{
 						var result = results.FirstOrDefault(value => value.Window == row.Item.Candidate.Window && value.Rule == row.Item.Rule.Id);
-						row.Result = this.Text["Outcome" + (result?.Outcome ?? PlacementOutcome.Unconfirmed)];
+						row.Result = this.Text[PlacementApplyRow.OutcomeKey(result?.Outcome ?? PlacementOutcome.Unconfirmed)];
 					}
 					this.Message("ApplyFinished");
 				}
@@ -250,7 +296,10 @@ namespace SylphyHorn.UI.Bindings
 				{
 					if (!this._disposed)
 					{
-						foreach (var row in selected) row.Result = this.Text["OutcomeUnconfirmed"];
+						foreach (var row in selected)
+						{
+							row.Result = this.Text["OutcomeUnconfirmed"];
+						}
 						this.Message("ApplyFailed");
 					}
 				}
