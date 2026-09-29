@@ -90,7 +90,7 @@ namespace SylphyHorn.Services.Commands
 						throw new ArgumentException("Unsupported request version or arguments.");
 					}
 					var command = CliCommand.Parse(request.Args);
-					if (IsLongRunning(command.Operation))
+					if (CliProtocol.IsLongRunning(command.Operation))
 					{
 						deadline.CancelAfter(LongRunningRequestTimeout);
 					}
@@ -144,10 +144,6 @@ namespace SylphyHorn.Services.Commands
 			catch (OperationCanceledException) { }
 			return response;
 		}
-
-		private static bool IsLongRunning(string operation)
-			=> operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
-				|| operation.StartsWith("startup ", StringComparison.Ordinal);
 
 		private static bool IsAcceptedExit(CliResponse response)
 			=> response.Command == "exit" && response.Success && response.Data?.Accepted == true;

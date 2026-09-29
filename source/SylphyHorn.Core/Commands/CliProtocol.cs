@@ -666,6 +666,11 @@ namespace SylphyHorn.Commands
 	{
 		internal const int MaximumFrameBytes = 1024 * 1024;
 
+		// Commands that can wait on Windows or on a long settings transaction; the host and the client allow them more time.
+		internal static bool IsLongRunning(string operation)
+			=> operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
+				|| operation.StartsWith("startup ", StringComparison.Ordinal);
+
 		internal static string PipeName(string company, string product)
 		{
 			using (var identity = WindowsIdentity.GetCurrent())

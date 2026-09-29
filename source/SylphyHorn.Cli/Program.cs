@@ -130,9 +130,7 @@ namespace SylphyHorn.Cli
 		private static TimeSpan TimeoutFor(string operation)
 		{
 			if (operation == "version") return TimeSpan.FromSeconds(2);
-			var longRunning = operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
-				|| operation.StartsWith("startup ", StringComparison.Ordinal);
-			return TimeSpan.FromSeconds(longRunning ? 45 : 15);
+			return TimeSpan.FromSeconds(CliProtocol.IsLongRunning(operation) ? 45 : 15);
 		}
 
 		private static int Print(CliResponse response)
