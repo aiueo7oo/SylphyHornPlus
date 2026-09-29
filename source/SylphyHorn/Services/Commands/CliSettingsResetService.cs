@@ -46,10 +46,7 @@ namespace SylphyHorn.Services.Commands
 					var result = await this._reset(cancellation);
 					if (!result.Succeeded)
 					{
-						var code = result.Status == SettingsImportCommitStatus.Conflict ? "state_changed"
-							: result.Status == SettingsImportCommitStatus.CompletedWithFailures ? "partial_failure"
-							: "result_unconfirmed";
-						return CliResponse.Fail(command.Operation, code,
+						return CliResponse.Fail(command.Operation, CliSettingsFileService.CommitFailureCode(result.Status),
 							"Settings reset did not complete successfully. Inspect settings before retrying.");
 					}
 					this._refresh();

@@ -185,18 +185,27 @@ namespace SylphyHorn.Services.Commands
 					result.ElevatedTarget = (string)action.Path;
 					result.TargetMatches &= this.Matches(result.ElevatedTarget) && string.IsNullOrEmpty((string)action.Arguments);
 				}
-				result.Mode = result.NormalRegistered ? result.ElevatedRegistered ? "mixed" : "normal"
-					: result.ElevatedRegistered ? "elevated" : "disabled";
+				result.Mode = DescribeMode(result.NormalRegistered, result.ElevatedRegistered);
 				return result;
 			}
 			finally
 			{
 				for (var index = objects.Count - 1; index >= 0; index--)
+				{
 					if (Marshal.IsComObject(objects[index]))
 					{
 						Marshal.FinalReleaseComObject(objects[index]);
 					}
+				}
 			}
+		}
+
+		private static string DescribeMode(bool normalRegistered, bool elevatedRegistered)
+		{
+			if (normalRegistered && elevatedRegistered) return "mixed";
+			if (normalRegistered) return "normal";
+			if (elevatedRegistered) return "elevated";
+			return "disabled";
 		}
 
 		private bool Matches(string path)

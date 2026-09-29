@@ -54,6 +54,9 @@ namespace SylphyHorn.Services.Commands
 			{ "bottom-right", (uint)WindowPlacement.BottomRight },
 		};
 
+		private const uint CurrentMonitor = 0;
+		private const uint AllMonitors = uint.MaxValue;
+
 		private readonly bool _nativeWallpaperSupported;
 		private readonly bool _nameSupported;
 		private readonly Func<Monitor[]> _monitors;
@@ -98,14 +101,7 @@ namespace SylphyHorn.Services.Commands
 					? this._monitors() : Array.Empty<Monitor>();
 				if (command.Operation == "monitor list")
 				{
-					return CliResponse.Ok(command.Operation, new CliData
-					{
-						Monitors = monitors.Select((monitor, index) => new CliMonitor
-						{
-							Number = index + 1, Name = monitor.Name,
-							Bounds = DescribeRectangle(monitor.MonitorArea), WorkArea = DescribeRectangle(monitor.WorkArea),
-						}).ToArray(),
-					});
+					return CliResponse.Ok(command.Operation, new CliData { Monitors = DescribeMonitors(monitors) });
 				}
 				if (!command.Operation.EndsWith(" configure", StringComparison.Ordinal))
 				{
@@ -116,81 +112,12 @@ namespace SylphyHorn.Services.Commands
 					return CliResponse.Fail(command.Operation, "host_busy", "Settings are being changed.", true);
 				}
 
-				if ((command.PerDesktopWallpaper.HasValue && this._nativeWallpaperSupported)
-					|| (command.OverrideOnStartup.HasValue && !this._nameSupported))
+				var rejection = this.ValidateConfiguration(command, monitors.Length);
+				if (rejection != null)
 				{
-					return CliResponse.Fail(command.Operation, "unsupported", "This setting is not available on this Windows build.");
+					return rejection;
 				}
-
-				uint? display = command.Monitor == null ? (uint?)null : command.Monitor == "current" ? 0u
-					: command.Monitor == "all" ? uint.MaxValue : uint.Parse(command.Monitor, CultureInfo.InvariantCulture);
-				if (display.HasValue && display != 0 && display != uint.MaxValue && display > monitors.Length)
-				{
-					return CliResponse.Fail(command.Operation, "monitor_unavailable", "The specified monitor number is not currently available.");
-				}
-
-				if (!ValidFontSize(command.HeaderFontSize) || !ValidFontSize(command.BodyFontSize))
-				{
-					return CliResponse.Fail(command.Operation, "invalid_arguments", "The font size is outside the supported rendering range.");
-				}
-				if (command.FontFamily != null && command.FontFamily.Length != 0)
-				{
-					try
-					{
-						if (string.IsNullOrWhiteSpace(command.FontFamily))
-						{
-							throw new ArgumentException();
-						}
-						_ = new FontFamily(command.FontFamily);
-					}
-					catch (Exception ex) when (ex is ArgumentException || ex is FormatException)
-					{
-						return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a font family or an empty string for the default.");
-					}
-				}
-
-				Set(this._settings.Display, display, ref changed);
-				Set(this._settings.Placement, command.Placement == null ? (uint?)null : Placements[command.Placement], ref changed);
-				Set(this._settings.NotificationOffsetX, command.OffsetX, ref changed);
-				Set(this._settings.NotificationOffsetY, command.OffsetY, ref changed);
-				Set(this._settings.NotificationMinWidth, command.MinWidth, ref changed);
-				Set(this._settings.SimpleNotificationMinWidth, command.SimpleMinWidth, ref changed);
-				Set(this._settings.NotificationMinHeight, command.MinHeight, ref changed);
-				Set(this._settings.PinWindowMinWidth, command.PinMinWidth, ref changed);
-				Set(this._settings.PinWindowOffsetX, command.PinOffsetX, ref changed);
-				Set(this._settings.PinWindowOffsetY, command.PinOffsetY, ref changed);
-				Set(this._settings.ChangeBackgroundEachDesktop, command.PerDesktopWallpaper, ref changed);
-				Set(this._settings.OverrideDesktopsOnStartup, command.OverrideOnStartup, ref changed);
-				Set(this._settings.LoopDesktop, command.Loop, ref changed);
-				Set(this._settings.OverrideWindowsDefaultKeyCombination, command.OverrideWindowsShortcuts, ref changed);
-				Set(this._settings.NotificationWhenSwitchedDesktop, command.OnSwitch, ref changed);
-				Set(this._settings.NotificationDuration, command.DurationMs, ref changed);
-				Set(this._settings.SimpleNotification, command.Simple, ref changed);
-				Set(this._settings.UseDesktopName, command.UseDesktopName, ref changed);
-				Set(this._settings.NotificationHeaderFontSize, command.HeaderFontSize, ref changed);
-				Set(this._settings.NotificationBodyFontSize, command.BodyFontSize, ref changed);
-				Set(this._settings.NotificationLineSpacing, command.LineSpacing, ref changed);
-				Set(this._settings.NotificationWindowStyle, command.Theme == null ? (uint?)null : Themes[command.Theme], ref changed);
-				Set(this._settings.NotificationCornerStyle, command.Corners == null ? (uint?)null : Corners[command.Corners], ref changed);
-				Set(this._settings.NotificationHeaderAlignment, command.HeaderAlign == null ? (uint?)null : Alignments[command.HeaderAlign], ref changed);
-				Set(this._settings.NotificationBodyAlignment, command.BodyAlign == null ? (uint?)null : Alignments[command.BodyAlign], ref changed);
-				if (command.FontFamily != null && command.FontFamily != (this._settings.NotificationFontFamily.Value ?? ""))
-				{
-					changed = true;
-					this._settings.NotificationFontFamily.Value = command.FontFamily;
-				}
-				Set(this._settings.AlwaysShowDesktopNotification, command.AlwaysShow, ref changed);
-				Set(this._settings.TrayShowOnlyCurrentNumber, command.CurrentNumberOnly, ref changed);
-				Set(this._settings.TrayShowDesktop, command.ShowDesktop, ref changed);
-				if (command.Language != null)
-				{
-					var culture = command.Language == "auto" ? null : command.Language;
-					if (this._settings.Culture.Value != culture)
-					{
-						changed = true;
-						this._settings.Culture.Value = culture;
-					}
-				}
+				this.ApplyConfiguration(command, ref changed);
 
 				var data = this.Describe(command.Operation, monitors.Length);
 				// An unchanged request also retries persistence after an earlier save failure.
@@ -199,6 +126,7 @@ namespace SylphyHorn.Services.Commands
 				{
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "Settings are active in memory but could not be saved.");
 				}
+				// Any concurrent change while saving shows up as a difference in the serialized description.
 				if (!CliProtocol.Serialize(data).SequenceEqual(CliProtocol.Serialize(this.Describe(command.Operation, monitors.Length))))
 				{
 					return CliResponse.Fail(command.Operation, "state_changed", "Settings changed while saving. Read current settings before retrying.");
@@ -246,11 +174,136 @@ namespace SylphyHorn.Services.Commands
 			}
 		}
 
+		private CliResponse ValidateConfiguration(CliCommand command, int monitorCount)
+		{
+			if ((command.PerDesktopWallpaper.HasValue && this._nativeWallpaperSupported)
+				|| (command.OverrideOnStartup.HasValue && !this._nameSupported))
+			{
+				return CliResponse.Fail(command.Operation, "unsupported", "This setting is not available on this Windows build.");
+			}
+			var display = ParseMonitor(command.Monitor);
+			if (display.HasValue && IsMonitorNumber(display.Value) && display.Value > monitorCount)
+			{
+				return CliResponse.Fail(command.Operation, "monitor_unavailable", "The specified monitor number is not currently available.");
+			}
+			if (!ValidFontSize(command.HeaderFontSize) || !ValidFontSize(command.BodyFontSize))
+			{
+				return CliResponse.Fail(command.Operation, "invalid_arguments", "The font size is outside the supported rendering range.");
+			}
+			if (!ValidFontFamily(command.FontFamily))
+			{
+				return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a font family or an empty string for the default.");
+			}
+			return null;
+		}
+
+		private void ApplyConfiguration(CliCommand command, ref bool changed)
+		{
+			Set(this._settings.Display, ParseMonitor(command.Monitor), ref changed);
+			Set(this._settings.Placement, Lookup(Placements, command.Placement), ref changed);
+			Set(this._settings.NotificationOffsetX, command.OffsetX, ref changed);
+			Set(this._settings.NotificationOffsetY, command.OffsetY, ref changed);
+			Set(this._settings.NotificationMinWidth, command.MinWidth, ref changed);
+			Set(this._settings.SimpleNotificationMinWidth, command.SimpleMinWidth, ref changed);
+			Set(this._settings.NotificationMinHeight, command.MinHeight, ref changed);
+			Set(this._settings.PinWindowMinWidth, command.PinMinWidth, ref changed);
+			Set(this._settings.PinWindowOffsetX, command.PinOffsetX, ref changed);
+			Set(this._settings.PinWindowOffsetY, command.PinOffsetY, ref changed);
+			Set(this._settings.ChangeBackgroundEachDesktop, command.PerDesktopWallpaper, ref changed);
+			Set(this._settings.OverrideDesktopsOnStartup, command.OverrideOnStartup, ref changed);
+			Set(this._settings.LoopDesktop, command.Loop, ref changed);
+			Set(this._settings.OverrideWindowsDefaultKeyCombination, command.OverrideWindowsShortcuts, ref changed);
+			Set(this._settings.NotificationWhenSwitchedDesktop, command.OnSwitch, ref changed);
+			Set(this._settings.NotificationDuration, command.DurationMs, ref changed);
+			Set(this._settings.SimpleNotification, command.Simple, ref changed);
+			Set(this._settings.UseDesktopName, command.UseDesktopName, ref changed);
+			Set(this._settings.NotificationHeaderFontSize, command.HeaderFontSize, ref changed);
+			Set(this._settings.NotificationBodyFontSize, command.BodyFontSize, ref changed);
+			Set(this._settings.NotificationLineSpacing, command.LineSpacing, ref changed);
+			Set(this._settings.NotificationWindowStyle, Lookup(Themes, command.Theme), ref changed);
+			Set(this._settings.NotificationCornerStyle, Lookup(Corners, command.Corners), ref changed);
+			Set(this._settings.NotificationHeaderAlignment, Lookup(Alignments, command.HeaderAlign), ref changed);
+			Set(this._settings.NotificationBodyAlignment, Lookup(Alignments, command.BodyAlign), ref changed);
+			if (command.FontFamily != null && command.FontFamily != (this._settings.NotificationFontFamily.Value ?? ""))
+			{
+				changed = true;
+				this._settings.NotificationFontFamily.Value = command.FontFamily;
+			}
+			Set(this._settings.AlwaysShowDesktopNotification, command.AlwaysShow, ref changed);
+			Set(this._settings.TrayShowOnlyCurrentNumber, command.CurrentNumberOnly, ref changed);
+			Set(this._settings.TrayShowDesktop, command.ShowDesktop, ref changed);
+			if (command.Language != null)
+			{
+				var culture = command.Language == "auto" ? null : command.Language;
+				if (this._settings.Culture.Value != culture)
+				{
+					changed = true;
+					this._settings.Culture.Value = culture;
+				}
+			}
+		}
+
+		private static CliMonitor[] DescribeMonitors(Monitor[] monitors)
+			=> monitors.Select((monitor, index) => new CliMonitor
+			{
+				Number = index + 1, Name = monitor.Name,
+				Bounds = DescribeRectangle(monitor.MonitorArea), WorkArea = DescribeRectangle(monitor.WorkArea),
+			}).ToArray();
+
 		private static CliRectangle DescribeRectangle(Rect rectangle)
 			=> new CliRectangle { X = rectangle.X, Y = rectangle.Y, Width = rectangle.Width, Height = rectangle.Height };
 
+		private static uint? ParseMonitor(string value)
+		{
+			switch (value)
+			{
+				case null:
+					return null;
+				case "current":
+					return CurrentMonitor;
+				case "all":
+					return AllMonitors;
+				default:
+					return uint.Parse(value, CultureInfo.InvariantCulture);
+			}
+		}
+
+		private static string FormatMonitor(uint display)
+		{
+			switch (display)
+			{
+				case CurrentMonitor:
+					return "current";
+				case AllMonitors:
+					return "all";
+				default:
+					return display.ToString(CultureInfo.InvariantCulture);
+			}
+		}
+
+		private static bool IsMonitorNumber(uint display) => display != CurrentMonitor && display != AllMonitors;
+
 		private static bool ValidFontSize(int? value)
 			=> !value.HasValue || TextElement.FontSizeProperty.IsValidValue((double)value.Value);
+
+		private static bool ValidFontFamily(string value)
+		{
+			// Null keeps the current font and an empty string selects the default.
+			if (string.IsNullOrEmpty(value)) return true;
+			if (string.IsNullOrWhiteSpace(value)) return false;
+			try
+			{
+				_ = new FontFamily(value);
+				return true;
+			}
+			catch (Exception ex) when (ex is ArgumentException || ex is FormatException)
+			{
+				return false;
+			}
+		}
+
+		private static uint? Lookup(IReadOnlyDictionary<string, uint> values, string name)
+			=> name == null ? (uint?)null : values[name];
 
 		private static string SettingName(IReadOnlyDictionary<string, uint> values, uint value)
 			=> values.FirstOrDefault(item => item.Value == value).Key ?? "unknown";
@@ -277,8 +330,8 @@ namespace SylphyHorn.Services.Commands
 			else if (operation.StartsWith("notification ", StringComparison.Ordinal))
 			{
 				var display = this._settings.Display.Value;
-				data.Monitor = display == 0 ? "current" : display == uint.MaxValue ? "all" : display.ToString(CultureInfo.InvariantCulture);
-				data.MonitorAvailable = monitorCount > 0 && (display == 0 || display == uint.MaxValue || display <= monitorCount);
+				data.Monitor = FormatMonitor(display);
+				data.MonitorAvailable = monitorCount > 0 && (!IsMonitorNumber(display) || display <= monitorCount);
 				data.Placement = SettingName(Placements, this._settings.Placement.Value);
 				data.OffsetX = this._settings.NotificationOffsetX.Value;
 				data.OffsetY = this._settings.NotificationOffsetY.Value;

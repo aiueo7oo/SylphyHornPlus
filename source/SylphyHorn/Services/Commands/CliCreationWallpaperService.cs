@@ -2,6 +2,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.Commands;
@@ -81,7 +82,7 @@ namespace SylphyHorn.Services.Commands
 			{
 				return CliResponse.Fail(command.Operation, published ? "result_unconfirmed" : "request_cancelled", "Read current settings before retrying.");
 			}
-			catch (System.Runtime.Serialization.SerializationException) when (!published)
+			catch (SerializationException) when (!published)
 			{
 				return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a valid destination and absolute image path.");
 			}

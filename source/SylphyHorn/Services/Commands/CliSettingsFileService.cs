@@ -34,6 +34,19 @@ namespace SylphyHorn.Services.Commands
 			this._nameSupported = nameSupported;
 		}
 
+		internal static string CommitFailureCode(SettingsImportCommitStatus status)
+		{
+			switch (status)
+			{
+				case SettingsImportCommitStatus.Conflict:
+					return "state_changed";
+				case SettingsImportCommitStatus.CompletedWithFailures:
+					return "partial_failure";
+				default:
+					return "result_unconfirmed";
+			}
+		}
+
 		internal async Task<CliResponse> ExecuteAsync(CliCommand command, CancellationToken cancellation)
 		{
 			var submitted = false;
@@ -44,39 +57,19 @@ namespace SylphyHorn.Services.Commands
 				{
 					return CliResponse.Fail(command.Operation, "host_busy", "Settings are changing or input is being edited.", true);
 				}
-				if (!System.IO.Path.IsPathFullyQualified(command.FilePath))
+				if (!Path.IsPathFullyQualified(command.FilePath))
 				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "The host requires an absolute file path.");
 				}
-				var path = System.IO.Path.GetFullPath(command.FilePath);
-				if (string.Equals(path, System.IO.Path.GetFullPath(this._settingsPath), StringComparison.OrdinalIgnoreCase))
+				var path = Path.GetFullPath(command.FilePath);
+				if (string.Equals(path, Path.GetFullPath(this._settingsPath), StringComparison.OrdinalIgnoreCase))
 				{
 					return CliResponse.Fail(command.Operation, "invalid_arguments", "Use a separate settings backup file.");
 				}
 
 				if (command.Operation == "settings export")
 				{
-					if (!command.Overwrite && File.Exists(path))
-					{
-						return CliResponse.Fail(command.Operation, "file_exists", "Use --overwrite to replace an existing backup.");
-					}
-					var directory = System.IO.Path.GetDirectoryName(path);
-					Directory.CreateDirectory(directory);
-					var temporary = System.IO.Path.Combine(directory, "." + Guid.NewGuid().ToString("N") + ".xml");
-					try
-					{
-						await this._provider.ExportAsync(temporary);
-						cancellation.ThrowIfCancellationRequested();
-						File.Move(temporary, path, command.Overwrite);
-					}
-					finally
-					{
-						if (File.Exists(temporary))
-						{
-							File.Delete(temporary);
-						}
-					}
-					return CliResponse.Ok(command.Operation, new CliData { Path = path });
+					return await this.ExportAsync(command, path, cancellation);
 				}
 				if (command.Operation != "settings import")
 				{
@@ -99,10 +92,7 @@ namespace SylphyHorn.Services.Commands
 						var result = await this._commit(stage, command.ApplyDesktops.Value, cancellation);
 						if (!result.Succeeded)
 						{
-							var code = result.Status == SettingsImportCommitStatus.Conflict ? "state_changed"
-								: result.Status == SettingsImportCommitStatus.CompletedWithFailures ? "partial_failure"
-								: "result_unconfirmed";
-							var failure = CliResponse.Fail(command.Operation, code,
+							var failure = CliResponse.Fail(command.Operation, CommitFailureCode(result.Status),
 								"Import did not complete successfully. Inspect settings and desktops before retrying.");
 							failure.Error.ImportStatus = result.Status.ToString();
 							return failure;
@@ -133,6 +123,31 @@ namespace SylphyHorn.Services.Commands
 				return CliResponse.Fail(command.Operation, submitted ? "result_unconfirmed" : "operation_failed",
 					"The settings file operation could not be confirmed.");
 			}
+		}
+
+		private async Task<CliResponse> ExportAsync(CliCommand command, string path, CancellationToken cancellation)
+		{
+			if (!command.Overwrite && File.Exists(path))
+			{
+				return CliResponse.Fail(command.Operation, "file_exists", "Use --overwrite to replace an existing backup.");
+			}
+			var directory = Path.GetDirectoryName(path);
+			Directory.CreateDirectory(directory);
+			var temporary = Path.Combine(directory, "." + Guid.NewGuid().ToString("N") + ".xml");
+			try
+			{
+				await this._provider.ExportAsync(temporary);
+				cancellation.ThrowIfCancellationRequested();
+				File.Move(temporary, path, command.Overwrite);
+			}
+			finally
+			{
+				if (File.Exists(temporary))
+				{
+					File.Delete(temporary);
+				}
+			}
+			return CliResponse.Ok(command.Operation, new CliData { Path = path });
 		}
 	}
 }

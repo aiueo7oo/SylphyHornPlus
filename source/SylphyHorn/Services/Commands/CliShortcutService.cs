@@ -146,9 +146,7 @@ namespace SylphyHorn.Services.Commands
 				}
 				var desired = command.Operation == "shortcut clear" ? ShortcutKey.None : ParseTrigger(command.Device, command.Trigger);
 				var settings = command.Device == "keyboard" ? this._keyboard : this._mouse;
-				var list = definition.List?.Invoke(settings);
-				var property = definition.Property?.Invoke(settings)
-					?? (command.Number.Value <= list.Count ? list.Value[command.Number.Value - 1] : null);
+				var property = ResolveProperty(definition, settings, command.Number);
 				var previous = property.ToShortcutKey();
 				if (previous != desired && desired != ShortcutKey.None)
 				{
@@ -176,6 +174,7 @@ namespace SylphyHorn.Services.Commands
 					this._registrationPending = true;
 					if (property == null)
 					{
+						var list = definition.List(settings);
 						list.StretchTo(command.Number.Value);
 						property = list.Value[command.Number.Value - 1];
 					}
@@ -193,8 +192,7 @@ namespace SylphyHorn.Services.Commands
 				{
 					return CliResponse.Fail(command.Operation, "settings_save_failed", "The shortcut is active in memory but could not be saved.");
 				}
-				var currentProperty = definition.Property?.Invoke(settings)
-					?? (command.Number.Value <= list.Count ? list.Value[command.Number.Value - 1] : null);
+				var currentProperty = ResolveProperty(definition, settings, command.Number);
 				if (currentProperty.ToShortcutKey() != desired)
 				{
 					return CliResponse.Fail(command.Operation, "state_changed", "The shortcut changed while saving. Read shortcuts before retrying.");
@@ -252,9 +250,19 @@ namespace SylphyHorn.Services.Commands
 						yield return this.DescribeOne(selected, definition, null, null);
 					}
 					for (var index = 0; index < count; index++)
+					{
 						yield return this.DescribeOne(selected, definition, index < list.Count ? list.Value[index] : null, index + 1);
+					}
 				}
 			}
+		}
+
+		/// <summary>Returns null for a numbered shortcut that the stored list does not reach yet.</summary>
+		private static ShortcutkeyProperty ResolveProperty(Definition definition, ShortcutKeySettings settings, int? number)
+		{
+			if (definition.Property != null) return definition.Property(settings);
+			var list = definition.List(settings);
+			return number.Value <= list.Count ? list.Value[number.Value - 1] : null;
 		}
 
 		private CliShortcut DescribeOne(string device, Definition definition, ShortcutkeyProperty property, int? number)
