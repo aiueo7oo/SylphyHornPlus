@@ -14,6 +14,12 @@ using SylphyHorn.Services;
 using SylphyHorn.Services.DesktopTransitions;
 using SylphyHorn.UI;
 using SylphyHorn.UI.Bindings;
+#if !NETFRAMEWORK
+using System.Globalization;
+using System.Windows.Threading;
+using SylphyHorn.Services.AppPlacement;
+using SylphyHorn.Services.Commands;
+#endif
 
 namespace SylphyHorn
 {
@@ -28,14 +34,14 @@ namespace SylphyHorn
 		private TaskTrayIcon _taskTrayIcon;
 		private DesktopTransitionRuntime _desktopRuntime;
 #if !NETFRAMEWORK
-		private Services.Commands.CliServer _cliServer;
-		private Services.Commands.CliAssignmentService _cliAssignments;
-		private Services.Commands.CliCreationWallpaperService _cliCreationWallpapers;
-		private Services.Commands.CliSettingsService _cliSettings;
-		private Services.Commands.CliShortcutService _cliShortcuts;
-		private Services.Commands.CliSettingsFileService _cliSettingsFiles;
-		private Services.Commands.CliStartupService _cliStartup;
-		private Services.Commands.CliSettingsResetService _cliSettingsReset;
+		private CliServer _cliServer;
+		private CliAssignmentService _cliAssignments;
+		private CliCreationWallpaperService _cliCreationWallpapers;
+		private CliSettingsService _cliSettings;
+		private CliShortcutService _cliShortcuts;
+		private CliSettingsFileService _cliSettingsFiles;
+		private CliStartupService _cliStartup;
+		private CliSettingsResetService _cliSettingsReset;
 #endif
 
 		public event Action VirtualDesktopInitialized;
@@ -92,14 +98,16 @@ namespace SylphyHorn
 		private void ShowSettings()
 		{
 			if (this._desktopRuntime == null || !this._desktopRuntime.IsInitialized) return;
-			if (SettingsWindow.Instance != null) SettingsWindow.Instance.Activate();
-			else
+			if (SettingsWindow.Instance != null)
 			{
-				var window = this.CreateSettingsWindow();
-				SettingsWindow.Instance = window;
-				window.ShowDialog();
-				SettingsWindow.Instance = null;
+				SettingsWindow.Instance.Activate();
+				return;
 			}
+
+			var window = this.CreateSettingsWindow();
+			SettingsWindow.Instance = window;
+			window.ShowDialog();
+			SettingsWindow.Instance = null;
 		}
 
 		private SettingsWindow CreateSettingsWindow()
@@ -140,102 +148,176 @@ namespace SylphyHorn
 
 		private Task<CliResponse> ExecuteCliAsync(CliCommand command, CancellationToken cancellation)
 		{
-			if (command.Operation == "exit")
+			var operation = command.Operation;
+			switch (operation)
 			{
-				return Task.FromResult(CliResponse.Ok("exit", new CliData { Accepted = true }));
+				case "exit":
+				case "version":
+				case "logs":
+					return Task.FromResult(ExecuteHostCommand(command));
+				case "settings reset":
+					return this._cliSettingsReset.ExecuteAsync(command, cancellation);
+				case "settings export":
+				case "settings import":
+					return this._cliSettingsFiles.ExecuteAsync(command, cancellation);
+				case "app list":
+					return this._cliAssignments.ExecuteAsync(command, cancellation);
+				// These exact operations belong to the desktop runtime even though they share
+				// the "app assignment " prefix routed to the assignment service below.
+				case "app assignment resume":
+					return this._desktopRuntime.ResumeCliPlacementAsync(command, cancellation);
+				case "app assignment apply":
+					return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
 			}
-			if (command.Operation == "version")
-			{
-				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData { Host = CliVersionInfo.Read(typeof(ApplicationPreparation).Assembly) }));
-			}
-			if (command.Operation == "logs")
-			{
-				var entries = LoggingService.Instance.GetRecent(command.Limit, out var totalCount);
-				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData
-				{
-					Logs = entries.Select(entry => new CliLog
-					{
-						Timestamp = entry.Log.DateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-						Header = entry.Log.Header,
-						Content = entry.Log.Content,
-					}).ToArray(),
-					TotalCount = totalCount,
-					OmittedCount = totalCount - entries.Length,
-				}));
-			}
-			if (command.Operation == "settings reset")
-			{
-				return this._cliSettingsReset.ExecuteAsync(command, cancellation);
-			}
-			if (command.Operation == "settings export" || command.Operation == "settings import")
-			{
-				return this._cliSettingsFiles.ExecuteAsync(command, cancellation);
-			}
-			if (command.Operation.StartsWith("startup ", StringComparison.Ordinal))
+
+			if (HasPrefix(operation, "startup "))
 			{
 				return this._cliStartup.ExecuteAsync(command, cancellation);
 			}
-			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
+			if (HasPrefix(operation, "shortcut "))
 			{
 				return this._cliShortcuts.ExecuteAsync(command, cancellation);
 			}
-			if (Services.Commands.CliSettingsService.Handles(command.Operation))
+			if (CliSettingsService.Handles(operation))
 			{
 				return this._cliSettings.ExecuteAsync(command, cancellation);
 			}
-			if (command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal))
+			if (HasPrefix(operation, "desktop creation wallpaper "))
 			{
 				return this._cliCreationWallpapers.ExecuteAsync(command, cancellation);
 			}
-			if (command.Operation == "app assignment resume")
-			{
-				return this._desktopRuntime.ResumeCliPlacementAsync(command, cancellation);
-			}
-			if (command.Operation == "app assignment apply")
-			{
-				return this._desktopRuntime.ApplyCliAssignmentsAsync(command, cancellation);
-			}
-			if (command.Operation == "app list" || command.Operation.StartsWith("app assignment ", StringComparison.Ordinal)
-				|| command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal))
+			if (HasPrefix(operation, "app assignment ") || HasPrefix(operation, "desktop autoclose "))
 			{
 				return this._cliAssignments.ExecuteAsync(command, cancellation);
 			}
-			if (!command.Operation.StartsWith("ui ", StringComparison.Ordinal))
+			if (HasPrefix(operation, "ui "))
 			{
-				return this._desktopRuntime.ExecuteCliAsync(command, cancellation);
-			}
-			if (cancellation.IsCancellationRequested)
-			{
-				return Task.FromResult(CliResponse.Fail(command.Operation, "request_cancelled",
-					"The request expired before the UI action was submitted."));
+				return Task.FromResult(this.ExecuteUiCommand(command, cancellation));
 			}
 
-			if (command.Operation == "ui settings")
-			{
-				if (!this.ShowSettingsFromCli())
-				{
-					return Task.FromResult(CliResponse.Fail(command.Operation, "settings_unavailable",
-						"The settings window is unavailable."));
-				}
-			}
-			else if (command.Operation == "ui task-view")
-			{
-				VirtualDesktopService.ShowTaskView();
-			}
-			else if (command.Operation == "ui window-switch")
-			{
-				VirtualDesktopService.ShowWindowSwitch();
-			}
-			else if (command.Operation == "ui notification-toggle")
-			{
-				NotificationService.Instance.ToggleCurrentDesktop();
-			}
-			else
-			{
-				return Task.FromResult(CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown UI command."));
-			}
-			return Task.FromResult(CliResponse.Ok(command.Operation, new CliData()));
+			// The remaining desktop and window commands are owned by the desktop runtime.
+			return this._desktopRuntime.ExecuteCliAsync(command, cancellation);
 		}
+
+		private static bool HasPrefix(string operation, string prefix) => operation.StartsWith(prefix, StringComparison.Ordinal);
+
+		private static CliResponse ExecuteHostCommand(CliCommand command)
+		{
+			switch (command.Operation)
+			{
+				case "exit":
+					return CliResponse.Ok(command.Operation, new CliData { Accepted = true });
+				case "version":
+					return CliResponse.Ok(command.Operation, new CliData { Host = CliVersionInfo.Read(typeof(ApplicationPreparation).Assembly) });
+				case "logs":
+					return CliResponse.Ok(command.Operation, DescribeRecentLogs(command.Limit));
+				default:
+					throw new ArgumentException("The operation is not a host command.", nameof(command));
+			}
+		}
+
+		private static CliData DescribeRecentLogs(int limit)
+		{
+			var entries = LoggingService.Instance.GetRecent(limit, out var totalCount);
+			return new CliData
+			{
+				Logs = entries.Select(entry => new CliLog
+				{
+					Timestamp = entry.Log.DateTime.ToString("O", CultureInfo.InvariantCulture),
+					Header = entry.Log.Header,
+					Content = entry.Log.Content,
+				}).ToArray(),
+				TotalCount = totalCount,
+				OmittedCount = totalCount - entries.Length,
+			};
+		}
+
+		private CliResponse ExecuteUiCommand(CliCommand command, CancellationToken cancellation)
+		{
+			if (cancellation.IsCancellationRequested)
+			{
+				return CliResponse.Fail(command.Operation, "request_cancelled", "The request expired before the UI action was submitted.");
+			}
+
+			switch (command.Operation)
+			{
+				case "ui settings":
+					if (!this.ShowSettingsFromCli())
+					{
+						return CliResponse.Fail(command.Operation, "settings_unavailable", "The settings window is unavailable.");
+					}
+					break;
+				case "ui task-view":
+					VirtualDesktopService.ShowTaskView();
+					break;
+				case "ui window-switch":
+					VirtualDesktopService.ShowWindowSwitch();
+					break;
+				case "ui notification-toggle":
+					NotificationService.Instance.ToggleCurrentDesktop();
+					break;
+				default:
+					return CliResponse.Fail(command.Operation, "invalid_arguments", "Unknown UI command.");
+			}
+			return CliResponse.Ok(command.Operation, new CliData());
+		}
+
+		private void CreateCliServices(DesktopTransitionRuntime runtime)
+		{
+			Func<bool> runtimeAvailable = () => runtime.CliAvailable;
+			Func<bool> runtimeAndInputAvailable = () => runtime.CliAvailable && !this._hookService.IsSuspended;
+			Func<IDisposable> suspendInput = () => this._hookService.Suspend();
+			Func<Task<SettingsSaveResult>> saveSettings = () => LocalSettingsProvider.Instance.SaveWithResultAsync();
+			Action refreshSettingsWindow = () => OpenSettingsViewModel()?.RefreshAfterExternalSettings();
+
+			this._cliSettingsReset = new CliSettingsResetService(
+				reset: runtime.ResetSettingsAsync,
+				available: runtimeAndInputAvailable,
+				suspendInput: suspendInput,
+				refresh: refreshSettingsWindow);
+			this._cliSettingsFiles = new CliSettingsFileService(
+				provider: LocalSettingsProvider.Instance,
+				settingsPath: LocalSettingsProvider.Instance.FilePath,
+				available: runtimeAndInputAvailable,
+				suspendInput: suspendInput,
+				commit: (stage, applyDesktops, token) => runtime.CommitPreparedImportAsync(stage, applyDesktops, token),
+				refresh: refreshSettingsWindow,
+				nameSupported: ProductInfo.IsNameSupportBuild);
+			this._cliStartup = new CliStartupService(
+				registration: new WindowsStartupRegistration(Environment.ProcessPath),
+				available: runtimeAvailable,
+				refresh: startup => OpenSettingsViewModel()?.RefreshAfterExternalStartup(startup.NormalRegistered, startup.ElevatedRegistered));
+			this._cliShortcuts = new CliShortcutService(
+				keyboard: Settings.ShortcutKey,
+				mouse: Settings.MouseShortcut,
+				general: Settings.General,
+				save: saveSettings,
+				available: runtimeAndInputAvailable,
+				reload: () => this._hookService.Reload(),
+				desktopCount: () => runtime.State.Order.Count);
+			this._cliSettings = new CliSettingsService(
+				settings: Settings.General,
+				save: saveSettings,
+				available: runtimeAvailable,
+				startupCulture: ResourceService.Current.StartupCulture);
+			this._cliCreationWallpapers = new CliCreationWallpaperService(
+				settings: Settings.General,
+				save: saveSettings,
+				available: runtimeAvailable);
+			this._cliAssignments = new CliAssignmentService(
+				settings: Settings.AppPlacement,
+				catalog: new PlacementAppCatalog(),
+				save: saveSettings,
+				available: runtimeAvailable,
+				status: () => runtime.PlacementStatus);
+			this._cliServer = new CliServer(
+				name: CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
+				execute: (command, token) => Application.Current.Dispatcher.InvokeAsync(
+					() => this.ExecuteCliAsync(command, token), DispatcherPriority.Background, token).Task.Unwrap(),
+				shutdown: () => Application.Current.Dispatcher.BeginInvoke(this._shutdownAction));
+		}
+
+		private static SettingsWindowViewModel OpenSettingsViewModel() => SettingsWindow.Instance?.DataContext as SettingsWindowViewModel;
 #endif
 
 		public TaskTrayBaloon CreateFirstTimeBaloon()
@@ -284,13 +366,17 @@ namespace SylphyHorn
 				var result = await runtime.InitializeAsync(Settings.General.OverrideDesktopsOnStartup, CancellationToken.None);
 				if (!result.Succeeded)
 				{
-					this._startupTrace?.Write(
-						StartupPhase.RuntimeInitialized,
-						result.Status == DesktopRuntimeInitializationStatus.Cancelled || result.Status == DesktopRuntimeInitializationStatus.ShuttingDown
-							? StartupTraceResult.Cancelled
-							: StartupTraceResult.Failed);
-					if (result.Status == DesktopRuntimeInitializationStatus.Cancelled || result.Status == DesktopRuntimeInitializationStatus.ShuttingDown) this.VirtualDesktopInitializationCanceled?.Invoke();
-					else this.VirtualDesktopInitializationFailed?.Invoke(new InvalidOperationException("Virtual desktop runtime initialization did not produce a stable state."), false);
+					var cancelled = result.Status == DesktopRuntimeInitializationStatus.Cancelled
+						|| result.Status == DesktopRuntimeInitializationStatus.ShuttingDown;
+					this._startupTrace?.Write(StartupPhase.RuntimeInitialized, cancelled ? StartupTraceResult.Cancelled : StartupTraceResult.Failed);
+					if (cancelled)
+					{
+						this.VirtualDesktopInitializationCanceled?.Invoke();
+					}
+					else
+					{
+						this.VirtualDesktopInitializationFailed?.Invoke(new InvalidOperationException("Virtual desktop runtime initialization did not produce a stable state."), false);
+					}
 					return;
 				}
 				this._startupTrace?.Write(StartupPhase.RuntimeInitialized, StartupTraceResult.Succeeded);
@@ -324,37 +410,7 @@ namespace SylphyHorn
 #if !NETFRAMEWORK
 				try
 				{
-					this._cliSettingsReset = new Services.Commands.CliSettingsResetService(
-						runtime.ResetSettingsAsync, () => runtime.CliAvailable && !this._hookService.IsSuspended,
-						() => this._hookService.Suspend(),
-						() => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalSettings());
-					this._cliSettingsFiles = new Services.Commands.CliSettingsFileService(
-						LocalSettingsProvider.Instance, LocalSettingsProvider.Instance.FilePath,
-						() => runtime.CliAvailable && !this._hookService.IsSuspended, () => this._hookService.Suspend(),
-						(stage, apply, token) => runtime.CommitPreparedImportAsync(stage, apply, token),
-						() => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalSettings(),
-						ProductInfo.IsNameSupportBuild);
-					this._cliStartup = new Services.Commands.CliStartupService(
-						new Services.Commands.WindowsStartupRegistration(Environment.ProcessPath), () => runtime.CliAvailable,
-						state => (SettingsWindow.Instance?.DataContext as SettingsWindowViewModel)?.RefreshAfterExternalStartup(
-							state.NormalRegistered, state.ElevatedRegistered));
-					this._cliShortcuts = new Services.Commands.CliShortcutService(Settings.ShortcutKey, Settings.MouseShortcut,
-						Settings.General, () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
-						() => runtime.CliAvailable && !this._hookService.IsSuspended,
-						() => this._hookService.Reload(), () => runtime.State.Order.Count);
-					this._cliSettings = new Services.Commands.CliSettingsService(Settings.General,
-						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable,
-						ResourceService.Current.StartupCulture);
-					this._cliCreationWallpapers = new Services.Commands.CliCreationWallpaperService(Settings.General,
-						() => LocalSettingsProvider.Instance.SaveWithResultAsync(), () => runtime.CliAvailable);
-					this._cliAssignments = new Services.Commands.CliAssignmentService(Settings.AppPlacement,
-						new Services.AppPlacement.PlacementAppCatalog(), () => LocalSettingsProvider.Instance.SaveWithResultAsync(),
-						() => runtime.CliAvailable, () => runtime.PlacementStatus);
-					this._cliServer = new Services.Commands.CliServer(
-						Commands.CliProtocol.PipeName(ProductInfo.Company, ProductInfo.Product),
-						(command, token) => Application.Current.Dispatcher.InvokeAsync(
-							() => this.ExecuteCliAsync(command, token), System.Windows.Threading.DispatcherPriority.Background, token).Task.Unwrap(),
-						() => Application.Current.Dispatcher.BeginInvoke(this._shutdownAction));
+					this.CreateCliServices(runtime);
 				}
 				catch (Exception ex)
 				{
