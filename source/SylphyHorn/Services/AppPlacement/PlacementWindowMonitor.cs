@@ -19,7 +19,8 @@ namespace SylphyHorn.Services.AppPlacement
 		private const int CHILDID_SELF = 0;
 		private const uint PM_NOREMOVE = 0;
 		private const uint PM_REMOVE = 1;
-		private const uint QS_ALLINPUT = 0x04FF;
+		// QS_ALLINPUT as defined before Windows 8, without the QS_TOUCH and QS_POINTER bits.
+		private const uint QS_ALLINPUT_WIN7 = 0x04FF;
 		private const uint MWMO_INPUTAVAILABLE = 0x0004;
 		private const uint INFINITE = uint.MaxValue;
 		private const uint WAIT_FAILED = uint.MaxValue;
@@ -152,7 +153,7 @@ namespace SylphyHorn.Services.AppPlacement
 						DispatchMessage(ref message);
 					}
 					if (this.Events.State == PlacementMonitorState.Paused) break;
-					var result = MsgWaitForMultipleObjectsEx(1, handles, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+					var result = MsgWaitForMultipleObjectsEx(1, handles, INFINITE, QS_ALLINPUT_WIN7, MWMO_INPUTAVAILABLE);
 					if (result == WAIT_FAILED)
 					{
 						throw new Win32Exception(Marshal.GetLastWin32Error());
