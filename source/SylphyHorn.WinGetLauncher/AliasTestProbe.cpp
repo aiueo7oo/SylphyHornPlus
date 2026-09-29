@@ -72,12 +72,12 @@ int wmain(int argumentCount, wchar_t* arguments[])
 			WriteAll(file, arguments[index], length * sizeof(wchar_t));
 	}
 
-	const auto directoryLength = GetCurrentDirectoryW(0, nullptr);
-	std::vector<wchar_t> directory(directoryLength);
-	const auto characters = GetCurrentDirectoryW(directoryLength, directory.data());
-	succeeded = succeeded && characters > 0 && characters < directoryLength &&
-		WriteAll(file, &characters, sizeof(characters)) &&
-		WriteAll(file, directory.data(), characters * sizeof(wchar_t));
+	const auto directoryBufferLength = GetCurrentDirectoryW(0, nullptr);
+	std::vector<wchar_t> directory(directoryBufferLength);
+	const auto directoryLength = GetCurrentDirectoryW(directoryBufferLength, directory.data());
+	succeeded = succeeded && directoryLength > 0 && directoryLength < directoryBufferLength &&
+		WriteAll(file, &directoryLength, sizeof(directoryLength)) &&
+		WriteAll(file, directory.data(), directoryLength * sizeof(wchar_t));
 
 	CloseHandle(file);
 	if (!succeeded)

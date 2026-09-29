@@ -1,19 +1,12 @@
 ﻿#include <windows.h>
 #include <shellapi.h>
-#ifdef SYLPHYHORN_CLI_LAUNCHER
-#include <cstdio>
-#endif
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
 namespace
 {
-#ifdef SYLPHYHORN_CLI_LAUNCHER
-	constexpr wchar_t TargetExecutableName[] = L"sylphyhorn-cli.exe";
-#else
-	constexpr wchar_t TargetExecutableName[] = L"SylphyHorn.exe";
-#endif
 	constexpr size_t MaximumSupportedPathLength = MAX_PATH - 1;
 
 	struct PathResult
@@ -160,22 +153,76 @@ namespace
 		return commandLine;
 	}
 
-	int ShowError(const wchar_t* message, DWORD error)
+	struct ChildProcessSettings
 	{
+		BOOL InheritHandles;
+		const wchar_t* WorkingDirectory;
+	};
+
 #ifdef SYLPHYHORN_CLI_LAUNCHER
+	constexpr wchar_t TargetExecutableName[] = L"sylphyhorn-cli.exe";
+
+	// Same exit code that the CLI assigns to launcher_failure (CliResponse.ExitCode).
+	constexpr int LauncherFailureExitCode = 4;
+
+	int ReportLaunchFailure(const wchar_t* message, DWORD error)
+	{
 		fwprintf(stderr, L"%ls Windows error: %lu\n", message, error);
 		fputs("{\"schemaVersion\":1,\"command\":null,\"success\":false,"
 			"\"error\":{\"code\":\"launcher_failure\","
 			"\"message\":\"The CLI could not be started.\",\"retryable\":false}}\n", stdout);
-		return 4;
+		return LauncherFailureExitCode;
+	}
+
+	// The CLI child shares the caller's console streams and working directory.
+	ChildProcessSettings PrepareChildProcess(STARTUPINFOW& startupInfo, const std::wstring&)
+	{
+		startupInfo.dwFlags = STARTF_USESTDHANDLES;
+		startupInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+		startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+		startupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+		return {TRUE, nullptr};
+	}
+
+	// Waits for the CLI so the caller receives its exit code.
+	int CompleteLaunch(HANDLE process)
+	{
+		const auto waitResult = WaitForSingleObject(process, INFINITE);
+		DWORD childExitCode = 0;
+		if (waitResult != WAIT_OBJECT_0 ||
+			!GetExitCodeProcess(process, &childExitCode))
+		{
+			const auto error = GetLastError();
+			CloseHandle(process);
+			return ReportLaunchFailure(L"The CLI result could not be obtained.", error);
+		}
+		CloseHandle(process);
+		return static_cast<int>(childExitCode);
+	}
 #else
+	constexpr wchar_t TargetExecutableName[] = L"SylphyHorn.exe";
+
+	int ReportLaunchFailure(const wchar_t* message, DWORD error)
+	{
 		std::wstring text(message);
 		text.append(L"\n\nWindows error: ");
 		text.append(std::to_wstring(error));
 		MessageBoxW(nullptr, text.c_str(), L"SylphyHornPlus", MB_OK | MB_ICONERROR);
 		return static_cast<int>(error == ERROR_SUCCESS ? ERROR_GEN_FAILURE : error);
-#endif
 	}
+
+	// The GUI starts detached from the caller, in its installation directory.
+	ChildProcessSettings PrepareChildProcess(STARTUPINFOW&, const std::wstring& installationDirectory)
+	{
+		return {FALSE, installationDirectory.c_str()};
+	}
+
+	int CompleteLaunch(HANDLE process)
+	{
+		CloseHandle(process);
+		return 0;
+	}
+#endif
 }
 
 #ifdef SYLPHYHORN_CLI_LAUNCHER
@@ -187,7 +234,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	const auto modulePathResult = GetModulePath();
 	if (modulePathResult.Path.empty())
 	{
-		return ShowError(
+		return ReportLaunchFailure(
 			L"The WinGet launcher path could not be determined.",
 			modulePathResult.Error);
 	}
@@ -195,7 +242,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	const auto resolvedLauncherPathResult = ResolveExecutablePath(modulePathResult.Path);
 	if (resolvedLauncherPathResult.Path.empty())
 	{
-		return ShowError(
+		return ReportLaunchFailure(
 			L"The WinGet launcher target could not be resolved.",
 			resolvedLauncherPathResult.Error);
 	}
@@ -204,7 +251,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	const auto separator = resolvedLauncherPath.find_last_of(L"\\/");
 	if (separator == std::wstring::npos)
 	{
-		return ShowError(L"The SylphyHornPlus installation directory could not be determined.", ERROR_BAD_PATHNAME);
+		return ReportLaunchFailure(L"The SylphyHornPlus installation directory could not be determined.", ERROR_BAD_PATHNAME);
 	}
 
 	const auto installationDirectory = resolvedLauncherPath.substr(0, separator);
@@ -212,7 +259,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	if (installationDirectory.size() > MaximumSupportedPathLength ||
 		targetPath.size() > MaximumSupportedPathLength)
 	{
-		return ShowError(
+		return ReportLaunchFailure(
 			L"The SylphyHornPlus installation path exceeds the supported Windows path length.",
 			ERROR_FILENAME_EXCED_RANGE);
 	}
@@ -220,7 +267,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	const auto commandLineText = BuildCommandLine(targetPath, commandLineError);
 	if (commandLineText.empty())
 	{
-		return ShowError(
+		return ReportLaunchFailure(
 			L"The SylphyHornPlus command line could not be prepared.",
 			commandLineError);
 	}
@@ -230,48 +277,23 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
 	STARTUPINFOW startupInfo{};
 	startupInfo.cb = sizeof(startupInfo);
-#ifdef SYLPHYHORN_CLI_LAUNCHER
-	startupInfo.dwFlags = STARTF_USESTDHANDLES;
-	startupInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-	startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-	startupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-	constexpr BOOL inheritHandles = TRUE;
-	const wchar_t* workingDirectory = nullptr;
-#else
-	constexpr BOOL inheritHandles = FALSE;
-	const auto workingDirectory = installationDirectory.c_str();
-#endif
+	const auto childProcess = PrepareChildProcess(startupInfo, installationDirectory);
 	PROCESS_INFORMATION processInformation{};
 	if (!CreateProcessW(
 		targetPath.c_str(),
 		commandLine.data(),
 		nullptr,
 		nullptr,
-		inheritHandles,
+		childProcess.InheritHandles,
 		0,
 		nullptr,
-		workingDirectory,
+		childProcess.WorkingDirectory,
 		&startupInfo,
 		&processInformation))
 	{
-		return ShowError(L"SylphyHornPlus could not be started.", GetLastError());
+		return ReportLaunchFailure(L"SylphyHornPlus could not be started.", GetLastError());
 	}
 
 	CloseHandle(processInformation.hThread);
-#ifdef SYLPHYHORN_CLI_LAUNCHER
-	const auto waitResult = WaitForSingleObject(processInformation.hProcess, INFINITE);
-	DWORD childExitCode = 0;
-	if (waitResult != WAIT_OBJECT_0 ||
-		!GetExitCodeProcess(processInformation.hProcess, &childExitCode))
-	{
-		const auto error = GetLastError();
-		CloseHandle(processInformation.hProcess);
-		return ShowError(L"The CLI result could not be obtained.", error);
-	}
-	CloseHandle(processInformation.hProcess);
-	return static_cast<int>(childExitCode);
-#else
-	CloseHandle(processInformation.hProcess);
-	return 0;
-#endif
+	return CompleteLaunch(processInformation.hProcess);
 }
