@@ -575,6 +575,10 @@ namespace SylphyHorn.UI.Bindings
 			{
 				previous.Cancel();
 			}
+			if (row.Group.Kind == PlacementDestinationKind.Number)
+			{
+				row.Destination = DesktopNumberInput.Normalize(row.Destination);
+			}
 			var revision = row.Revision;
 			var generation = this._generation;
 			if (!TryReadDestination(row, out var destination)) return;
@@ -645,7 +649,7 @@ namespace SylphyHorn.UI.Bindings
 			destination = null;
 			if (row.Group.Kind == PlacementDestinationKind.Number)
 			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+				if (!DesktopNumberInput.TryParse(row.Destination, out var number))
 				{
 					row.SetErrorKey("InvalidNumber");
 					return false;
@@ -698,6 +702,10 @@ namespace SylphyHorn.UI.Bindings
 		internal Task CommitClosingAsync(PlacementClosingRow row)
 		{
 			if (this._disposed || !row.Group.Rows.Contains(row)) return Task.CompletedTask;
+			if (row.Group.Kind == PlacementDestinationKind.Number)
+			{
+				row.Destination = DesktopNumberInput.Normalize(row.Destination);
+			}
 			if (string.IsNullOrWhiteSpace(row.Destination))
 			{
 				row.SetInvalid(row.Saved != null);
@@ -705,7 +713,7 @@ namespace SylphyHorn.UI.Bindings
 			}
 			if (row.Group.Kind == PlacementDestinationKind.Number)
 			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+				if (!DesktopNumberInput.TryParse(row.Destination, out var number))
 				{
 					row.SetInvalid(true);
 					return Task.CompletedTask;

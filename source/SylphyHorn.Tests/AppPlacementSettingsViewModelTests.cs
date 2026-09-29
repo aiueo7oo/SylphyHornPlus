@@ -20,6 +20,41 @@ namespace SylphyHorn.Tests
 	[Collection(PlacementUiCollection.Name)]
 	public sealed class AppPlacementSettingsViewModelTests
 	{
+		[Theory]
+		[InlineData("\uFF13", 3)]
+		[InlineData(" 12\u3000", 12)]
+		[InlineData("\uFF11\uFF10\uFF10", 100)]
+		public async Task NumbersTypedWithTheImeOrSpacesAreSavedAsDigits(string typed, int expected)
+		{
+			using (var fixture = await PlacementUiFixture.Create())
+			{
+				var row = await fixture.Add(@"C:\one\editor.exe", 2);
+				row.Destination = typed;
+				await fixture.Model.CommitAsync(row);
+				Assert.Empty(row.Error);
+				Assert.Equal(expected.ToString(System.Globalization.CultureInfo.InvariantCulture), row.Destination);
+				Assert.Equal(expected, Assert.Single(fixture.Settings.Configuration.Value.Rules).Destination.Number);
+			}
+		}
+
+		[Fact]
+		public async Task ClosingNumbersAcceptImeDigitsAndRejectNumbersAboveTheMaximum()
+		{
+			using (var fixture = await PlacementUiFixture.Create())
+			{
+				var row = fixture.Model.AddClosingRow(fixture.Model.NumberClosingGroup);
+				row.Destination = "101";
+				await fixture.Model.CommitClosingAsync(row);
+				Assert.Equal(fixture.Model.Text["InvalidNumber"], row.Error);
+				Assert.Empty(fixture.Settings.Configuration.Value.ClosingTargets);
+				row.Destination = " \uFF14 ";
+				await fixture.Model.CommitClosingAsync(row);
+				Assert.Empty(row.Error);
+				Assert.Equal("4", row.Destination);
+				Assert.Equal(4, Assert.Single(fixture.Settings.Configuration.Value.ClosingTargets).Number);
+			}
+		}
+
 		[Fact]
 		public async Task ClosingSettingsSurvivePlacementEditsAndRejectInvalidNumbers()
 		{
@@ -117,6 +152,8 @@ namespace SylphyHorn.Tests
 		[InlineData("-1")]
 		[InlineData("1.5")]
 		[InlineData("2147483648")]
+		[InlineData("101")]
+		[InlineData("abc")]
 		public async Task InvalidInputKeepsSavedRuleAndEscapeRestoresIt(string number)
 		{
 			using (var fixture = await PlacementUiFixture.Create())

@@ -172,7 +172,7 @@ namespace SylphyHorn.Commands
 			yield return Command("desktop creation wallpaper set", "Set wallpaper settings applied to newly created desktops.", fields,
 				arguments: new[]
 				{
-					DesktopOption("--name"), DesktopOption("--number"),
+					DesktopOption("--name"), SettingsDesktopOption("--number"),
 					Option("--path", "string", required: true, description: "Absolute readable image path."),
 				},
 				constraints: new[] { ExactlyOne("--name --number") },
@@ -182,7 +182,7 @@ namespace SylphyHorn.Commands
 				queries: queries);
 
 			yield return Command("desktop creation wallpaper remove", "Remove wallpaper settings applied to newly created desktops.", fields,
-				arguments: new[] { DesktopOption("--name"), DesktopOption("--number") },
+				arguments: new[] { DesktopOption("--name"), SettingsDesktopOption("--number") },
 				constraints: new[] { ExactlyOne("--name --number") },
 				notes: notes,
 				effects: "persist-settings",
@@ -204,7 +204,7 @@ namespace SylphyHorn.Commands
 			foreach (var verb in new[] { "add", "remove" })
 			{
 				yield return Command("desktop autoclose " + verb, Capitalized(verb) + " an automatic desktop closure target.", fields,
-					arguments: new[] { DesktopOption("--name"), DesktopOption("--number") },
+					arguments: new[] { DesktopOption("--name"), SettingsDesktopOption("--number") },
 					constraints: new[] { ExactlyOne("--name --number") },
 					notes: notes,
 					effects: "persist-closing-targets",
@@ -319,7 +319,7 @@ namespace SylphyHorn.Commands
 						description: "Package application identity returned for an assignable app.",
 						source: "app list: apps[].appIdentity when appKind=packageAppId"),
 					DesktopOption("--desktop-name"),
-					DesktopOption("--desktop-number"),
+					SettingsDesktopOption("--desktop-number"),
 					Option("--follow-foreground", "string", values: "default true false", omission: "preserve-existing-or-default",
 						description: "default inherits the global setting. true/false override it, " +
 							"still only for foreground windows during automatic placement."),
@@ -627,6 +627,14 @@ namespace SylphyHorn.Commands
 				return Option(name, "integer", required, minimum: 1, maximum: int.MaxValue, source: source);
 			}
 			return Option(name, field == "id" ? "uuid" : "string", required, source: source);
+		}
+
+		// Settings may name a desktop that does not exist yet, but only up to DesktopNumberInput.Maximum.
+		private static CliSpecArgument SettingsDesktopOption(string name)
+		{
+			var option = DesktopOption(name);
+			option.Maximum = DesktopNumberInput.Maximum;
+			return option;
 		}
 
 		private static CliSpecConstraint ExactlyOne(string options) => Constraint("exactlyOne", options);

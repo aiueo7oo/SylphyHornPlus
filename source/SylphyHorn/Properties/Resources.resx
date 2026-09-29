@@ -625,7 +625,7 @@
     <value>The executable path could not be confirmed.</value>
   </data>
   <data name="Placement_InvalidNumber" xml:space="preserve">
-    <value>Enter a whole number of 1 or greater.</value>
+    <value>Enter a whole number from 1 to 100.</value>
   </data>
   <data name="Placement_InvalidName" xml:space="preserve">
     <value>Enter a desktop name. Spaces are matched exactly.</value>
@@ -940,7 +940,7 @@
     <value>Enter a desktop name. Spaces are matched exactly.</value>
   </data>
   <data name="CreationWallpaper_InvalidNumber" xml:space="preserve">
-    <value>Enter a whole number of 1 or greater.</value>
+    <value>Enter a whole number from 1 to 100.</value>
   </data>
   <data name="CreationWallpaper_DuplicateName" xml:space="preserve">
     <value>An entry for this desktop name already exists.</value>

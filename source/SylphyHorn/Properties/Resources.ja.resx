@@ -625,7 +625,7 @@
     <value>実行ファイルパスは確認できません。</value>
   </data>
   <data name="Placement_InvalidNumber" xml:space="preserve">
-    <value>1以上の整数を入力してください。</value>
+    <value>1から100までの整数を入力してください。</value>
   </data>
   <data name="Placement_InvalidName" xml:space="preserve">
     <value>デスクトップ名を入力してください。空白も含めて完全一致で照合します。</value>
@@ -940,7 +940,7 @@
     <value>デスクトップ名を入力してください。空白も含めて完全一致で照合します。</value>
   </data>
   <data name="CreationWallpaper_InvalidNumber" xml:space="preserve">
-    <value>1以上の整数を入力してください。</value>
+    <value>1から100までの整数を入力してください。</value>
   </data>
   <data name="CreationWallpaper_DuplicateName" xml:space="preserve">
     <value>同じデスクトップ名の登録が既にあります。</value>

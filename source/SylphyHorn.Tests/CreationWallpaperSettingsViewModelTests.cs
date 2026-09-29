@@ -66,6 +66,20 @@ namespace SylphyHorn.Tests
 		}
 
 		[Fact]
+		public async Task NumbersTypedWithTheImeAreSavedAsDigitsAndLimitedToTheMaximum()
+		{
+			using (var fixture = await CreationWallpaperUiFixture.Create())
+			{
+				var tooHigh = await fixture.Add(false, "101", @"C:\Wallpapers\high.jpg");
+				Assert.Equal(fixture.Model.Text["InvalidNumber"], tooHigh.Error);
+				var typed = await fixture.Add(false, " \uFF17 ", @"C:\Wallpapers\seven.jpg");
+				Assert.Equal("", typed.Error);
+				Assert.Equal("7", typed.Destination);
+				Assert.Equal(7, Assert.Single(fixture.Settings.DesktopWallpapersOnCreation.Value).Number);
+			}
+		}
+
+		[Fact]
 		public async Task UnreadableImagesAndLateResultsNeverOverwriteNewerInput()
 		{
 			using (var fixture = await CreationWallpaperUiFixture.Create())

@@ -2,12 +2,16 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using SylphyHorn.Serialization;
 
 namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
 		private const string DesktopNumberError = "Desktop numbers must be positive integers starting at 1.";
+
+		private static readonly string SettingsDesktopNumberError =
+			"Desktop numbers in settings must be integers from 1 to " + DesktopNumberInput.Maximum.ToString(CultureInfo.InvariantCulture) + ".";
 
 		private const string DesktopSelectorError = "Specify a desktop selector and required value.";
 
@@ -467,7 +471,7 @@ namespace SylphyHorn.Commands
 					this.SetTarget("name", options.ReadValue());
 					return true;
 				case "--number":
-					this.SetTarget("number", options.ReadPositiveIntegerText("Desktop numbers must be positive integers."));
+					this.ReadSettingsDesktopNumber(options);
 					return true;
 				case "--path" when this.Operation == "desktop creation wallpaper set":
 					this.WallpaperPath = options.ReadValue();
@@ -496,7 +500,7 @@ namespace SylphyHorn.Commands
 					this.ReadDesktopSelector(options, "name");
 					return true;
 				case "--number":
-					this.ReadDesktopSelector(options, "number");
+					this.ReadSettingsDesktopNumber(options);
 					return true;
 				default:
 					return false;
@@ -525,6 +529,10 @@ namespace SylphyHorn.Commands
 					break;
 			}
 		}
+
+		// Settings may name a desktop that does not exist yet, but only up to DesktopNumberInput.Maximum.
+		private void ReadSettingsDesktopNumber(OptionReader options)
+			=> this.SetTarget("number", options.ReadIntegerText(1, DesktopNumberInput.Maximum, SettingsDesktopNumberError));
 
 		private void SetTarget(string kind, string value)
 		{
@@ -685,7 +693,7 @@ namespace SylphyHorn.Commands
 					this.ReadDesktopSelector(options, "name");
 					return true;
 				case "--desktop-number":
-					this.ReadDesktopSelector(options, "number");
+					this.ReadSettingsDesktopNumber(options);
 					return true;
 				case "--follow-foreground":
 					this.FollowForeground = this.ReadCatalogChoice(options);
@@ -1167,9 +1175,13 @@ namespace SylphyHorn.Commands
 
 			// Validated like ReadPositiveInteger but returned as typed.
 			internal string ReadPositiveIntegerText(string error)
+				=> this.ReadIntegerText(1, int.MaxValue, error);
+
+			// Digits only, validated against the range but returned as typed.
+			internal string ReadIntegerText(int minimum, int maximum, string error)
 			{
 				var value = this.ReadValue();
-				if (!TryParseInteger(value, NumberStyles.None, 1, int.MaxValue, out _))
+				if (!TryParseInteger(value, NumberStyles.None, minimum, maximum, out _))
 				{
 					throw new ArgumentException(error);
 				}

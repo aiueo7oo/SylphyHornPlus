@@ -241,7 +241,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Enter a whole number of 1 or greater..
+        ///   Looks up a localized string similar to Enter a whole number from 1 to 100..
         /// </summary>
         public static string CreationWallpaper_InvalidNumber {
             get {
@@ -2039,7 +2039,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Enter a whole number of 1 or greater..
+        ///   Looks up a localized string similar to Enter a whole number from 1 to 100..
         /// </summary>
         public static string Placement_InvalidNumber {
             get {

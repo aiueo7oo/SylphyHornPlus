@@ -412,6 +412,10 @@ namespace SylphyHorn.UI.Bindings
 			{
 				row.WallpaperPath = path;
 			}
+			if (!row.Group.ByName)
+			{
+				row.Destination = DesktopNumberInput.Normalize(row.Destination);
+			}
 			var revision = row.Revision;
 			if (!TryCreateEntry(row, path, out var entry)) return;
 			if (row.Saved != null && Same(row.Saved, entry))
@@ -458,7 +462,7 @@ namespace SylphyHorn.UI.Bindings
 			}
 			else
 			{
-				if (!int.TryParse(row.Destination, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value <= 0)
+				if (!DesktopNumberInput.TryParse(row.Destination, out var value))
 				{
 					row.SetErrorKey("InvalidNumber");
 					return false;

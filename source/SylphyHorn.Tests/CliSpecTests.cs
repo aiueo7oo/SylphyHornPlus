@@ -93,6 +93,16 @@ namespace SylphyHorn.Tests
 			Assert.All(CliSpecCatalog.Find("desktop configure").Arguments, item => Assert.Equal("preserve-current", item.Omission));
 		}
 
+		[Theory]
+		[InlineData("app assignment set", "--desktop-number")]
+		[InlineData("desktop autoclose add", "--number")]
+		[InlineData("desktop autoclose remove", "--number")]
+		[InlineData("desktop creation wallpaper set", "--number")]
+		[InlineData("desktop creation wallpaper remove", "--number")]
+		public void SettingsDesktopNumbersDeclareTheInputMaximum(string command, string option)
+			=> Assert.Equal((long?)SylphyHorn.Serialization.DesktopNumberInput.Maximum,
+				CliSpecCatalog.Find(command).Arguments.Single(argument => argument.Name == option).Maximum);
+
 		[Fact]
 		public async Task ResolutionReturnsSourceIdsAndPreservesPartialFailures()
 		{

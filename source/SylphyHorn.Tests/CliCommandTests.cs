@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Globalization;
 using SylphyHorn.Commands;
+using SylphyHorn.Serialization;
 using Xunit;
 
 namespace SylphyHorn.Tests
@@ -143,6 +145,23 @@ namespace SylphyHorn.Tests
 		[InlineData("app assignment remove --id invalid")]
 		public void AutocloseAndRuleIdsRejectAmbiguousOrMissingSelectors(string args)
 			=> Assert.Throws<ArgumentException>(() => CliCommand.Parse(args.Split(' ')));
+
+		[Theory]
+		[InlineData("desktop autoclose add --number")]
+		[InlineData("app assignment set --path C:\\App.exe --desktop-number")]
+		[InlineData("desktop creation wallpaper set --path C:\\Wallpaper.jpg --number")]
+		public void SettingsDesktopNumbersAreLimitedToTheMaximum(string args)
+		{
+			var maximum = DesktopNumberInput.Maximum.ToString(CultureInfo.InvariantCulture);
+			var above = (DesktopNumberInput.Maximum + 1).ToString(CultureInfo.InvariantCulture);
+			Assert.Equal(maximum, CliCommand.Parse((args + " " + maximum).Split(' ')).TargetValue);
+			var error = Assert.Throws<ArgumentException>(() => CliCommand.Parse((args + " " + above).Split(' ')));
+			Assert.Contains(maximum, error.Message);
+		}
+
+		[Fact]
+		public void SelectorsOfExistingDesktopsAreNotLimitedToTheSettingsMaximum()
+			=> Assert.Equal("101", CliCommand.Parse(new[] { "desktop", "switch", "--number", "101" }).TargetValue);
 
 		[Theory]
 		[InlineData("set")]
