@@ -22,6 +22,7 @@ namespace SylphyHorn.Tests
 			foreach (var entry in overview.Data.Commands)
 			{
 				Assert.Null(entry.Arguments);
+				Assert.DoesNotContain("settings settings", entry.Summary);
 				var response = await CliSpecService.ExecuteAsync(new[] { "spec" }.Concat(entry.Name.Split(' ')).ToArray(), NeverQuery);
 				Assert.True(response.Success);
 				Assert.Equal(entry.Name, response.Data.Target);

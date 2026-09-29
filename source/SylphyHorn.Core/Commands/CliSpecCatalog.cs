@@ -370,13 +370,13 @@ namespace SylphyHorn.Commands
 
 		private static IEnumerable<CliCommandSpec> SettingsCommands()
 		{
-			var desktop = SettingsArea("desktop", "desktop settings",
+			var desktop = SettingsArea("desktop", "desktop", "desktop settings",
 				"loop overrideWindowsShortcuts perDesktopWallpaper overrideOnStartup nativeWallpaperSupported wallpaperEnabled",
 				Booleans("--loop --override-windows-shortcuts --per-desktop-wallpaper --override-on-startup"),
 				"override-on-startup affects the next launch and can change desktop count. " +
 					"per-desktop-wallpaper is editable only without native OS wallpaper support. override-on-startup requires OS name support.",
 				"--loop true");
-			var notification = SettingsArea("notification", "notification settings",
+			var notification = SettingsArea("notification", "notification", "notification settings",
 				"onSwitch alwaysShow durationMs simple useDesktopName theme corners fontFamily headerFontSize bodyFontSize headerAlign bodyAlign " +
 					"lineSpacing cornersSupported monitor monitorAvailable placement offsetX offsetY minWidth simpleMinWidth minHeight " +
 					"pinMinWidth pinOffsetX pinOffsetY",
@@ -387,16 +387,16 @@ namespace SylphyHorn.Commands
 					"Empty font-family restores the default.",
 				"--duration-ms 1000",
 				"monitor list");
-			var tray = SettingsArea("tray", "tray settings", "showDesktop currentNumberOnly",
+			var tray = SettingsArea("tray", "tray", "tray settings", "showDesktop currentNumberOnly",
 				Booleans("--show-desktop --current-number-only"),
 				"Omitted settings remain unchanged.",
 				"--show-desktop true");
-			var application = SettingsArea("settings", "settings get", "language restartRequired",
+			var general = SettingsArea("settings", "general", "settings get", "language restartRequired",
 				new[] { Option("--language", "string", values: "auto en ja", omission: "preserve-current") },
 				"Language changes may require restart; inspect restartRequired.",
 				"--language en");
 
-			foreach (var command in desktop.Concat(notification).Concat(tray).Concat(application))
+			foreach (var command in desktop.Concat(notification).Concat(tray).Concat(general))
 			{
 				yield return command;
 			}
@@ -439,14 +439,15 @@ namespace SylphyHorn.Commands
 		}
 
 		// Each settings area has a read command and a configure command that changes only the supplied options.
-		private static IEnumerable<CliCommandSpec> SettingsArea(string area, string readCommand, string fields,
+		// The label names the settings in summaries, such as "general" for the area whose commands start with "settings".
+		private static IEnumerable<CliCommandSpec> SettingsArea(string area, string label, string readCommand, string fields,
 			CliSpecArgument[] arguments, string notes, string example, params string[] extraQueries)
 		{
 			var queries = Queries(new[] { readCommand }.Concat(extraQueries).ToArray());
 
-			yield return Command(readCommand, "Read " + area + " settings.", fields, queries: Queries(readCommand));
+			yield return Command(readCommand, "Read " + label + " settings.", fields, queries: Queries(readCommand));
 
-			yield return Command(area + " configure", "Change only the supplied " + area + " settings.", fields + " changed",
+			yield return Command(area + " configure", "Change only the supplied " + label + " settings.", fields + " changed",
 				arguments: arguments,
 				constraints: new[] { AtLeastOne(string.Join(" ", arguments.Select(argument => argument.Name))) },
 				notes: notes,
