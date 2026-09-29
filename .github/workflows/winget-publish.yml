@@ -140,7 +140,6 @@ jobs:
           $manifest = $showOutput.Substring($jsonStart) | ConvertFrom-Json
           $topology = & '.github\scripts\Get-WinGetManifestTopology.ps1' `
             -Manifest $manifest
-          $installerCount = $topology.InstallerCount
 
           if ($topology.Topology -ne 'LauncherAndCliThreeArchitecture') {
             $localeOutput = @(
@@ -171,8 +170,14 @@ jobs:
             )
             $actualTags = @($locale.Tags | Sort-Object)
             $repositoryUrl = $locale.PackageUrl
+            # Catalog manifests from before the repository rename still use the
+            # SylphyHornPlusWin11 URL; it is accepted here only to migrate them.
+            $acceptedRepositoryUrls = @(
+              'https://github.com/hwtnb/SylphyHornPlusWin11',
+              'https://github.com/hwtnb/SylphyHornPlus'
+            )
             $repositoryUrlsMatch =
-              $repositoryUrl -cin @('https://github.com/hwtnb/SylphyHornPlusWin11', 'https://github.com/hwtnb/SylphyHornPlus') -and
+              $repositoryUrl -cin $acceptedRepositoryUrls -and
               $locale.PublisherSupportUrl -ceq "$repositoryUrl/issues" -and
               $locale.LicenseUrl -ceq "$repositoryUrl/blob/HEAD/LICENSE.txt"
             $localeContractMatches =
@@ -189,7 +194,6 @@ jobs:
               throw "The current WinGet package metadata differs from the reviewed bootstrap manifest. Update the generator explicitly before submitting."
             }
           }
-          "installer_count=$installerCount" >> $env:GITHUB_OUTPUT
           "topology=$($topology.Topology)" >> $env:GITHUB_OUTPUT
 
       - name: Reject duplicate open WinGet submissions
@@ -239,17 +243,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "WinGetCreate generation failed with exit code $LASTEXITCODE."
           }
-          $installerManifest = Get-Content `
-            -LiteralPath (Join-Path $manifestRoot 'hwtnb.SylphyHornPlus.installer.yaml') `
-            -Raw
-          $aliasCount = @([regex]::Matches($installerManifest, '(?m)^  PortableCommandAlias:')).Count
-          if ($aliasCount -ne 2 -or
-              -not $installerManifest.Contains('RelativeFilePath: SylphyHorn/SylphyHorn.WinGetLauncher.exe') -or
-              -not $installerManifest.Contains('PortableCommandAlias: SylphyHornPlus') -or
-              -not $installerManifest.Contains('RelativeFilePath: SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe') -or
-              -not $installerManifest.Contains('PortableCommandAlias: sylphyhorn-cli')) {
-            throw 'Generated WinGet manifest does not contain the approved GUI and CLI aliases.'
-          }
+          & '.github\scripts\Assert-WinGetAliasContract.ps1' `
+            -ManifestRoot $manifestRoot
           $releaseNotes = [Text.Encoding]::UTF8.GetString(
             [Convert]::FromBase64String($env:RELEASE_NOTES_BASE64))
           $manifestPath = & '.github\scripts\SetWinGetReleaseNotes.ps1' `
@@ -280,7 +275,7 @@ jobs:
 
       - name: Generate three-architecture manifests with CLI alias
         if: steps.current_manifest.outputs.topology != 'LauncherAndCliThreeArchitecture'
-        id: bootstrap
+        id: migrate
         shell: pwsh
         env:
           PACKAGE_VERSION: ${{ steps.release.outputs.version }}
@@ -312,17 +307,8 @@ jobs:
             -UrlArm64 $env:URL_ARM64 `
             -PathArm64 $pathArm64 `
             -OutputDirectory $manifestRoot
-          $installerManifest = Get-Content `
-            -LiteralPath (Join-Path $manifestRoot 'hwtnb.SylphyHornPlus.installer.yaml') `
-            -Raw
-          $aliasCount = @([regex]::Matches($installerManifest, '(?m)^  PortableCommandAlias:')).Count
-          if ($aliasCount -ne 2 -or
-              -not $installerManifest.Contains('RelativeFilePath: SylphyHorn/SylphyHorn.WinGetLauncher.exe') -or
-              -not $installerManifest.Contains('PortableCommandAlias: SylphyHornPlus') -or
-              -not $installerManifest.Contains('RelativeFilePath: SylphyHorn/sylphyhorn-cli.WinGetLauncher.exe') -or
-              -not $installerManifest.Contains('PortableCommandAlias: sylphyhorn-cli')) {
-            throw 'Generated WinGet manifest does not contain the approved GUI and CLI aliases.'
-          }
+          & '.github\scripts\Assert-WinGetAliasContract.ps1' `
+            -ManifestRoot $manifestRoot
           $releaseNotes = [Text.Encoding]::UTF8.GetString(
             [Convert]::FromBase64String($env:RELEASE_NOTES_BASE64))
           $manifestPath = & '.github\scripts\SetWinGetReleaseNotes.ps1' `
@@ -336,7 +322,7 @@ jobs:
         env:
           WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
           WINGETCREATE_PATH: ${{ steps.wingetcreate.outputs.tool_path }}
-          MANIFEST_PATH: ${{ steps.bootstrap.outputs.manifest_path }}
+          MANIFEST_PATH: ${{ steps.migrate.outputs.manifest_path }}
           PACKAGE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           $expectedHash = '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA'
