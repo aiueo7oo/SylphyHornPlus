@@ -17,9 +17,7 @@ namespace SylphyHorn.Cli
 			Console.OutputEncoding = new UTF8Encoding(false);
 			if (args.Length == 1 && args[0] == "--version")
 			{
-				var version = CliVersionInfo.Read(Assembly.GetExecutingAssembly());
-				var revision = version.Revision == null ? "" : " (" + version.Revision.Substring(0, 9) + ")";
-				Console.WriteLine("sylphyhorn-cli " + version.Version + revision);
+				PrintLocalVersion();
 				return 0;
 			}
 			if (args.Length == 1 && args[0] == "version")
@@ -32,24 +30,44 @@ namespace SylphyHorn.Cli
 			}
 			if (args.Length == 1 && (args[0] == "--help" || args[0] == "-h"))
 			{
-				Console.WriteLine("sylphyhorn-cli --version");
-				Console.WriteLine("sylphyhorn-cli spec [COMMAND...] [--resolve]");
-				foreach (var item in CliSpecCatalog.All)
-				{
-					var usage = item.Arguments.Select(argument =>
-					{
-						var text = argument.Name + (argument.Type == "flag" ? "" : " " +
-							(argument.Values == null ? argument.Type.ToUpperInvariant() : "(" + string.Join("|", argument.Values) + ")"));
-						return argument.Required ? text : "[" + text + "]";
-					});
-					Console.WriteLine("sylphyhorn-cli " + item.Name + " " + string.Join(" ", usage));
-					Console.WriteLine("  " + item.Summary);
-				}
-				Console.WriteLine("Use spec COMMAND for arguments, constraints, result fields and examples; add --resolve for current values.");
+				PrintHelp();
 				return 0;
 			}
 			return Print(await SendAsync(args));
 		}
+
+		private static void PrintLocalVersion()
+		{
+			var version = CliVersionInfo.Read(Assembly.GetExecutingAssembly());
+			var revision = version.Revision == null ? "" : " (" + version.Revision.Substring(0, 9) + ")";
+			Console.WriteLine("sylphyhorn-cli " + version.Version + revision);
+		}
+
+		private static void PrintHelp()
+		{
+			Console.WriteLine("sylphyhorn-cli --version");
+			Console.WriteLine("sylphyhorn-cli spec [COMMAND...] [--resolve]");
+			foreach (var item in CliSpecCatalog.All)
+			{
+				Console.WriteLine("sylphyhorn-cli " + item.Name + " " + string.Join(" ", item.Arguments.Select(FormatUsage)));
+				Console.WriteLine("  " + item.Summary);
+			}
+			Console.WriteLine("Use spec COMMAND for arguments, constraints, result fields and examples; add --resolve for current values.");
+		}
+
+		// Such as --number INTEGER, [--wrap] or [--scope (window|app)].
+		private static string FormatUsage(CliSpecArgument argument)
+		{
+			var usage = argument.Name;
+			if (argument.Type != "flag")
+			{
+				usage += " " + ValuePlaceholder(argument);
+			}
+			return argument.Required ? usage : "[" + usage + "]";
+		}
+
+		private static string ValuePlaceholder(CliSpecArgument argument)
+			=> argument.Values == null ? argument.Type.ToUpperInvariant() : "(" + string.Join("|", argument.Values) + ")";
 
 		private static async Task<CliResponse> SendAsync(string[] args)
 		{
@@ -79,9 +97,7 @@ namespace SylphyHorn.Cli
 			var company = assembly.GetCustomAttribute<AssemblyCompanyAttribute>().Company;
 			var product = assembly.GetCustomAttribute<AssemblyProductAttribute>().Product;
 			using (var pipe = new NamedPipeClientStream(".", CliProtocol.PipeName(company, product), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
-			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(operation == "version" ? 2
-				: operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
-					|| operation.StartsWith("startup ", StringComparison.Ordinal) ? 45 : 15)))
+			using (var deadline = new CancellationTokenSource(TimeoutFor(operation)))
 			{
 				var submitted = false;
 				try
@@ -95,8 +111,7 @@ namespace SylphyHorn.Cli
 					{
 						return CliResponse.Fail(operation, "unsupported", "This host does not support version queries.");
 					}
-					if (response == null || response.SchemaVersion != 1 || response.Command != operation
-						|| (response.Success ? response.Data == null || response.Error != null : response.Error == null || response.Data != null))
+					if (!CliResponse.IsWellFormed(response, operation))
 					{
 						throw new InvalidDataException("Invalid host response.");
 					}
@@ -110,6 +125,14 @@ namespace SylphyHorn.Cli
 				}
 			}
 			return response;
+		}
+
+		private static TimeSpan TimeoutFor(string operation)
+		{
+			if (operation == "version") return TimeSpan.FromSeconds(2);
+			var longRunning = operation == "app assignment apply" || operation == "settings import" || operation == "settings reset"
+				|| operation.StartsWith("startup ", StringComparison.Ordinal);
+			return TimeSpan.FromSeconds(longRunning ? 45 : 15);
 		}
 
 		private static int Print(CliResponse response)

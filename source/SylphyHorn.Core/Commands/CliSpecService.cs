@@ -48,37 +48,55 @@ namespace SylphyHorn.Commands
 			};
 			if (resolve)
 			{
-				var sources = new List<CliSpecSource>();
-				foreach (var request in definition.Queries)
-				{
-					// Queries come only from the fixed read-only catalog, never from user-supplied arguments.
-					CliResponse response;
-					try
-					{
-						response = await query((string[])request.Clone());
-						if (response == null || response.SchemaVersion != 1 || response.Command != CliCommand.Recognize(request)
-							|| (response.Success ? response.Data == null || response.Error != null : response.Error == null || response.Data != null))
-						{
-							response = CliResponse.Fail(CliCommand.Recognize(request), "result_unconfirmed", "Invalid source response.");
-						}
-					}
-					catch (Exception)
-					{
-						response = CliResponse.Fail(CliCommand.Recognize(request), "result_unconfirmed", "Source values could not be read.");
-					}
-					sources.Add(new CliSpecSource { Args = request, Response = response });
-					// Avoid repeated connection timeouts when no host is available.
-					if (!response.Success && response.Error?.Code == "host_unavailable") break;
-				}
-				var successCount = sources.Count(source => source.Response.Success);
-				data.Resolution = new CliSpecResolution
-				{
-					Status = definition.Queries.Length == 0 ? "not-applicable"
-						: successCount == definition.Queries.Length && sources.All(source => source.Response.Data.Complete != false) ? "complete" : successCount == 0 ? "unavailable" : "partial",
-					ObservedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture), Sources = sources.ToArray(),
-				};
+				data.Resolution = await ResolveAsync(definition, query);
 			}
 			return CliResponse.Ok("spec", data);
+		}
+
+		private static async Task<CliSpecResolution> ResolveAsync(CliCommandSpec definition, Func<string[], Task<CliResponse>> query)
+		{
+			var sources = new List<CliSpecSource>();
+			foreach (var request in definition.Queries)
+			{
+				var response = await QuerySourceAsync(request, query);
+				sources.Add(new CliSpecSource { Args = request, Response = response });
+				// Avoid repeated connection timeouts when no host is available.
+				if (!response.Success && response.Error?.Code == "host_unavailable") break;
+			}
+			return new CliSpecResolution
+			{
+				Status = ResolutionStatus(definition, sources),
+				ObservedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+				Sources = sources.ToArray(),
+			};
+		}
+
+		// Queries come only from the fixed read-only catalog, never from user-supplied arguments.
+		private static async Task<CliResponse> QuerySourceAsync(string[] request, Func<string[], Task<CliResponse>> query)
+		{
+			var command = CliCommand.Recognize(request);
+			try
+			{
+				var response = await query((string[])request.Clone());
+				if (!CliResponse.IsWellFormed(response, command))
+				{
+					return CliResponse.Fail(command, "result_unconfirmed", "Invalid source response.");
+				}
+				return response;
+			}
+			catch (Exception)
+			{
+				return CliResponse.Fail(command, "result_unconfirmed", "Source values could not be read.");
+			}
+		}
+
+		private static string ResolutionStatus(CliCommandSpec definition, List<CliSpecSource> sources)
+		{
+			if (definition.Queries.Length == 0) return "not-applicable";
+			var successCount = sources.Count(source => source.Response.Success);
+			if (successCount == 0) return "unavailable";
+			var allComplete = successCount == definition.Queries.Length && sources.All(source => source.Response.Data.Complete != false);
+			return allComplete ? "complete" : "partial";
 		}
 
 		private static readonly CliSpecError[] CommonErrors =
@@ -126,7 +144,7 @@ namespace SylphyHorn.Commands
 			=> new CliSpecError
 			{
 				Code = code, Action = action,
-				ExitCode = code == "invalid_arguments" ? 2 : code == "host_unavailable" ? 3 : code == "result_unconfirmed" ? 5 : 4,
+				ExitCode = CliResponse.ExitCodeFor(code),
 			};
 
 		private static CliSpecError[] ErrorsFor(string command)
@@ -179,33 +197,44 @@ namespace SylphyHorn.Commands
 		private static CliSpecType[] DescribeResult(CliCommandSpec definition)
 		{
 			var result = new List<CliSpecType>();
-			result.Add(new CliSpecType { Name = "response", Fields = Members(typeof(CliResponse)).Select(DescribeField).ToArray() });
+			result.Add(new CliSpecType { Name = "response", Fields = DataMemberFields(typeof(CliResponse)).Select(DescribeField).ToArray() });
 			var pending = new Queue<Type>();
 			var seen = new HashSet<Type>();
-			var dataFields = Members(typeof(CliData)).Where(field => definition.ResultFields.Contains(Member(field).Name)).ToArray();
+			var dataFields = DataMemberFields(typeof(CliData)).Where(field => definition.ResultFields.Contains(DataMemberOf(field).Name)).ToArray();
 			if (dataFields.Length != definition.ResultFields.Length)
 			{
 				throw new InvalidOperationException("Unknown result field in " + definition.Name);
 			}
 			result.Add(new CliSpecType { Name = "CliData", Fields = dataFields.Select(DescribeField).ToArray() });
-			foreach (var field in dataFields) Enqueue(field.FieldType, pending);
+			foreach (var field in dataFields)
+			{
+				Enqueue(field.FieldType, pending);
+			}
 			pending.Enqueue(typeof(CliError));
 			while (pending.Count != 0)
 			{
 				var type = pending.Dequeue();
 				if (!seen.Add(type)) continue;
-				var fields = Members(type);
+				var fields = DataMemberFields(type);
 				result.Add(new CliSpecType { Name = type.Name, Fields = fields.Select(DescribeField).ToArray() });
-				foreach (var field in fields) Enqueue(field.FieldType, pending);
+				foreach (var field in fields)
+				{
+					Enqueue(field.FieldType, pending);
+				}
 			}
 			return result.ToArray();
 		}
 
-		private static FieldInfo[] Members(Type type) => type.GetFields().Where(field => Member(field) != null).ToArray();
-		private static DataMemberAttribute Member(FieldInfo field) => field.GetCustomAttribute<DataMemberAttribute>();
+		// Declaration order, which is the order resultSchema publishes.
+		private static FieldInfo[] DataMemberFields(Type type) => type.GetFields().Where(field => DataMemberOf(field) != null).ToArray();
+
+		private static DataMemberAttribute DataMemberOf(FieldInfo field) => field.GetCustomAttribute<DataMemberAttribute>();
 
 		private static CliSpecField DescribeField(FieldInfo field)
-			=> new CliSpecField { Name = Member(field).Name, Type = TypeName(field.FieldType), Optional = !Member(field).EmitDefaultValue };
+		{
+			var member = DataMemberOf(field);
+			return new CliSpecField { Name = member.Name, Type = TypeName(field.FieldType), Optional = !member.EmitDefaultValue };
+		}
 
 		private static string TypeName(Type type)
 		{

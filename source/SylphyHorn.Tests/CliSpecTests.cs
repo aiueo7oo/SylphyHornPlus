@@ -49,7 +49,9 @@ namespace SylphyHorn.Tests
 					}
 				}
 				foreach (var query in spec.Queries)
+				{
 					Assert.Contains(CliCommand.Parse(query).Operation, allowedQueries);
+				}
 				var json = Encoding.UTF8.GetString(CliProtocol.Serialize(response));
 				Assert.Contains("\"specification\"", json);
 				Assert.Contains("\"success\":true", json);

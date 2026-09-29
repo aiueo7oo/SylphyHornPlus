@@ -41,34 +41,54 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "error", Order = 4, EmitDefaultValue = false)]
 		public CliError Error;
 
-		internal int ExitCode => this.Success ? 0 : this.Error.Code == "invalid_arguments" ? 2
-			: this.Error.Code == "host_unavailable" ? 3 : this.Error.Code == "result_unconfirmed" ? 5 : 4;
+		internal int ExitCode => this.Success ? 0 : ExitCodeFor(this.Error.Code);
 
 		internal static CliResponse Ok(string command, CliData data) => new CliResponse { Command = command, Success = true, Data = data };
 
 		internal static CliResponse Fail(string command, string code, string message, bool retryable = false)
 			=> new CliResponse { Command = command, Error = new CliError { Code = code, Message = message, Retryable = retryable } };
+
+		internal static int ExitCodeFor(string errorCode)
+		{
+			switch (errorCode)
+			{
+				case "invalid_arguments": return 2;
+				case "host_unavailable": return 3;
+				case "result_unconfirmed": return 5;
+				default: return 4;
+			}
+		}
+
+		// A success carries only data and a failure carries only an error.
+		internal static bool IsWellFormed(CliResponse response, string command)
+		{
+			if (response == null || response.SchemaVersion != 1 || response.Command != command) return false;
+			return response.Success
+				? response.Data != null && response.Error == null
+				: response.Error != null && response.Data == null;
+		}
 	}
 
 	[DataContract]
 	internal sealed class CliError
 	{
-		[DataMember(Name = "importStatus", EmitDefaultValue = false)]
+		// Declaration order is the field order that spec publishes in resultSchema; Order gives the wire order.
+		[DataMember(Name = "importStatus", Order = 1, EmitDefaultValue = false)]
 		public string ImportStatus;
 
-		[DataMember(Name = "conflicts", EmitDefaultValue = false)]
+		[DataMember(Name = "conflicts", Order = 0, EmitDefaultValue = false)]
 		public CliShortcut[] Conflicts;
 
-		[DataMember(Name = "results", Order = 3, EmitDefaultValue = false)]
+		[DataMember(Name = "results", Order = 5, EmitDefaultValue = false)]
 		public CliAssignmentResult[] Results;
 
-		[DataMember(Name = "code", Order = 0)]
+		[DataMember(Name = "code", Order = 2)]
 		public string Code;
 
-		[DataMember(Name = "message", Order = 1)]
+		[DataMember(Name = "message", Order = 3)]
 		public string Message;
 
-		[DataMember(Name = "retryable", Order = 2)]
+		[DataMember(Name = "retryable", Order = 4)]
 		public bool Retryable;
 	}
 
@@ -77,8 +97,10 @@ namespace SylphyHorn.Commands
 	{
 		[DataMember(Name = "name", EmitDefaultValue = false)]
 		public string Name;
+
 		[DataMember(Name = "number", EmitDefaultValue = false)]
 		public int? Number;
+
 		[DataMember(Name = "path")]
 		public string Path;
 	}
@@ -145,9 +167,12 @@ namespace SylphyHorn.Commands
 		public string Content;
 	}
 
+	// Without an explicit Order the serializer writes these members alphabetically. spec lists result fields in declaration order,
+	// so moving a member must keep the relative order of the fields each command returns.
 	[DataContract]
 	internal sealed class CliData
 	{
+		// Host commands
 		[DataMember(Name = "accepted", EmitDefaultValue = false)]
 		public bool? Accepted;
 
@@ -156,9 +181,6 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "host", EmitDefaultValue = false)]
 		public CliVersionInfo Host;
-
-		[DataMember(Name = "saved", EmitDefaultValue = false)]
-		public bool? Saved;
 
 		[DataMember(Name = "logs", EmitDefaultValue = false)]
 		public CliLog[] Logs;
@@ -169,9 +191,10 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "omittedCount", EmitDefaultValue = false)]
 		public int? OmittedCount;
 
-		[DataMember(Name = "wallpapersOnCreation", EmitDefaultValue = false)]
-		public CliCreationWallpaper[] WallpapersOnCreation;
+		[DataMember(Name = "monitors", EmitDefaultValue = false)]
+		public CliMonitor[] Monitors;
 
+		// Specification
 		[DataMember(Name = "specVersion", EmitDefaultValue = false)]
 		public int? SpecVersion;
 
@@ -193,6 +216,14 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "resolution", EmitDefaultValue = false)]
 		public CliSpecResolution Resolution;
 
+		// Wallpapers applied to created desktops
+		[DataMember(Name = "wallpapersOnCreation", EmitDefaultValue = false)]
+		public CliCreationWallpaper[] WallpapersOnCreation;
+
+		// Settings persistence
+		[DataMember(Name = "saved", EmitDefaultValue = false)]
+		public bool? Saved;
+
 		[DataMember(Name = "path", EmitDefaultValue = false)]
 		public string Path;
 
@@ -202,15 +233,18 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "reset", EmitDefaultValue = false)]
 		public bool? Reset;
 
+		// Startup
 		[DataMember(Name = "startup", EmitDefaultValue = false)]
 		public CliStartup Startup;
 
+		// Shortcuts
 		[DataMember(Name = "shortcuts", EmitDefaultValue = false)]
 		public CliShortcut[] Shortcuts;
 
 		[DataMember(Name = "keys", EmitDefaultValue = false)]
 		public CliInputKey[] Keys;
 
+		// Desktop settings
 		[DataMember(Name = "perDesktopWallpaper", EmitDefaultValue = false)]
 		public bool? PerDesktopWallpaper;
 
@@ -223,6 +257,13 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "wallpaperEnabled", EmitDefaultValue = false)]
 		public bool? WallpaperEnabled;
 
+		[DataMember(Name = "loop", EmitDefaultValue = false)]
+		public bool? Loop;
+
+		[DataMember(Name = "overrideWindowsShortcuts", EmitDefaultValue = false)]
+		public bool? OverrideWindowsShortcuts;
+
+		// Notification settings
 		[DataMember(Name = "monitor", EmitDefaultValue = false)]
 		public string Monitor;
 
@@ -255,9 +296,6 @@ namespace SylphyHorn.Commands
 
 		[DataMember(Name = "monitorAvailable", EmitDefaultValue = false)]
 		public bool? MonitorAvailable;
-
-		[DataMember(Name = "monitors", EmitDefaultValue = false)]
-		public CliMonitor[] Monitors;
 
 		[DataMember(Name = "simple", EmitDefaultValue = false)]
 		public bool? Simple;
@@ -292,12 +330,6 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "cornersSupported", EmitDefaultValue = false)]
 		public bool? CornersSupported;
 
-		[DataMember(Name = "loop", EmitDefaultValue = false)]
-		public bool? Loop;
-
-		[DataMember(Name = "overrideWindowsShortcuts", EmitDefaultValue = false)]
-		public bool? OverrideWindowsShortcuts;
-
 		[DataMember(Name = "onSwitch", EmitDefaultValue = false)]
 		public bool? OnSwitch;
 
@@ -307,18 +339,21 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "durationMs", EmitDefaultValue = false)]
 		public int? DurationMs;
 
+		// Tray settings
 		[DataMember(Name = "showDesktop", EmitDefaultValue = false)]
 		public bool? ShowDesktop;
 
 		[DataMember(Name = "currentNumberOnly", EmitDefaultValue = false)]
 		public bool? CurrentNumberOnly;
 
+		// General settings
 		[DataMember(Name = "language", EmitDefaultValue = false)]
 		public string Language;
 
 		[DataMember(Name = "restartRequired", EmitDefaultValue = false)]
 		public bool? RestartRequired;
 
+		// Applications, assignment rules and automatic closure
 		[DataMember(Name = "apps", EmitDefaultValue = false)]
 		public CliApp[] Apps;
 
@@ -352,9 +387,11 @@ namespace SylphyHorn.Commands
 		[DataMember(Name = "assignments", EmitDefaultValue = false)]
 		public CliAssignment[] Assignments;
 
+		// Shared by mutating commands
 		[DataMember(Name = "changed", EmitDefaultValue = false)]
 		public bool? Changed;
 
+		// Desktops and windows
 		[DataMember(Name = "desktop", EmitDefaultValue = false)]
 		public CliDesktop Desktop;
 

@@ -1,11 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace SylphyHorn.Commands
 {
 	internal sealed class CliCommand
 	{
+		private const string DesktopNumberError = "Desktop numbers must be positive integers starting at 1.";
+
+		private const string DesktopSelectorError = "Specify a desktop selector and required value.";
+
+		private const string NoSettingError =
+			"Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.";
+
+		private const string GeometryError = "Minimum sizes must be positive integers; offsets must be signed integers.";
+
+		private const string FontSizeError = "Font sizes must be positive integers; line spacing must be a signed integer.";
+
 		internal int Limit { get; private set; } = 50;
 
 		internal bool ConfirmReset { get; private set; }
@@ -141,6 +153,21 @@ namespace SylphyHorn.Commands
 
 		internal bool SwitchAfterCreate { get; private set; }
 
+		// Mirrors the command areas of CliSpecCatalog.
+		private enum CommandArea
+		{
+			Host,
+			Desktop,
+			Window,
+			Ui,
+			CreationWallpaper,
+			AppAssignment,
+			AutoClose,
+			Settings,
+			Startup,
+			Shortcut,
+		}
+
 		internal static string Recognize(string[] args)
 		{
 			if (args != null && args.Length > 0 && (args[0] == "logs" || args[0] == "version" || args[0] == "exit"))
@@ -157,560 +184,354 @@ namespace SylphyHorn.Commands
 			{
 				operation += " wallpaper " + args[3];
 			}
-			return IsKnown(operation) ? operation : null;
+			return CliSpecCatalog.Find(operation) != null ? operation : null;
 		}
 
 		internal static CliCommand Parse(string[] args)
 		{
-			if (args == null) throw new ArgumentNullException(nameof(args));
+			if (args == null)
+			{
+				throw new ArgumentNullException(nameof(args));
+			}
 			if (args.Length == 0)
 			{
 				throw new ArgumentException("Specify a command.");
 			}
-			var command = new CliCommand { Operation = Recognize(args) };
-			if (command.Operation == null)
+			var operation = Recognize(args);
+			if (operation == null)
 			{
 				throw new ArgumentException("Unknown command.");
 			}
-			var assignment = command.Operation.StartsWith("app assignment ", StringComparison.Ordinal);
-			var autoclose = command.Operation.StartsWith("desktop autoclose ", StringComparison.Ordinal);
-			var creationWallpaper = command.Operation.StartsWith("desktop creation wallpaper ", StringComparison.Ordinal);
 
-			var options = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = command.Operation.Split(' ').Length; i < args.Length; i++)
+			var command = new CliCommand { Operation = operation };
+			var area = AreaOf(operation);
+			var options = new OptionReader(args, operation.Split(' ').Length);
+			while (options.MoveNext())
 			{
-				var option = args[i];
-				if (!options.Add(option))
+				if (!command.ReadOption(area, options))
 				{
-					throw new ArgumentException("Duplicate option: " + option);
-				}
-				if (command.Operation == "logs" && option == "--limit")
-				{
-					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var limit) || limit < 1)
-					{
-						throw new ArgumentException("--limit requires a positive integer.");
-					}
-					command.Limit = limit;
-				}
-				else if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && (option == "--name" || option == "--number"))
-				{
-					var value = ReadValue(args, ref i);
-					if (option == "--number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers.");
-					}
-					command.SetTarget(option.Substring(2), value);
-				}
-				else if (command.Operation == "desktop creation wallpaper set" && option == "--path")
-				{
-					command.WallpaperPath = ReadValue(args, ref i);
-				}
-				else if (command.Operation == "app assignment configure"
-					&& (option == "--enabled" || option == "--create-missing-desktops" || option == "--close-created-desktops"))
-				{
-					var value = ReadValue(args, ref i);
-					if (value != "true" && value != "false")
-					{
-						throw new ArgumentException(option + " requires true or false.");
-					}
-					if (option == "--enabled")
-					{
-						command.AssignmentEnabled = value == "true";
-					}
-					else if (option == "--create-missing-desktops")
-					{
-						command.CreateMissingDesktops = value == "true";
-					}
-					else
-					{
-						command.CloseCreatedDesktops = value == "true";
-					}
-				}
-				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
-				{
-					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (option == "--id" && (command.Operation == "app assignment enable" || command.Operation == "app assignment disable"
-					|| command.Operation == "app assignment set" || command.Operation == "app assignment remove" || command.Operation == "app assignment apply"))
-				{
-					command.RuleId = ReadValue(args, ref i);
-					RequireId(command.RuleId);
-				}
-				else if ((command.Operation == "settings export" || command.Operation == "settings import") && option == "--path")
-				{
-					command.FilePath = ReadTextValue(args, ref i, "Specify a settings file path.");
-				}
-				else if (command.Operation == "settings reset" && option == "--yes")
-				{
-					command.ConfirmReset = true;
-				}
-				else if (command.Operation == "settings export" && option == "--overwrite")
-				{
-					command.Overwrite = true;
-				}
-				else if (command.Operation == "settings import" && option == "--apply-desktops")
-				{
-					command.ApplyDesktops = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "startup configure" && option == "--mode")
-				{
-					command.StartupMode = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal) && option == "--device")
-				{
-					command.Device = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--action")
-				{
-					command.Action = ReadTextValue(args, ref i, "Specify an action returned by shortcut list.");
-				}
-				else if (command.Operation == "shortcut set" && option == "--trigger")
-				{
-					command.Trigger = ReadTextValue(args, ref i, "Specify a trigger using names from shortcut keys.");
-				}
-				else if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && option == "--number")
-				{
-					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var number)
-						|| number < 1 || number > 1000)
-					{
-						throw new ArgumentException("Shortcut desktop numbers must be between 1 and 1000.");
-					}
-					command.Number = number;
-				}
-				else if (command.Operation == "desktop configure" && option == "--per-desktop-wallpaper")
-				{
-					command.PerDesktopWallpaper = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "desktop configure" && option == "--override-on-startup")
-				{
-					command.OverrideOnStartup = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "desktop configure" && option == "--loop")
-				{
-					command.Loop = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "desktop configure" && option == "--override-windows-shortcuts")
-				{
-					command.OverrideWindowsShortcuts = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "notification configure" && option == "--on-switch")
-				{
-					command.OnSwitch = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "notification configure" && option == "--always-show")
-				{
-					command.AlwaysShow = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "tray configure" && option == "--show-desktop")
-				{
-					command.ShowDesktop = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "tray configure" && option == "--current-number-only")
-				{
-					command.CurrentNumberOnly = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "notification configure" && option == "--monitor")
-				{
-					command.Monitor = ReadValue(args, ref i);
-					if (command.Monitor != "current" && command.Monitor != "all"
-						&& (!uint.TryParse(command.Monitor, NumberStyles.None, CultureInfo.InvariantCulture, out var monitor)
-							|| monitor == 0 || monitor == uint.MaxValue))
-					{
-						throw new ArgumentException("--monitor requires current, all or a positive monitor number.");
-					}
-				}
-				else if (command.Operation == "notification configure" && option == "--placement")
-				{
-					command.Placement = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation == "notification configure"
-					&& (option == "--offset-x"
-						|| option == "--offset-y"
-						|| option == "--min-width"
-						|| option == "--simple-min-width"
-						|| option == "--min-height"
-						|| option == "--pin-min-width"
-						|| option == "--pin-offset-x"
-						|| option == "--pin-offset-y"))
-				{
-					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
-						|| (option.Contains("min-") && value < 1))
-					{
-						throw new ArgumentException("Minimum sizes must be positive integers; offsets must be signed integers.");
-					}
-					if (option == "--offset-x")
-					{
-						command.OffsetX = value;
-					}
-					else if (option == "--offset-y")
-					{
-						command.OffsetY = value;
-					}
-					else if (option == "--min-width")
-					{
-						command.MinWidth = value;
-					}
-					else if (option == "--simple-min-width")
-					{
-						command.SimpleMinWidth = value;
-					}
-					else if (option == "--min-height")
-					{
-						command.MinHeight = value;
-					}
-					else if (option == "--pin-min-width")
-					{
-						command.PinMinWidth = value;
-					}
-					else if (option == "--pin-offset-x")
-					{
-						command.PinOffsetX = value;
-					}
-					else if (option == "--pin-offset-y")
-					{
-						command.PinOffsetY = value;
-					}
-				}
-				else if (command.Operation == "notification configure" && option == "--simple")
-				{
-					command.Simple = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "notification configure" && option == "--use-desktop-name")
-				{
-					command.UseDesktopName = ReadBoolean(args, ref i);
-				}
-				else if (command.Operation == "notification configure" && option == "--theme")
-				{
-					command.Theme = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation == "notification configure" && option == "--corners")
-				{
-					command.Corners = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation == "notification configure" && option == "--header-align")
-				{
-					command.HeaderAlign = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation == "notification configure" && option == "--body-align")
-				{
-					command.BodyAlign = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (command.Operation == "notification configure" && option == "--font-family")
-				{
-					command.FontFamily = ReadTextValue(args, ref i, "A font family is missing; use an empty string to restore the default.");
-				}
-				else if (command.Operation == "notification configure"
-					&& (option == "--header-font-size" || option == "--body-font-size" || option == "--line-spacing"))
-				{
-					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number)
-						|| (option != "--line-spacing" && number < 1))
-					{
-						throw new ArgumentException("Font sizes must be positive integers; line spacing must be a signed integer.");
-					}
-					if (option == "--header-font-size")
-					{
-						command.HeaderFontSize = number;
-					}
-					else if (option == "--body-font-size")
-					{
-						command.BodyFontSize = number;
-					}
-					else
-					{
-						command.LineSpacing = number;
-					}
-				}
-				else if (command.Operation == "notification configure" && option == "--duration-ms")
-				{
-					if (!int.TryParse(ReadValue(args, ref i), NumberStyles.None, CultureInfo.InvariantCulture, out var duration) || duration < 1)
-					{
-						throw new ArgumentException("--duration-ms requires a positive integer in milliseconds.");
-					}
-					command.DurationMs = duration;
-				}
-				else if (command.Operation == "settings configure" && option == "--language")
-				{
-					command.Language = ReadValue(args, ref i);
-					if (command.Language != "auto" && command.Language != "en" && command.Language != "ja")
-					{
-						throw new ArgumentException("--language must be auto, en or ja.");
-					}
-				}
-				else if (option == "--source" && command.Operation == "app list")
-				{
-					command.Source = ReadValue(args, ref i);
-					if (command.Source != "registered" && command.Source != "windows")
-					{
-						throw new ArgumentException("--source must be registered or windows.");
-					}
-				}
-				else if (option == "--app-id" && command.Operation == "app assignment set")
-				{
-					command.AppId = ReadValue(args, ref i);
-				}
-				else if (option == "--all" && command.Operation == "app assignment apply")
-				{
-					command.All = true;
-				}
-				else if (option == "--dry-run" && command.Operation == "app assignment apply")
-				{
-					command.DryRun = true;
-				}
-				else if (option == "--path" && (command.Operation == "app assignment set" || command.Operation == "app assignment remove"
-					|| command.Operation == "app assignment apply"))
-				{
-					command.AppPath = ReadValue(args, ref i);
-				}
-				else if ((command.Operation == "app assignment set" && (option == "--desktop-name" || option == "--desktop-number"))
-					|| ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove")
-						&& (option == "--name" || option == "--number")))
-				{
-					var kind = option.Substring(autoclose ? "--".Length : "--desktop-".Length);
-					var value = ReadValue(args, ref i);
-					if (kind == "number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					}
-					command.SetTarget(kind, value);
-				}
-				else if (option == "--wrap" && (command.Operation == "desktop switch" || command.Operation == "window move"))
-				{
-					command.Wrap = true;
-				}
-				else if (option == "--switch" && command.Operation == "desktop create")
-				{
-					command.SwitchAfterCreate = true;
-				}
-				else if (option == "--follow" && command.Operation == "window move")
-				{
-					command.Follow = true;
-				}
-				else if ((option == "--next" || option == "--previous") && command.Operation == "desktop switch")
-				{
-					command.SetTarget(option.Substring(2), null);
-				}
-				else if (option == "--last-used" && command.Operation == "desktop switch")
-				{
-					command.SetTarget("last-used", null);
-				}
-				else if (command.Operation == "window move" && (option == "--desktop-next" || option == "--desktop-previous"
-					|| option == "--desktop-last-used" || option == "--desktop-new"))
-				{
-					command.SetTarget(option.Substring("--desktop-".Length), null);
-				}
-				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
-				{
-					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (option == "--id" && (command.Operation == "window move" || command.Operation == "window pin"
-					|| command.Operation == "window unpin"))
-				{
-					command.WindowId = ReadValue(args, ref i);
-					RequireId(command.WindowId);
-				}
-				else if (option == "--follow-foreground" && (command.Operation == "app assignment configure" || command.Operation == "app assignment set"))
-				{
-					command.FollowForeground = ReadChoice(args, ref i, CliSpecCatalog.Choices(command.Operation, option));
-				}
-				else if (option == "--id" && (command.Operation == "desktop rename" || command.Operation == "desktop reorder"
-					|| command.Operation == "desktop delete" || command.Operation == "desktop wallpaper"))
-				{
-					var id = ReadValue(args, ref i);
-					RequireId(id);
-					command.SetTarget("id", id);
-				}
-				else if (option == "--name" && (command.Operation == "desktop create" || command.Operation == "desktop rename"))
-				{
-					command.Name = command.Operation == "desktop rename" ? ReadName(args, ref i) : ReadValue(args, ref i);
-				}
-				else if (option == "--number" && command.Operation == "desktop reorder")
-				{
-					var value = ReadValue(args, ref i);
-					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					}
-					command.Number = number;
-				}
-				else if (option == "--number" && (command.Operation == "desktop delete" || command.Operation == "desktop wallpaper"))
-				{
-					var value = ReadValue(args, ref i);
-					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					}
-					command.SetTarget("number", value);
-				}
-				else if (option == "--fallback-id" && command.Operation == "desktop delete")
-				{
-					var id = ReadValue(args, ref i);
-					RequireId(id);
-					command.FallbackId = Guid.Parse(id);
-				}
-				else if (option == "--fallback-number" && command.Operation == "desktop delete")
-				{
-					var value = ReadValue(args, ref i);
-					if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1)
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					}
-					command.FallbackNumber = number;
-				}
-				else if (option == "--path" && command.Operation == "desktop wallpaper")
-				{
-					command.WallpaperPath = ReadTextValue(args, ref i, "A wallpaper path is missing.");
-				}
-				else if (option == "--position" && command.Operation == "desktop wallpaper")
-				{
-					command.WallpaperPosition = ReadValue(args, ref i);
-					if (command.WallpaperPosition != "center" && command.WallpaperPosition != "tile"
-						&& command.WallpaperPosition != "stretch" && command.WallpaperPosition != "fit"
-						&& command.WallpaperPosition != "fill" && command.WallpaperPosition != "span")
-					{
-						throw new ArgumentException("--position must be center, tile, stretch, fit, fill, or span.");
-					}
-				}
-				else if (option == "--scope" && (command.Operation == "window pin" || command.Operation == "window unpin"))
-				{
-					command.Scope = ReadValue(args, ref i);
-					if (command.Scope != "window" && command.Scope != "app")
-					{
-						throw new ArgumentException("--scope must be window or app.");
-					}
-				}
-				else
-				{
-					var prefix = command.Operation == "window move" ? "--desktop-" : "--";
-					if ((command.Operation != "desktop switch" && command.Operation != "window move")
-						|| (option != prefix + "number" && option != prefix + "name" && option != prefix + "id"))
-					{
-						throw new ArgumentException("Unknown option: " + option);
-					}
-					var kind = option.Substring(prefix.Length);
-					var value = ReadValue(args, ref i);
-					if (kind == "number" && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number < 1))
-					{
-						throw new ArgumentException("Desktop numbers must be positive integers starting at 1.");
-					}
-					if (kind == "id")
-					{
-						RequireId(value);
-					}
-					command.SetTarget(kind, value);
+					throw new ArgumentException("Unknown option: " + options.Option);
 				}
 			}
-
-			if ((command.Operation == "desktop switch" || command.Operation == "window move") && command.TargetKind == null)
-			{
-				throw new ArgumentException("Specify exactly one destination.");
-			}
-			if (command.Operation == "window move" && command.WindowId == null)
-			{
-				throw new ArgumentException("Specify --id using a window ID returned by window list.");
-			}
-			if ((command.Operation == "desktop rename" && command.Name == null)
-				|| (command.Operation == "desktop reorder" && command.Number == null)
-				|| ((command.Operation == "desktop rename" || command.Operation == "desktop reorder"
-					|| command.Operation == "desktop delete" || command.Operation == "desktop wallpaper") && command.TargetKind == null))
-			{
-				throw new ArgumentException("Specify a desktop selector and required value.");
-			}
-			if (command.Operation == "desktop wallpaper" && (command.WallpaperPath == null) == (command.WallpaperPosition == null))
-			{
-				throw new ArgumentException("Specify exactly one of --path or --position.");
-			}
-			if ((command.Operation == "window pin" || command.Operation == "window unpin") && (command.WindowId == null || command.Scope == null))
-			{
-				throw new ArgumentException("Specify --id from window list and --scope window or app.");
-			}
-			if (command.FallbackId.HasValue && command.FallbackNumber.HasValue)
-			{
-				throw new ArgumentException("--fallback-id and --fallback-number are mutually exclusive.");
-			}
-			if (command.Wrap && command.TargetKind != "next" && command.TargetKind != "previous")
-			{
-				throw new ArgumentException("--wrap requires a next or previous destination.");
-			}
-			if (creationWallpaper && command.Operation != "desktop creation wallpaper list" && command.TargetKind == null)
-			{
-				throw new ArgumentException("Specify --name or --number.");
-			}
-			if (command.Operation == "desktop creation wallpaper set" && command.WallpaperPath == null)
-			{
-				throw new ArgumentException("Specify --path.");
-			}
-			var assignmentSelectors = (command.AppPath != null ? 1 : 0) + (command.RuleId != null ? 1 : 0) + (command.All ? 1 : 0) + (command.AppId != null ? 1 : 0);
-			if ((command.Operation == "app assignment set" || command.Operation == "app assignment remove") && assignmentSelectors != 1)
-			{
-				throw new ArgumentException(command.Operation == "app assignment set"
-					? "Specify exactly one of --path, --app-id or --id." : "Specify exactly one of --path or --id.");
-			}
-			if (command.Operation == "app assignment apply" && assignmentSelectors != 1)
-			{
-				throw new ArgumentException("Specify exactly one of --path, --id or --all.");
-			}
-			if ((command.Operation == "desktop autoclose add" || command.Operation == "desktop autoclose remove") && command.TargetKind == null)
-			{
-				throw new ArgumentException("Specify exactly one of --name or --number.");
-			}
-			if (command.Operation == "app assignment set" && command.TargetKind == null
-				&& (command.RuleId == null || command.FollowForeground == null))
-			{
-				throw new ArgumentException("Specify exactly one of --desktop-name or --desktop-number.");
-			}
-			if (command.Operation == "app assignment configure" && command.AssignmentEnabled == null
-				&& command.CreateMissingDesktops == null && command.CloseCreatedDesktops == null && command.FollowForeground == null)
-			{
-				throw new ArgumentException("Specify at least one assignment setting.");
-			}
-			if ((command.Operation == "app assignment enable" || command.Operation == "app assignment disable") && command.RuleId == null)
-			{
-				throw new ArgumentException("Specify --id using a saved rule ID returned by app assignment list.");
-			}
-			if ((command.Operation == "desktop configure" && command.Loop == null && command.OverrideWindowsShortcuts == null
-					&& command.PerDesktopWallpaper == null && command.OverrideOnStartup == null)
-				|| (command.Operation == "notification configure" && command.OnSwitch == null && command.AlwaysShow == null
-					&& command.DurationMs == null && !command.HasNotificationAppearance && !command.HasNotificationGeometry)
-				|| (command.Operation == "tray configure" && command.ShowDesktop == null && command.CurrentNumberOnly == null)
-				|| (command.Operation == "settings configure" && command.Language == null))
-			{
-				throw new ArgumentException("Specify at least one setting. Read current values with desktop/notification/tray settings or settings get.");
-			}
-			if (command.Operation.StartsWith("shortcut ", StringComparison.Ordinal))
-			{
-				if (command.Operation != "shortcut list" && command.Device == null)
-				{
-					throw new ArgumentException("Specify --device keyboard or mouse.");
-				}
-				if ((command.Operation == "shortcut set" || command.Operation == "shortcut clear") && command.Action == null)
-				{
-					throw new ArgumentException("Specify --action using shortcut list.");
-				}
-				if (command.Operation == "shortcut set" && command.Trigger == null)
-				{
-					throw new ArgumentException("Specify --trigger using shortcut keys.");
-				}
-			}
-			if ((command.Operation == "settings export" || command.Operation == "settings import") && command.FilePath == null)
-			{
-				throw new ArgumentException("Specify --path.");
-			}
-			if (command.Operation == "settings import" && command.ApplyDesktops == null)
-			{
-				throw new ArgumentException("Specify --apply-desktops true or false.");
-			}
-			if (command.Operation == "settings reset" && !command.ConfirmReset)
-			{
-				throw new ArgumentException("Specify --yes to reset application settings.");
-			}
-			if (command.Operation == "startup configure" && command.StartupMode == null)
-			{
-				throw new ArgumentException("Specify --mode disabled, normal or elevated.");
-			}
+			command.Validate(area);
 			return command;
 		}
 
-		private static bool IsKnown(string operation) => CliSpecCatalog.Find(operation) != null;
+		private static CommandArea AreaOf(string operation)
+		{
+			var words = operation.Split(' ');
+			switch (words[0])
+			{
+				case "desktop": return DesktopAreaOf(words[1]);
+				case "window": return CommandArea.Window;
+				case "ui": return CommandArea.Ui;
+				case "app": return CommandArea.AppAssignment;
+				case "notification":
+				case "tray":
+				case "settings":
+					return CommandArea.Settings;
+				case "startup": return CommandArea.Startup;
+				case "shortcut": return CommandArea.Shortcut;
+				default: return CommandArea.Host;
+			}
+		}
+
+		// Desktop settings commands belong to the settings area, as in CliSpecCatalog.
+		private static CommandArea DesktopAreaOf(string subcommand)
+		{
+			switch (subcommand)
+			{
+				case "creation": return CommandArea.CreationWallpaper;
+				case "autoclose": return CommandArea.AutoClose;
+				case "settings":
+				case "configure":
+					return CommandArea.Settings;
+				default: return CommandArea.Desktop;
+			}
+		}
+
+		private bool ReadOption(CommandArea area, OptionReader options)
+		{
+			switch (area)
+			{
+				case CommandArea.Host: return this.ReadHostOption(options);
+				case CommandArea.Desktop: return this.ReadDesktopOption(options);
+				case CommandArea.Window: return this.ReadWindowOption(options);
+				case CommandArea.CreationWallpaper: return this.ReadCreationWallpaperOption(options);
+				case CommandArea.AppAssignment: return this.ReadAppAssignmentOption(options);
+				case CommandArea.AutoClose: return this.ReadAutoCloseOption(options);
+				case CommandArea.Settings: return this.ReadSettingsOption(options);
+				case CommandArea.Startup: return this.ReadStartupOption(options);
+				case CommandArea.Shortcut: return this.ReadShortcutOption(options);
+				// UI commands take no options.
+				default: return false;
+			}
+		}
+
+		private void Validate(CommandArea area)
+		{
+			switch (area)
+			{
+				case CommandArea.Desktop:
+					this.ValidateDesktop();
+					break;
+				case CommandArea.Window:
+					this.ValidateWindow();
+					break;
+				case CommandArea.CreationWallpaper:
+					this.ValidateCreationWallpaper();
+					break;
+				case CommandArea.AppAssignment:
+					this.ValidateAppAssignment();
+					break;
+				case CommandArea.AutoClose:
+					this.ValidateAutoClose();
+					break;
+				case CommandArea.Settings:
+					this.ValidateSettings();
+					break;
+				case CommandArea.Startup:
+					this.ValidateStartup();
+					break;
+				case CommandArea.Shortcut:
+					this.ValidateShortcut();
+					break;
+			}
+		}
+
+		#region Host
+
+		private bool ReadHostOption(OptionReader options)
+		{
+			if (this.Operation != "logs" || options.Option != "--limit") return false;
+			this.Limit = options.ReadPositiveInteger("--limit requires a positive integer.");
+			return true;
+		}
+
+		#endregion
+
+		#region Desktops
+
+		private bool ReadDesktopOption(OptionReader options)
+		{
+			switch (this.Operation)
+			{
+				case "desktop switch": return this.ReadSwitchOption(options);
+				case "desktop create": return this.ReadCreateOption(options);
+				case "desktop rename": return this.ReadRenameOption(options);
+				case "desktop reorder": return this.ReadReorderOption(options);
+				case "desktop delete": return this.ReadDeleteOption(options);
+				case "desktop wallpaper": return this.ReadWallpaperOption(options);
+				default: return false;
+			}
+		}
+
+		private bool ReadSwitchOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				case "--name":
+					this.ReadDesktopSelector(options, "name");
+					return true;
+				case "--id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--next":
+				case "--previous":
+				case "--last-used":
+					this.SetTarget(options.Option.Substring("--".Length), null);
+					return true;
+				case "--wrap":
+					this.Wrap = true;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadCreateOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--name":
+					this.Name = options.ReadValue();
+					return true;
+				case "--switch":
+					this.SwitchAfterCreate = true;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadRenameOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--name":
+					this.Name = options.ReadText("A desktop name is missing.");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadReorderOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--number":
+					// The destination position, not a second selector.
+					this.Number = options.ReadPositiveInteger(DesktopNumberError);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadDeleteOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				case "--fallback-id":
+					this.FallbackId = Guid.Parse(options.ReadId());
+					return true;
+				case "--fallback-number":
+					this.FallbackNumber = options.ReadPositiveInteger(DesktopNumberError);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadWallpaperOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				case "--path":
+					this.WallpaperPath = options.ReadText("A wallpaper path is missing.");
+					return true;
+				case "--position":
+					this.WallpaperPosition = this.ReadCatalogChoice(options, "--position must be center, tile, stretch, fit, fill, or span.");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private void ValidateDesktop()
+		{
+			switch (this.Operation)
+			{
+				case "desktop switch":
+					Require(this.TargetKind != null, "Specify exactly one destination.");
+					this.ValidateWrap();
+					break;
+				case "desktop rename":
+					Require(this.TargetKind != null && this.Name != null, DesktopSelectorError);
+					break;
+				case "desktop reorder":
+					Require(this.TargetKind != null && this.Number != null, DesktopSelectorError);
+					break;
+				case "desktop delete":
+					Require(this.TargetKind != null, DesktopSelectorError);
+					Require(this.FallbackId == null || this.FallbackNumber == null, "--fallback-id and --fallback-number are mutually exclusive.");
+					break;
+				case "desktop wallpaper":
+					Require(this.TargetKind != null, DesktopSelectorError);
+					Require((this.WallpaperPath == null) != (this.WallpaperPosition == null), "Specify exactly one of --path or --position.");
+					break;
+			}
+		}
+
+		private bool ReadCreationWallpaperOption(OptionReader options)
+		{
+			if (this.Operation == "desktop creation wallpaper list") return false;
+			switch (options.Option)
+			{
+				case "--name":
+					this.SetTarget("name", options.ReadValue());
+					return true;
+				case "--number":
+					this.SetTarget("number", options.ReadPositiveIntegerText("Desktop numbers must be positive integers."));
+					return true;
+				case "--path" when this.Operation == "desktop creation wallpaper set":
+					this.WallpaperPath = options.ReadValue();
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private void ValidateCreationWallpaper()
+		{
+			if (this.Operation == "desktop creation wallpaper list") return;
+			Require(this.TargetKind != null, "Specify --name or --number.");
+			if (this.Operation == "desktop creation wallpaper set")
+			{
+				Require(this.WallpaperPath != null, "Specify --path.");
+			}
+		}
+
+		private bool ReadAutoCloseOption(OptionReader options)
+		{
+			if (this.Operation == "desktop autoclose list") return false;
+			switch (options.Option)
+			{
+				case "--name":
+					this.ReadDesktopSelector(options, "name");
+					return true;
+				case "--number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private void ValidateAutoClose()
+		{
+			if (this.Operation == "desktop autoclose list") return;
+			Require(this.TargetKind != null, "Specify exactly one of --name or --number.");
+		}
+
+		// Selectors keep the value as typed; the host resolves it against current desktops.
+		private void ReadDesktopSelector(OptionReader options, string kind)
+		{
+			switch (kind)
+			{
+				case "number":
+					this.SetTarget(kind, options.ReadPositiveIntegerText(DesktopNumberError));
+					break;
+				case "id":
+					this.SetTarget(kind, options.ReadId());
+					break;
+				default:
+					this.SetTarget(kind, options.ReadValue());
+					break;
+			}
+		}
 
 		private void SetTarget(string kind, string value)
 		{
@@ -722,53 +543,650 @@ namespace SylphyHorn.Commands
 			this.TargetValue = value;
 		}
 
-		private static string ReadChoice(string[] args, ref int index, params string[] choices)
+		private void ValidateWrap()
 		{
-			var value = ReadValue(args, ref index);
-			if (Array.IndexOf(choices, value) < 0)
+			var relative = this.TargetKind == "next" || this.TargetKind == "previous";
+			Require(!this.Wrap || relative, "--wrap requires a next or previous destination.");
+		}
+
+		#endregion
+
+		#region Windows
+
+		private bool ReadWindowOption(OptionReader options)
+		{
+			switch (this.Operation)
 			{
-				throw new ArgumentException("Expected one of: " + string.Join(", ", choices) + ".");
+				case "window move": return this.ReadMoveOption(options);
+				case "window pin":
+				case "window unpin":
+					return this.ReadPinOption(options);
+				default: return false;
+			}
+		}
+
+		private bool ReadMoveOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.WindowId = options.ReadId();
+					return true;
+				case "--desktop-number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				case "--desktop-name":
+					this.ReadDesktopSelector(options, "name");
+					return true;
+				case "--desktop-id":
+					this.ReadDesktopSelector(options, "id");
+					return true;
+				case "--desktop-next":
+				case "--desktop-previous":
+				case "--desktop-last-used":
+				case "--desktop-new":
+					this.SetTarget(options.Option.Substring("--desktop-".Length), null);
+					return true;
+				case "--wrap":
+					this.Wrap = true;
+					return true;
+				case "--follow":
+					this.Follow = true;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadPinOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--id":
+					this.WindowId = options.ReadId();
+					return true;
+				case "--scope":
+					this.Scope = this.ReadCatalogChoice(options, "--scope must be window or app.");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private void ValidateWindow()
+		{
+			switch (this.Operation)
+			{
+				case "window move":
+					Require(this.TargetKind != null, "Specify exactly one destination.");
+					Require(this.WindowId != null, "Specify --id using a window ID returned by window list.");
+					this.ValidateWrap();
+					break;
+				case "window pin":
+				case "window unpin":
+					Require(this.WindowId != null && this.Scope != null, "Specify --id from window list and --scope window or app.");
+					break;
+			}
+		}
+
+		#endregion
+
+		#region Application assignment
+
+		// set, remove and apply each take exactly one of these selectors.
+		private int RuleSelectorCount
+			=> new[] { this.AppPath != null, this.AppId != null, this.RuleId != null, this.All }.Count(selected => selected);
+
+		private bool ReadAppAssignmentOption(OptionReader options)
+		{
+			switch (this.Operation)
+			{
+				case "app list": return this.ReadAppListOption(options);
+				case "app assignment configure": return this.ReadAssignmentConfigureOption(options);
+				case "app assignment set": return this.ReadAssignmentSetOption(options);
+				case "app assignment remove": return this.ReadRuleSelector(options);
+				case "app assignment apply": return this.ReadRuleSelector(options) || this.ReadApplyOption(options);
+				case "app assignment enable":
+				case "app assignment disable":
+					return this.ReadRuleId(options);
+				default: return false;
+			}
+		}
+
+		private bool ReadAppListOption(OptionReader options)
+		{
+			if (options.Option != "--source") return false;
+			this.Source = this.ReadCatalogChoice(options, "--source must be registered or windows.");
+			return true;
+		}
+
+		private bool ReadAssignmentConfigureOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--enabled":
+					this.AssignmentEnabled = options.ReadBoolean("--enabled requires true or false.");
+					return true;
+				case "--create-missing-desktops":
+					this.CreateMissingDesktops = options.ReadBoolean("--create-missing-desktops requires true or false.");
+					return true;
+				case "--close-created-desktops":
+					this.CloseCreatedDesktops = options.ReadBoolean("--close-created-desktops requires true or false.");
+					return true;
+				case "--follow-foreground":
+					this.FollowForeground = this.ReadCatalogChoice(options);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadAssignmentSetOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--app-id":
+					this.AppId = options.ReadValue();
+					return true;
+				case "--desktop-name":
+					this.ReadDesktopSelector(options, "name");
+					return true;
+				case "--desktop-number":
+					this.ReadDesktopSelector(options, "number");
+					return true;
+				case "--follow-foreground":
+					this.FollowForeground = this.ReadCatalogChoice(options);
+					return true;
+				default:
+					return this.ReadRuleSelector(options);
+			}
+		}
+
+		private bool ReadApplyOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--all":
+					this.All = true;
+					return true;
+				case "--dry-run":
+					this.DryRun = true;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadRuleSelector(OptionReader options)
+		{
+			if (this.ReadRuleId(options)) return true;
+			if (options.Option != "--path") return false;
+			this.AppPath = options.ReadValue();
+			return true;
+		}
+
+		private bool ReadRuleId(OptionReader options)
+		{
+			if (options.Option != "--id") return false;
+			this.RuleId = options.ReadId();
+			return true;
+		}
+
+		private void ValidateAppAssignment()
+		{
+			switch (this.Operation)
+			{
+				case "app assignment configure":
+					var anySetting = this.AssignmentEnabled != null || this.CreateMissingDesktops != null
+						|| this.CloseCreatedDesktops != null || this.FollowForeground != null;
+					Require(anySetting, "Specify at least one assignment setting.");
+					break;
+				case "app assignment set":
+					Require(this.RuleSelectorCount == 1, "Specify exactly one of --path, --app-id or --id.");
+					// Changing only --follow-foreground of a saved rule preserves its destination.
+					var keepsDestination = this.RuleId != null && this.FollowForeground != null;
+					Require(this.TargetKind != null || keepsDestination, "Specify exactly one of --desktop-name or --desktop-number.");
+					break;
+				case "app assignment remove":
+					Require(this.RuleSelectorCount == 1, "Specify exactly one of --path or --id.");
+					break;
+				case "app assignment apply":
+					Require(this.RuleSelectorCount == 1, "Specify exactly one of --path, --id or --all.");
+					break;
+				case "app assignment enable":
+				case "app assignment disable":
+					Require(this.RuleId != null, "Specify --id using a saved rule ID returned by app assignment list.");
+					break;
+			}
+		}
+
+		#endregion
+
+		#region Settings and startup
+
+		private bool ReadSettingsOption(OptionReader options)
+		{
+			switch (this.Operation)
+			{
+				case "desktop configure": return this.ReadDesktopSettingsOption(options);
+				case "notification configure": return this.ReadNotificationSettingsOption(options);
+				case "tray configure": return this.ReadTraySettingsOption(options);
+				case "settings configure": return this.ReadGeneralSettingsOption(options);
+				case "settings export": return this.ReadExportOption(options);
+				case "settings import": return this.ReadImportOption(options);
+				case "settings reset": return this.ReadResetOption(options);
+				default: return false;
+			}
+		}
+
+		private bool ReadDesktopSettingsOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--loop":
+					this.Loop = options.ReadBoolean();
+					return true;
+				case "--override-windows-shortcuts":
+					this.OverrideWindowsShortcuts = options.ReadBoolean();
+					return true;
+				case "--per-desktop-wallpaper":
+					this.PerDesktopWallpaper = options.ReadBoolean();
+					return true;
+				case "--override-on-startup":
+					this.OverrideOnStartup = options.ReadBoolean();
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadNotificationSettingsOption(OptionReader options)
+			=> this.ReadNotificationBehaviorOption(options)
+				|| this.ReadNotificationAppearanceOption(options)
+				|| this.ReadNotificationGeometryOption(options);
+
+		private bool ReadNotificationBehaviorOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--on-switch":
+					this.OnSwitch = options.ReadBoolean();
+					return true;
+				case "--always-show":
+					this.AlwaysShow = options.ReadBoolean();
+					return true;
+				case "--duration-ms":
+					this.DurationMs = options.ReadPositiveInteger("--duration-ms requires a positive integer in milliseconds.");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadNotificationAppearanceOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--simple":
+					this.Simple = options.ReadBoolean();
+					return true;
+				case "--use-desktop-name":
+					this.UseDesktopName = options.ReadBoolean();
+					return true;
+				case "--theme":
+					this.Theme = this.ReadCatalogChoice(options);
+					return true;
+				case "--corners":
+					this.Corners = this.ReadCatalogChoice(options);
+					return true;
+				case "--font-family":
+					this.FontFamily = options.ReadText("A font family is missing; use an empty string to restore the default.");
+					return true;
+				case "--header-font-size":
+					this.HeaderFontSize = ReadFontSize(options);
+					return true;
+				case "--body-font-size":
+					this.BodyFontSize = ReadFontSize(options);
+					return true;
+				case "--header-align":
+					this.HeaderAlign = this.ReadCatalogChoice(options);
+					return true;
+				case "--body-align":
+					this.BodyAlign = this.ReadCatalogChoice(options);
+					return true;
+				case "--line-spacing":
+					this.LineSpacing = options.ReadInteger(NumberStyles.AllowLeadingSign, int.MinValue, int.MaxValue, FontSizeError);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadNotificationGeometryOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--monitor":
+					this.Monitor = ReadMonitor(options);
+					return true;
+				case "--placement":
+					this.Placement = this.ReadCatalogChoice(options);
+					return true;
+				case "--offset-x":
+					this.OffsetX = ReadPixelOffset(options);
+					return true;
+				case "--offset-y":
+					this.OffsetY = ReadPixelOffset(options);
+					return true;
+				case "--min-width":
+					this.MinWidth = ReadPixelSize(options);
+					return true;
+				case "--simple-min-width":
+					this.SimpleMinWidth = ReadPixelSize(options);
+					return true;
+				case "--min-height":
+					this.MinHeight = ReadPixelSize(options);
+					return true;
+				case "--pin-min-width":
+					this.PinMinWidth = ReadPixelSize(options);
+					return true;
+				case "--pin-offset-x":
+					this.PinOffsetX = ReadPixelOffset(options);
+					return true;
+				case "--pin-offset-y":
+					this.PinOffsetY = ReadPixelOffset(options);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private static int ReadFontSize(OptionReader options) => options.ReadInteger(NumberStyles.AllowLeadingSign, 1, int.MaxValue, FontSizeError);
+
+		private static int ReadPixelSize(OptionReader options) => options.ReadInteger(NumberStyles.AllowLeadingSign, 1, int.MaxValue, GeometryError);
+
+		private static int ReadPixelOffset(OptionReader options) => options.ReadInteger(NumberStyles.AllowLeadingSign, int.MinValue, int.MaxValue, GeometryError);
+
+		private static string ReadMonitor(OptionReader options)
+		{
+			var value = options.ReadValue();
+			if (value == "current" || value == "all") return value;
+			if (!uint.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number == 0 || number == uint.MaxValue)
+			{
+				throw new ArgumentException("--monitor requires current, all or a positive monitor number.");
 			}
 			return value;
 		}
 
-		private static bool ReadBoolean(string[] args, ref int index)
+		private bool ReadTraySettingsOption(OptionReader options)
 		{
-			var value = ReadValue(args, ref index);
-			if (value != "true" && value != "false")
+			switch (options.Option)
 			{
-				throw new ArgumentException("Boolean settings require true or false.");
+				case "--show-desktop":
+					this.ShowDesktop = options.ReadBoolean();
+					return true;
+				case "--current-number-only":
+					this.CurrentNumberOnly = options.ReadBoolean();
+					return true;
+				default:
+					return false;
 			}
-			return value == "true";
 		}
 
-		private static string ReadValue(string[] args, ref int index)
+		private bool ReadGeneralSettingsOption(OptionReader options)
 		{
-			if (++index >= args.Length || string.IsNullOrWhiteSpace(args[index]) || args[index].StartsWith("--", StringComparison.Ordinal))
-			{
-				throw new ArgumentException("An option value is missing.");
-			}
-			return args[index];
+			if (options.Option != "--language") return false;
+			this.Language = this.ReadCatalogChoice(options, "--language must be auto, en or ja.");
+			return true;
 		}
 
-		private static string ReadName(string[] args, ref int index)
-			=> ReadTextValue(args, ref index, "A desktop name is missing.");
-
-		private static string ReadTextValue(string[] args, ref int index, string error)
+		private bool ReadExportOption(OptionReader options)
 		{
-			if (++index >= args.Length || args[index] == null || args[index].StartsWith("--", StringComparison.Ordinal))
+			switch (options.Option)
+			{
+				case "--path":
+					this.FilePath = options.ReadText("Specify a settings file path.");
+					return true;
+				case "--overwrite":
+					this.Overwrite = true;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadImportOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--path":
+					this.FilePath = options.ReadText("Specify a settings file path.");
+					return true;
+				case "--apply-desktops":
+					this.ApplyDesktops = options.ReadBoolean();
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private bool ReadResetOption(OptionReader options)
+		{
+			if (options.Option != "--yes") return false;
+			this.ConfirmReset = true;
+			return true;
+		}
+
+		private void ValidateSettings()
+		{
+			switch (this.Operation)
+			{
+				case "desktop configure":
+					var anyDesktopSetting = this.Loop != null || this.OverrideWindowsShortcuts != null
+						|| this.PerDesktopWallpaper != null || this.OverrideOnStartup != null;
+					Require(anyDesktopSetting, NoSettingError);
+					break;
+				case "notification configure":
+					var anyNotificationSetting = this.OnSwitch != null || this.AlwaysShow != null || this.DurationMs != null
+						|| this.HasNotificationAppearance || this.HasNotificationGeometry;
+					Require(anyNotificationSetting, NoSettingError);
+					break;
+				case "tray configure":
+					Require(this.ShowDesktop != null || this.CurrentNumberOnly != null, NoSettingError);
+					break;
+				case "settings configure":
+					Require(this.Language != null, NoSettingError);
+					break;
+				case "settings export":
+					Require(this.FilePath != null, "Specify --path.");
+					break;
+				case "settings import":
+					Require(this.FilePath != null, "Specify --path.");
+					Require(this.ApplyDesktops != null, "Specify --apply-desktops true or false.");
+					break;
+				case "settings reset":
+					Require(this.ConfirmReset, "Specify --yes to reset application settings.");
+					break;
+			}
+		}
+
+		private bool ReadStartupOption(OptionReader options)
+		{
+			if (this.Operation != "startup configure" || options.Option != "--mode") return false;
+			this.StartupMode = this.ReadCatalogChoice(options);
+			return true;
+		}
+
+		private void ValidateStartup()
+		{
+			if (this.Operation != "startup configure") return;
+			Require(this.StartupMode != null, "Specify --mode disabled, normal or elevated.");
+		}
+
+		#endregion
+
+		#region Shortcuts
+
+		private bool ChangesBinding => this.Operation == "shortcut set" || this.Operation == "shortcut clear";
+
+		private bool ReadShortcutOption(OptionReader options)
+		{
+			switch (options.Option)
+			{
+				case "--device":
+					this.Device = this.ReadCatalogChoice(options);
+					return true;
+				case "--action" when this.ChangesBinding:
+					this.Action = options.ReadText("Specify an action returned by shortcut list.");
+					return true;
+				case "--number" when this.ChangesBinding:
+					this.Number = options.ReadInteger(NumberStyles.None, 1, 1000, "Shortcut desktop numbers must be between 1 and 1000.");
+					return true;
+				case "--trigger" when this.Operation == "shortcut set":
+					this.Trigger = options.ReadText("Specify a trigger using names from shortcut keys.");
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private void ValidateShortcut()
+		{
+			if (this.Operation != "shortcut list")
+			{
+				Require(this.Device != null, "Specify --device keyboard or mouse.");
+			}
+			if (this.ChangesBinding)
+			{
+				Require(this.Action != null, "Specify --action using shortcut list.");
+			}
+			if (this.Operation == "shortcut set")
+			{
+				Require(this.Trigger != null, "Specify --trigger using shortcut keys.");
+			}
+		}
+
+		#endregion
+
+		#region Option reading
+
+		// The accepted values are the ones CliSpecCatalog publishes for this command and option.
+		private string ReadCatalogChoice(OptionReader options)
+			=> options.ReadChoice(CliSpecCatalog.Choices(this.Operation, options.Option));
+
+		private string ReadCatalogChoice(OptionReader options, string error)
+			=> options.ReadChoice(CliSpecCatalog.Choices(this.Operation, options.Option), error);
+
+		private static void Require(bool condition, string error)
+		{
+			if (!condition)
 			{
 				throw new ArgumentException(error);
 			}
-			return args[index];
 		}
 
-		private static void RequireId(string value)
+		// Walks the options after the command words; each option may appear once and consumes its value, if any.
+		private sealed class OptionReader
 		{
-			if (!Guid.TryParse(value, out var id) || id == Guid.Empty)
+			private readonly string[] _args;
+			private readonly HashSet<string> _seen = new HashSet<string>(StringComparer.Ordinal);
+			private int _index;
+
+			internal OptionReader(string[] args, int firstOptionIndex)
 			{
-				throw new ArgumentException("Specify a nonempty ID returned by the corresponding list command.");
+				this._args = args;
+				this._index = firstOptionIndex - 1;
 			}
+
+			internal string Option { get; private set; }
+
+			internal bool MoveNext()
+			{
+				if (++this._index >= this._args.Length) return false;
+				this.Option = this._args[this._index];
+				if (!this._seen.Add(this.Option))
+				{
+					throw new ArgumentException("Duplicate option: " + this.Option);
+				}
+				return true;
+			}
+
+			// Accepts empty or blank text, such as an empty name that clears the current one.
+			internal string ReadText(string missingError)
+			{
+				if (++this._index >= this._args.Length || this._args[this._index] == null
+					|| this._args[this._index].StartsWith("--", StringComparison.Ordinal))
+				{
+					throw new ArgumentException(missingError);
+				}
+				return this._args[this._index];
+			}
+
+			internal string ReadValue()
+			{
+				const string missingError = "An option value is missing.";
+				var value = this.ReadText(missingError);
+				if (string.IsNullOrWhiteSpace(value))
+				{
+					throw new ArgumentException(missingError);
+				}
+				return value;
+			}
+
+			internal string ReadChoice(string[] choices)
+				=> this.ReadChoice(choices, "Expected one of: " + string.Join(", ", choices) + ".");
+
+			internal string ReadChoice(string[] choices, string error)
+			{
+				var value = this.ReadValue();
+				if (Array.IndexOf(choices, value) < 0)
+				{
+					throw new ArgumentException(error);
+				}
+				return value;
+			}
+
+			internal bool ReadBoolean() => this.ReadBoolean("Boolean settings require true or false.");
+
+			internal bool ReadBoolean(string error) => this.ReadChoice(new[] { "true", "false" }, error) == "true";
+
+			internal string ReadId()
+			{
+				var value = this.ReadValue();
+				if (!Guid.TryParse(value, out var id) || id == Guid.Empty)
+				{
+					throw new ArgumentException("Specify a nonempty ID returned by the corresponding list command.");
+				}
+				return value;
+			}
+
+			internal int ReadInteger(NumberStyles styles, int minimum, int maximum, string error)
+			{
+				if (!TryParseInteger(this.ReadValue(), styles, minimum, maximum, out var value))
+				{
+					throw new ArgumentException(error);
+				}
+				return value;
+			}
+
+			// Digits only; a sign or surrounding white space is rejected.
+			internal int ReadPositiveInteger(string error) => this.ReadInteger(NumberStyles.None, 1, int.MaxValue, error);
+
+			// Validated like ReadPositiveInteger but returned as typed.
+			internal string ReadPositiveIntegerText(string error)
+			{
+				var value = this.ReadValue();
+				if (!TryParseInteger(value, NumberStyles.None, 1, int.MaxValue, out _))
+				{
+					throw new ArgumentException(error);
+				}
+				return value;
+			}
+
+			private static bool TryParseInteger(string text, NumberStyles styles, int minimum, int maximum, out int value)
+				=> int.TryParse(text, styles, CultureInfo.InvariantCulture, out value) && value >= minimum && value <= maximum;
 		}
+
+		#endregion
 	}
 }

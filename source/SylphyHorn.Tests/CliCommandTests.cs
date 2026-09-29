@@ -18,7 +18,9 @@ namespace SylphyHorn.Tests
 			Assert.Null(byNumber.FallbackId);
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", "--fallback-id", id, "--fallback-number", "2" }));
 			foreach (var value in new[] { "0", "-1", "2147483648", "x" })
+			{
 				Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", "--fallback-number", value }));
+			}
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", "--fallback-id", "x" }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "delete", "--number", "1", "--fallback-number" }));
 			Assert.Throws<ArgumentException>(() => CliCommand.Parse(new[] { "desktop", "switch", "--number", "1", "--fallback-number", "2" }));
