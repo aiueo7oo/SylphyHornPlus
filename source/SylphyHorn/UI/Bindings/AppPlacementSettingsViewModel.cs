@@ -24,14 +24,6 @@ namespace SylphyHorn.UI.Bindings
 		public string this[string key] => Resources.ResourceManager.GetString("Placement_" + key, Resources.Culture) ?? key;
 	}
 
-	// DesktopTransitionRuntime.PlacementStatus values that the settings pages act on.
-	internal static class PlacementStatuses
-	{
-		internal const string Active = "Active";
-
-		internal const string Paused = "Paused";
-	}
-
 	// One choice of the per-rule / global switch setting. The instances are shared by every combo box and keep
 	// their identity; only Label changes with the language or the global value.
 	public sealed class PlacementFollowOption : ObservableObject

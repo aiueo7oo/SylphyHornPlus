@@ -90,7 +90,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 		{
 			this.EnsureOwnerAccess();
 			if (!this._initialized || this.IsPlacementHalted || this._placementChanging
-				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.HasClosingTargets
+				|| !this._placementConfiguration.Enabled || !this._placementConfiguration.ClosesDesktops
 				|| !observation.Complete || !observation.StillCurrent() || ReferenceEquals(this.PlacementDestinations, PlacementDesktopMap.Unavailable))
 			{
 				this._desktopClosure.Reset();

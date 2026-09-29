@@ -36,7 +36,8 @@ namespace SylphyHorn.AppPlacement
 
 		public IReadOnlyList<PlacementDestination> ClosingTargets => this._closingView;
 
-		public bool HasClosingTargets => this.CloseCreatedDesktops || this._closingTargets.Length != 0;
+		// Whether empty desktops can be closed automatically, either desktops created by placement or listed targets.
+		public bool ClosesDesktops => this.CloseCreatedDesktops || this._closingTargets.Length != 0;
 
 		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false,
 			bool closeCreatedDesktops = false, IEnumerable<PlacementDestination> closingTargets = null, bool followForeground = true)

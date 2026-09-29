@@ -9,13 +9,13 @@ using SylphyHorn.AppPlacement;
 using SylphyHorn.Commands;
 using SylphyHorn.Serialization;
 using SylphyHorn.Services.AppPlacement;
+using SylphyHorn.Services.DesktopTransitions;
 
 namespace SylphyHorn.Services.Commands
 {
 	internal sealed class CliAssignmentService
 	{
 		private const string FollowForegroundDefault = "default";
-		private const string NoRulesStatus = "NoRules";
 		private const string LauncherOnlyProblem = "LauncherOnly";
 
 		private readonly AppPlacementSettings _settings;
@@ -96,7 +96,7 @@ namespace SylphyHorn.Services.Commands
 
 		private async Task<CliResponse> ListAppsAsync(CliCommand command, CancellationToken cancellation)
 		{
-			var apps = await this._catalog.ReadAsync(command.Source == "windows", cancellation, false).WaitAsync(cancellation);
+			var apps = await this._catalog.ReadAsync(windows: command.Source == "windows", cancellation, includeIcons: false).WaitAsync(cancellation);
 			return CliResponse.Ok(command.Operation, new CliData
 			{
 				Source = command.Source,
@@ -217,7 +217,7 @@ namespace SylphyHorn.Services.Commands
 			if (command.AppId != null)
 			{
 				identity = new PlacementAppIdentity(PlacementAppKind.PackageAppId, command.AppId);
-				var apps = await this._catalog.ReadAsync(false, cancellation, false).WaitAsync(cancellation);
+				var apps = await this._catalog.ReadAsync(windows: false, cancellation, includeIcons: false).WaitAsync(cancellation);
 				choice = apps.FirstOrDefault(app => identity.Equals(app.Identity));
 				if (choice == null)
 				{
@@ -330,7 +330,7 @@ namespace SylphyHorn.Services.Commands
 		private string DescribeStatus()
 		{
 			var status = this._status();
-			return status == NoRulesStatus ? "no_rules" : status.ToLowerInvariant();
+			return status == PlacementStatuses.NoRules ? "no_rules" : status.ToLowerInvariant();
 		}
 
 		private CliData Describe(AppPlacementConfiguration configuration, bool includeRules = true) => new CliData

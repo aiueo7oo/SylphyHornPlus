@@ -41,14 +41,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 				if (this._placementChanging) return PlacementStatuses.Stopping;
 				if (this.IsPlacementHalted) return PlacementStatuses.Suspended;
 				if (!this._placementConfiguration.Enabled) return PlacementStatuses.Disabled;
-				if (!this.HasEnabledRulesOrClosingTargets) return PlacementStatuses.NoRules;
+				if (!this.HasEnabledRulesOrDesktopClosing) return PlacementStatuses.NoRules;
 				if (this._placementSession == null || this._placementSession.Completion.IsCompleted) return PlacementStatuses.Paused;
 				return this._placementSession.IsReady ? PlacementStatuses.Active : PlacementStatuses.Preparing;
 			}
 		}
 
-		private bool HasEnabledRulesOrClosingTargets
-			=> this._placementConfiguration.Rules.Any(rule => rule.Enabled) || this._placementConfiguration.HasClosingTargets;
+		private bool HasEnabledRulesOrDesktopClosing
+			=> this._placementConfiguration.Rules.Any(rule => rule.Enabled) || this._placementConfiguration.ClosesDesktops;
 
 		internal Task RestartPlacementAsync()
 		{
@@ -120,14 +120,14 @@ namespace SylphyHorn.Services.DesktopTransitions
 					}
 				}
 				if (generation != this._placementGeneration || !this._initialized || this.IsPlacementHalted
-					|| !this._placementConfiguration.Enabled || !this.HasEnabledRulesOrClosingTargets)
+					|| !this._placementConfiguration.Enabled || !this.HasEnabledRulesOrDesktopClosing)
 				{
 					return;
 				}
 				try
 				{
 					Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> closeDesktops = null;
-					if (this._placementConfiguration.HasClosingTargets)
+					if (this._placementConfiguration.ClosesDesktops)
 					{
 						closeDesktops = (observation, cancellation) => this.ObserveDesktopClosureAsync(generation, observation, cancellation);
 					}
@@ -369,18 +369,6 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 		}
 
-		// Values of PlacementStatus. The UI and CLI services compare against these literal strings.
-		private static class PlacementStatuses
-		{
-			internal const string Stopping = "Stopping";
-			internal const string Suspended = "Suspended";
-			internal const string Disabled = "Disabled";
-			internal const string NoRules = "NoRules";
-			internal const string Paused = "Paused";
-			internal const string Active = "Active";
-			internal const string Preparing = "Preparing";
-		}
-
 		private sealed class PlacementAuthorizationRequest
 		{
 			internal PlacementAuthorizationRequest(long generation, PlacementDestination destination,
@@ -423,5 +411,17 @@ namespace SylphyHorn.Services.DesktopTransitions
 				this.ScheduleDeferredCommands();
 			}
 		}
+	}
+
+	// Values of DesktopTransitionRuntime.PlacementStatus, compared by the settings pages and the CLI.
+	internal static class PlacementStatuses
+	{
+		internal const string Stopping = "Stopping";
+		internal const string Suspended = "Suspended";
+		internal const string Disabled = "Disabled";
+		internal const string NoRules = "NoRules";
+		internal const string Paused = "Paused";
+		internal const string Active = "Active";
+		internal const string Preparing = "Preparing";
 	}
 }

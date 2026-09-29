@@ -8,8 +8,6 @@ namespace SylphyHorn.Serialization
 	[DataContract]
 	public sealed class DesktopWallpaperOnCreation
 	{
-		internal const string SettingsKey = GeneralSettings.DesktopWallpapersOnCreationKey;
-
 		[DataMember(Order = 0, EmitDefaultValue = false)]
 		public string Name { get; private set; }
 
