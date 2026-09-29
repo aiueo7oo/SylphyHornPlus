@@ -1,6 +1,8 @@
 ﻿#if !NETFRAMEWORK
 using System;
+using System.Collections.Generic;
 using System.IO.Pipes;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.Commands;
@@ -99,6 +101,55 @@ namespace SylphyHorn.Tests
 					release.TrySetResult(true);
 					await server.StopAsync().WaitAsync(deadline.Token);
 				}
+			}
+		}
+
+		[Fact]
+		public async Task LongestNotificationConfigureReachesHostAndOversizedRequestKeepsCommand()
+		{
+			var name = "SylphyHorn.Tests." + Guid.NewGuid();
+			CliCommand received = null;
+			var server = new CliServer(name, (command, token) =>
+			{
+				received = command;
+				return Task.FromResult(CliResponse.Ok(command.Operation, new CliData { Changed = true }));
+			}, () => throw new InvalidOperationException("Unexpected shutdown."));
+			var args = new List<string> { "notification", "configure" };
+			foreach (var argument in CliSpecCatalog.Find("notification configure").Arguments)
+			{
+				args.Add(argument.Name);
+				args.Add(argument.Values?[0] ?? (argument.Type == "integer" ? "10" : argument.Name == "--monitor" ? "current" : "Segoe UI"));
+			}
+			Assert.Equal(48, args.Count);
+			Assert.True(args.Count <= CliSpecCatalog.MaximumArgumentCount);
+			using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+			{
+				try
+				{
+					using (var client = Client(name))
+					{
+						await client.ConnectAsync(deadline.Token);
+						await CliProtocol.WriteAsync(client, new CliRequest { Args = args.ToArray() }, deadline.Token);
+						var response = await CliProtocol.ReadAsync<CliResponse>(client, deadline.Token);
+						Assert.True(response.Success);
+						Assert.Equal("notification configure", response.Command);
+						Assert.Equal(10, received.DurationMs);
+						Assert.Equal("current", received.Monitor);
+					}
+					received = null;
+					var oversized = args.Concat(Enumerable.Repeat("--duration-ms", CliSpecCatalog.MaximumArgumentCount)).ToArray();
+					using (var client = Client(name))
+					{
+						await client.ConnectAsync(deadline.Token);
+						await CliProtocol.WriteAsync(client, new CliRequest { Args = oversized }, deadline.Token);
+						var response = await CliProtocol.ReadAsync<CliResponse>(client, deadline.Token);
+						Assert.False(response.Success);
+						Assert.Equal("notification configure", response.Command);
+						Assert.Equal("invalid_arguments", response.Error.Code);
+						Assert.Null(received);
+					}
+				}
+				finally { await server.StopAsync().WaitAsync(deadline.Token); }
 			}
 		}
 

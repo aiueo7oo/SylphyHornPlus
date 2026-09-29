@@ -52,11 +52,12 @@ namespace SylphyHorn.Services.Commands
 							try
 							{
 								var request = await CliProtocol.ReadAsync<CliRequest>(pipe, deadline.Token).ConfigureAwait(false);
-								if (request == null || request.SchemaVersion != 1 || request.Args == null || request.Args.Length > 32)
+								operation = request?.Args == null ? null : CliCommand.Recognize(request.Args);
+								if (request == null || request.SchemaVersion != 1 || request.Args == null
+									|| request.Args.Length > CliSpecCatalog.MaximumArgumentCount)
 								{
 									throw new ArgumentException("Unsupported request version or arguments.");
 								}
-								operation = CliCommand.Recognize(request.Args);
 								var command = CliCommand.Parse(request.Args);
 								if (command.Operation == "app assignment apply" || command.Operation == "settings import"
 									|| command.Operation == "settings reset"

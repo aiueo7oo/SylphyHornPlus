@@ -10,6 +10,10 @@ namespace SylphyHorn.Commands
 		private static readonly Dictionary<string, CliCommandSpec> Definitions = Build()
 			.ToDictionary(item => item.Name, StringComparer.Ordinal);
 
+		// Command words plus every option and its value; the transport must accept the longest valid command.
+		internal static readonly int MaximumArgumentCount = Definitions.Values.Max(item => item.Name.Split(' ').Length
+			+ (item.Arguments ?? Array.Empty<CliSpecArgument>()).Sum(argument => argument.Type == "flag" ? 1 : 2));
+
 		internal static IEnumerable<CliCommandSpec> All => Definitions.Values.OrderBy(item => item.Name, StringComparer.Ordinal);
 
 		internal static CliCommandSpec Find(string name)
