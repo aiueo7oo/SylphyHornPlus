@@ -269,6 +269,89 @@ function Invoke-LoggedCommand {
 	return $displayCommand
 }
 
+function Invoke-ProjectRestore {
+	param(
+		[Parameter(Mandatory = $true)]
+		[string] $ProjectPath,
+
+		[Parameter(Mandatory = $true)]
+		[string] $ArtifactsPath,
+
+		[Parameter(Mandatory = $true)]
+		[string[]] $BuildProperties,
+
+		[Parameter(Mandatory = $true)]
+		[string] $LogsRoot,
+
+		[Parameter(Mandatory = $true)]
+		[string] $LogName
+	)
+
+	$arguments = @(
+		"restore",
+		$ProjectPath,
+		"-p:Configuration=$Configuration",
+		"-p:Platform=AnyCPU",
+		$ApprovedRuntimeIdentifiersArgument,
+		"-p:RuntimeIdentifier=$RuntimeIdentifier",
+		"-p:SelfContained=true",
+		"--locked-mode",
+		"--artifacts-path=$ArtifactsPath"
+	) + $BuildProperties + @(
+		"-bl:$LogsRoot/$LogName-restore.binlog"
+	)
+	return Invoke-LoggedCommand `
+		-Executable "dotnet" `
+		-Arguments $arguments `
+		-LogPath (Join-Path $LogsRoot "$LogName-restore.log")
+}
+
+function Invoke-ProjectPublish {
+	param(
+		[Parameter(Mandatory = $true)]
+		[string] $ProjectPath,
+
+		[Parameter(Mandatory = $true)]
+		[string] $ArtifactsPath,
+
+		[Parameter(Mandatory = $true)]
+		[string[]] $BuildProperties,
+
+		[Parameter(Mandatory = $true)]
+		[string] $PublishDirectory,
+
+		[Parameter(Mandatory = $true)]
+		[string] $LogsRoot,
+
+		[Parameter(Mandatory = $true)]
+		[string] $LogName
+	)
+
+	$arguments = @(
+		"publish",
+		$ProjectPath,
+		"-c",
+		$Configuration,
+		"-f",
+		$TargetFramework,
+		"-p:Platform=AnyCPU",
+		$ApprovedRuntimeIdentifiersArgument,
+		"-r",
+		$RuntimeIdentifier,
+		"--self-contained",
+		"true",
+		"--no-restore",
+		"--artifacts-path=$ArtifactsPath"
+	) + $BuildProperties + @(
+		"-p:PublishDir=$PublishDirectory",
+		"-bl:$LogsRoot/$LogName-publish.binlog"
+	)
+	return Invoke-LoggedCommand `
+		-Executable "dotnet" `
+		-Arguments $arguments `
+		-LogPath (Join-Path $LogsRoot "$LogName-publish.log")
+}
+
 function Get-MSBuildPath {
 	param(
 		[Parameter(Mandatory = $true)]
@@ -1085,22 +1168,12 @@ foreach ($directory in @(
 }
 
 $commands = @()
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"restore",
-		$applicationProject,
-		"-p:Configuration=$Configuration",
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-p:RuntimeIdentifier=$RuntimeIdentifier",
-		"-p:SelfContained=true",
-		"--locked-mode",
-		"--artifacts-path=$applicationArtifacts",
-		"-p:RunSylphyHornPostBuild=false",
-		"-bl:$logsRoot/SylphyHorn-restore.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "SylphyHorn-restore.log")
+$commands += Invoke-ProjectRestore `
+	-ProjectPath $applicationProject `
+	-ArtifactsPath $applicationArtifacts `
+	-BuildProperties @("-p:RunSylphyHornPostBuild=false") `
+	-LogsRoot $logsRoot `
+	-LogName "SylphyHorn"
 
 $applicationAssetsPath = Find-ProjectAssetsFile `
 	-ArtifactsRoot $applicationArtifacts `
@@ -1109,22 +1182,12 @@ $applicationAssets = Assert-AssetsClosure `
 	-AssetsPath $applicationAssetsPath `
 	-Rid $RuntimeIdentifier
 
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"restore",
-		$cliProject,
-		"-p:Configuration=$Configuration",
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-p:RuntimeIdentifier=$RuntimeIdentifier",
-		"-p:SelfContained=true",
-		"--locked-mode",
-		"--artifacts-path=$cliArtifacts",
-		"-p:RunSylphyHornPostBuild=false",
-		"-bl:$logsRoot/sylphyhorn-cli-restore.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "sylphyhorn-cli-restore.log")
+$commands += Invoke-ProjectRestore `
+	-ProjectPath $cliProject `
+	-ArtifactsPath $cliArtifacts `
+	-BuildProperties @("-p:RunSylphyHornPostBuild=false") `
+	-LogsRoot $logsRoot `
+	-LogName "sylphyhorn-cli"
 
 $cliAssetsPath = Find-ProjectAssetsFile `
 	-ArtifactsRoot $cliArtifacts `
@@ -1133,22 +1196,12 @@ $null = Assert-AssetsClosure `
 	-AssetsPath $cliAssetsPath `
 	-Rid $RuntimeIdentifier
 
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"restore",
-		$schedulerProject,
-		"-p:Configuration=$Configuration",
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-p:RuntimeIdentifier=$RuntimeIdentifier",
-		"-p:SelfContained=true",
-		"--locked-mode",
-		"--artifacts-path=$schedulerArtifacts",
-		"-p:OutputPath=$schedulerOutput",
-		"-bl:$logsRoot/SchedulerManager-restore.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "SchedulerManager-restore.log")
+$commands += Invoke-ProjectRestore `
+	-ProjectPath $schedulerProject `
+	-ArtifactsPath $schedulerArtifacts `
+	-BuildProperties @("-p:OutputPath=$schedulerOutput") `
+	-LogsRoot $logsRoot `
+	-LogName "SchedulerManager"
 
 $schedulerAssetsPath = Find-ProjectAssetsFile `
 	-ArtifactsRoot $schedulerArtifacts `
@@ -1157,74 +1210,29 @@ $null = Assert-AssetsClosure `
 	-AssetsPath $schedulerAssetsPath `
 	-Rid $RuntimeIdentifier
 
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"publish",
-		$applicationProject,
-		"-c",
-		$Configuration,
-		"-f",
-		$TargetFramework,
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-r",
-		$RuntimeIdentifier,
-		"--self-contained",
-		"true",
-		"--no-restore",
-		"--artifacts-path=$applicationArtifacts",
-		"-p:RunSylphyHornPostBuild=false",
-		"-p:PublishDir=$applicationPublish",
-		"-bl:$logsRoot/SylphyHorn-publish.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "SylphyHorn-publish.log")
+$commands += Invoke-ProjectPublish `
+	-ProjectPath $applicationProject `
+	-ArtifactsPath $applicationArtifacts `
+	-BuildProperties @("-p:RunSylphyHornPostBuild=false") `
+	-PublishDirectory $applicationPublish `
+	-LogsRoot $logsRoot `
+	-LogName "SylphyHorn"
 
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"publish",
-		$cliProject,
-		"-c",
-		$Configuration,
-		"-f",
-		$TargetFramework,
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-r",
-		$RuntimeIdentifier,
-		"--self-contained",
-		"true",
-		"--no-restore",
-		"--artifacts-path=$cliArtifacts",
-		"-p:RunSylphyHornPostBuild=false",
-		"-p:PublishDir=$cliPublish",
-		"-bl:$logsRoot/sylphyhorn-cli-publish.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "sylphyhorn-cli-publish.log")
+$commands += Invoke-ProjectPublish `
+	-ProjectPath $cliProject `
+	-ArtifactsPath $cliArtifacts `
+	-BuildProperties @("-p:RunSylphyHornPostBuild=false") `
+	-PublishDirectory $cliPublish `
+	-LogsRoot $logsRoot `
+	-LogName "sylphyhorn-cli"
 
-$commands += Invoke-LoggedCommand `
-	-Executable "dotnet" `
-	-Arguments @(
-		"publish",
-		$schedulerProject,
-		"-c",
-		$Configuration,
-		"-f",
-		$TargetFramework,
-		"-p:Platform=AnyCPU",
-		$ApprovedRuntimeIdentifiersArgument,
-		"-r",
-		$RuntimeIdentifier,
-		"--self-contained",
-		"true",
-		"--no-restore",
-		"--artifacts-path=$schedulerArtifacts",
-		"-p:OutputPath=$schedulerOutput",
-		"-p:PublishDir=$schedulerPublish",
-		"-bl:$logsRoot/SchedulerManager-publish.binlog"
-	) `
-	-LogPath (Join-Path $logsRoot "SchedulerManager-publish.log")
+$commands += Invoke-ProjectPublish `
+	-ProjectPath $schedulerProject `
+	-ArtifactsPath $schedulerArtifacts `
+	-BuildProperties @("-p:OutputPath=$schedulerOutput") `
+	-PublishDirectory $schedulerPublish `
+	-LogsRoot $logsRoot `
+	-LogName "SchedulerManager"
 
 $launcherPlatform = switch ($RuntimeIdentifier) {
 	"win-x86" { "Win32" }
@@ -1414,39 +1422,29 @@ if ($canExecuteTarget) {
 		-Arguments @("--help") `
 		-LogPath (Join-Path $logsRoot "sylphyhorn-cli-help.log")
 
+	# Each alias test throws on failure; its returned Status is kept as evidence.
 	$cliWinGetAliasTestResult = & $cliWinGetAliasTest `
 		-PackageRoot $wrapperRoot `
 		-RequireSymbolicLink:($env:GITHUB_ACTIONS -ceq "true")
-	Assert-Condition ($LASTEXITCODE -eq 0) `
-		"CLI WinGet portable alias integration test failed."
 
 	$cliWorkingDirectoryTestResult = & $winGetAliasTest `
 		-LauncherPath (Join-Path $wrapperRoot "sylphyhorn-cli.WinGetLauncher.exe") `
 		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
 		-Cli -RequireSymbolicLink:($env:GITHUB_ACTIONS -ceq "true")
-	Assert-Condition ($LASTEXITCODE -eq 0) `
-		"CLI launcher working-directory test failed."
 
 	$winGetAliasTestResult = & $winGetAliasTest `
 		-LauncherPath (Join-Path $wrapperRoot "SylphyHorn.WinGetLauncher.exe") `
 		-ProbePath (Join-Path $winGetAliasProbeOutput "AliasTestProbe.exe") `
 		-RequireSymbolicLink:($env:GITHUB_ACTIONS -ceq "true")
-	Assert-Condition ($LASTEXITCODE -eq 0) `
-		"WinGet portable alias integration test failed."
 }
 else {
-	$cliWorkingDirectoryTestResult = [pscustomobject]@{
+	$notRunOnThisHost = [pscustomobject]@{
 		Status = "NotRun"
 		Reason = "HostArchitectureCannotExecuteArm64"
 	}
-	$cliWinGetAliasTestResult = [pscustomobject]@{
-		Status = "NotRun"
-		Reason = "HostArchitectureCannotExecuteArm64"
-	}
-	$winGetAliasTestResult = [pscustomobject]@{
-		Status = "NotRun"
-		Reason = "HostArchitectureCannotExecuteArm64"
-	}
+	$cliWinGetAliasTestResult = $notRunOnThisHost
+	$cliWorkingDirectoryTestResult = $notRunOnThisHost
+	$winGetAliasTestResult = $notRunOnThisHost
 }
 
 foreach ($metroEntry in $ExpectedMetroHashes.GetEnumerator()) {

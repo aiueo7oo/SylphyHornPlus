@@ -42,6 +42,8 @@ if ($LASTEXITCODE -ne 0) {
 	throw "Windows integration-test restore failed with exit code $LASTEXITCODE."
 }
 
+# dotnet test reads global.json from the current directory, and its test runner
+# setting enables the Microsoft.Testing.Platform options used below.
 Push-Location $repositoryRoot
 try {
 	dotnet test --project $testProject `

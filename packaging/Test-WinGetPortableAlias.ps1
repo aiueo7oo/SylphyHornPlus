@@ -39,23 +39,46 @@ $temporaryRoot = Join-Path `
 	("SylphyHornPlus-AliasTest-{0}" -f ([guid]::NewGuid().ToString("N")))
 $packageRoot = Join-Path $temporaryRoot "package with spaces"
 $linksRoot = Join-Path $temporaryRoot "WinGet Links"
-$aliasName = if ($Cli) { "sylphyhorn-cli.exe" } else { "SylphyHornPlus.exe" }
-$targetName = if ($Cli) { "sylphyhorn-cli.exe" } else { "SylphyHorn.exe" }
-$launcherName = if ($Cli) { "sylphyhorn-cli.WinGetLauncher.exe" } else { "SylphyHorn.WinGetLauncher.exe" }
-$aliasPath = Join-Path $linksRoot $aliasName
-$probePath = Join-Path $packageRoot $targetName
+# The CLI launcher lets the child inherit the caller's working directory, while
+# the GUI launcher starts the child in its own installation directory.
+$variant = if ($Cli) {
+	@{
+		AliasName = "sylphyhorn-cli.exe"
+		TargetName = "sylphyhorn-cli.exe"
+		LauncherName = "sylphyhorn-cli.WinGetLauncher.exe"
+		ExpectedDirectory = $linksRoot
+	}
+}
+else {
+	@{
+		AliasName = "SylphyHornPlus.exe"
+		TargetName = "SylphyHorn.exe"
+		LauncherName = "SylphyHorn.WinGetLauncher.exe"
+		ExpectedDirectory = $packageRoot
+	}
+}
+$launcherName = $variant.LauncherName
+$expectedDirectory = $variant.ExpectedDirectory
+$aliasPath = Join-Path $linksRoot $variant.AliasName
+$probePath = Join-Path $packageRoot $variant.TargetName
 $usedSymbolicLink = $true
 $markerPath = Join-Path $temporaryRoot "alias-launched.txt"
 $launcherProcess = $null
 $createdRoot = $null
+# The working directory reported by the probe need not be spelled like the
+# expected path: the GUI launcher derives it from the normalized final path, and
+# the temporary directory may be spelled with 8.3 names. A uniquely named marker
+# file identifies the directory without comparing path strings.
 $directoryMarkerName = "cwd-{0}.txt" -f [guid]::NewGuid().ToString("N")
 $directoryMarkerValue = [guid]::NewGuid().ToString("N")
 
 try {
 	New-Item -ItemType Directory -Path $packageRoot, $linksRoot | Out-Null
 	$createdRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path
-	$expectedDirectory = if ($Cli) { $linksRoot } else { $packageRoot }
-	Set-Content -LiteralPath (Join-Path $expectedDirectory $directoryMarkerName) -Value $directoryMarkerValue -NoNewline
+	Set-Content `
+		-LiteralPath (Join-Path $expectedDirectory $directoryMarkerName) `
+		-Value $directoryMarkerValue `
+		-NoNewline
 	Copy-Item -LiteralPath $resolvedLauncher -Destination `
 		(Join-Path $packageRoot $launcherName)
 	Copy-Item -LiteralPath $resolvedProbe -Destination $probePath
@@ -132,10 +155,13 @@ try {
 				$actualArguments += [Text.Encoding]::Unicode.GetString($bytes)
 			}
 			$directoryLength = $reader.ReadUInt32()
-			$workingDirectory = [Text.Encoding]::Unicode.GetString($reader.ReadBytes($directoryLength * 2))
+			$workingDirectory = [Text.Encoding]::Unicode.GetString(
+				$reader.ReadBytes($directoryLength * 2))
 			$directoryMarker = Join-Path $workingDirectory $directoryMarkerName
-			Assert-Condition ((Test-Path -LiteralPath $directoryMarker -PathType Leaf) -and
-				(Get-Content -LiteralPath $directoryMarker -Raw) -ceq $directoryMarkerValue) `
+			$isExpectedDirectory =
+				(Test-Path -LiteralPath $directoryMarker -PathType Leaf) -and
+				(Get-Content -LiteralPath $directoryMarker -Raw) -ceq $directoryMarkerValue
+			Assert-Condition $isExpectedDirectory `
 				"Unexpected child working directory: $workingDirectory (expected $expectedDirectory)."
 			Assert-Condition ($stream.Position -eq $stream.Length) `
 				"The alias probe result contains trailing data."

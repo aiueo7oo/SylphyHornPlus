@@ -16,6 +16,7 @@
 		<ProjectReference Include="..\SylphyHorn.Core\SylphyHorn.Core.csproj" />
 	</ItemGroup>
 
+	<!-- The CLI reports the app's product version, so read it from SylphyHorn.csproj rather than duplicating it. -->
 	<Target Name="ReadProductVersion" BeforeTargets="GetAssemblyVersion">
 		<XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\SylphyHorn\SylphyHorn.csproj" Query="/Project/PropertyGroup/Version/text()">
 			<Output TaskParameter="Result" PropertyName="Version" />

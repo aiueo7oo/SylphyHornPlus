@@ -12,6 +12,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# Exit codes follow CliResponse.ExitCode in SylphyHorn.Core/Commands/CliProtocol.cs.
+$invalidArgumentsExitCode = 2
+$launcherFailureExitCode = 4
+
 $packagePath = (Resolve-Path -LiteralPath $PackageRoot).Path
 $launcherPath = Join-Path $packagePath "sylphyhorn-cli.WinGetLauncher.exe"
 $clientPath = Join-Path $packagePath "sylphyhorn-cli.exe"
@@ -69,7 +73,8 @@ function Assert-CliAlias {
 
 	$invalid = Invoke-Cli $Path @("invalid-command")
 	$result = $invalid.Stdout | ConvertFrom-Json
-	if ($invalid.ExitCode -ne 2 -or $invalid.Stderr -ne "" -or
+	if ($invalid.ExitCode -ne $invalidArgumentsExitCode -or
+		$invalid.Stderr -ne "" -or
 		$result.schemaVersion -ne 1 -or $result.success -ne $false -or
 		$result.error.code -cne "invalid_arguments") {
 		throw "CLI alias JSON or exit code was not preserved: $Path"
@@ -81,15 +86,16 @@ Assert-CliAlias $launcherPath
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) `
 	("SylphyHornPlus-CliAliasTest-{0}" -f [guid]::NewGuid().ToString("N"))
 $aliasPath = Join-Path $temporaryRoot "sylphyhorn-cli.exe"
-$missingClientPath = Join-Path $temporaryRoot "sylphyhorn-cli.WinGetLauncher.exe"
+# A launcher copy with no adjacent sylphyhorn-cli.exe must fail with a JSON error.
+$orphanLauncherPath = Join-Path $temporaryRoot "sylphyhorn-cli.WinGetLauncher.exe"
 try {
 	New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
-	Copy-Item -LiteralPath $launcherPath -Destination $missingClientPath
-	$missingClient = Invoke-Cli $missingClientPath @("desktop", "list")
-	$missingClientResult = $missingClient.Stdout | ConvertFrom-Json
-	if ($missingClient.ExitCode -ne 4 -or
-		$missingClientResult.success -ne $false -or
-		$missingClientResult.error.code -cne "launcher_failure") {
+	Copy-Item -LiteralPath $launcherPath -Destination $orphanLauncherPath
+	$orphanLauncher = Invoke-Cli $orphanLauncherPath @("desktop", "list")
+	$orphanLauncherResult = $orphanLauncher.Stdout | ConvertFrom-Json
+	if ($orphanLauncher.ExitCode -ne $launcherFailureExitCode -or
+		$orphanLauncherResult.success -ne $false -or
+		$orphanLauncherResult.error.code -cne "launcher_failure") {
 		throw "CLI alias startup failure was not reported as JSON."
 	}
 
@@ -118,8 +124,8 @@ finally {
 		if (Test-Path -LiteralPath $aliasPath) {
 			Remove-Item -LiteralPath $aliasPath -Force
 		}
-		if (Test-Path -LiteralPath $missingClientPath) {
-			Remove-Item -LiteralPath $missingClientPath -Force
+		if (Test-Path -LiteralPath $orphanLauncherPath) {
+			Remove-Item -LiteralPath $orphanLauncherPath -Force
 		}
 		Remove-Item -LiteralPath $temporaryRoot -Force
 	}
