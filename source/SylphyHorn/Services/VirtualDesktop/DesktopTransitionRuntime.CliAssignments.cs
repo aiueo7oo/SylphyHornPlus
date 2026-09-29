@@ -1,6 +1,7 @@
 ﻿#if !NETFRAMEWORK
 using System;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
@@ -11,6 +12,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 {
 	internal sealed partial class DesktopTransitionRuntime
 	{
+		// Assignment results register window IDs without the listing limit, so keep headroom below it.
+		private const int CliAssignmentWindowHeadroom = 256;
+
 		internal async Task<CliResponse> ResumeCliPlacementAsync(CliCommand command, CancellationToken cancellation)
 		{
 			this.EnsureOwnerAccess();
@@ -19,22 +23,22 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				this.EnsureCliAvailable(cancellation);
 				var status = this.PlacementStatus;
-				if (status == "Stopping" || status == "Suspended")
+				if (status == PlacementStatuses.Stopping || status == PlacementStatuses.Suspended)
 				{
-					return CliResponse.Fail(command.Operation, "host_busy", "Placement is being stopped or suspended.", true);
+					return CliResponse.Fail(command.Operation, "host_busy", "Placement is being stopped or suspended.", retryable: true);
 				}
-				if (status == "Disabled" || status == "NoRules")
+				if (status == PlacementStatuses.Disabled || status == PlacementStatuses.NoRules)
 				{
 					return CliResponse.Fail(command.Operation, "assignment_unavailable",
 						"Enable automatic placement and configure an enabled rule or closing target first.");
 				}
-				if (status == "Paused")
+				if (status == PlacementStatuses.Paused)
 				{
 					submitted = true;
 					await this.RestartPlacementAsync().WaitAsync(cancellation);
 					this.EnsureCliAvailable(cancellation);
 					status = this.PlacementStatus;
-					if (status != "Active" && status != "Preparing")
+					if (status != PlacementStatuses.Active && status != PlacementStatuses.Preparing)
 					{
 						return CliResponse.Fail(command.Operation, "assignment_unavailable", "Monitoring did not resume. Read assignment status and logs before retrying.");
 					}
@@ -65,8 +69,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 				PlacementAppIdentity app = null;
 				if (command.AppPath != null)
 				{
-					try { app = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath); }
-					catch (System.Runtime.Serialization.SerializationException)
+					try
+					{
+						app = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, command.AppPath);
+					}
+					catch (SerializationException)
 					{
 						return CliResponse.Fail(command.Operation, "invalid_arguments", "Specify a valid absolute executable path.");
 					}
@@ -86,7 +93,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 					}
 					app = rule.App;
 				}
-				if (this.PlacementStatus != "Active")
+				if (this.PlacementStatus != PlacementStatuses.Active)
 				{
 					return CliResponse.Fail(command.Operation, "assignment_unavailable", "Automatic app placement must be enabled and monitoring.");
 				}
@@ -94,34 +101,16 @@ namespace SylphyHorn.Services.DesktopTransitions
 				{
 					return CliResponse.Fail(command.Operation, "assignment_not_found", "No enabled assignment matches this executable path.");
 				}
-				foreach (var key in this._cliWindows.Where(pair => pair.Value.ExpiresAt < DateTime.UtcNow).Select(pair => pair.Key).ToArray())
-					this._cliWindows.Remove(key);
-				if (this._cliWindows.Count > 4096 - 256)
+				this.RemoveExpiredCliWindows();
+				if (this._cliWindows.Count > CliWindowLimit - CliAssignmentWindowHeadroom)
 				{
-					return CliResponse.Fail(command.Operation, "host_busy", "Too many unexpired window identifiers. Retry after they expire.", true);
+					return CliResponse.Fail(command.Operation, "host_busy", "Too many unexpired window identifiers. Retry after they expire.", retryable: true);
 				}
 				var request = this._placementSession.ApplyRulesAsync(this.PlacementDestinations, app, command.DryRun, cancellation);
 				submitted = !command.DryRun;
 				var application = await request;
-				var results = application.Preview.Items.Select(item =>
-				{
-					var previous = this._cliWindows.FirstOrDefault(pair => pair.Value.Identity.SameInstance(item.Identity));
-					var key = previous.Value == null ? Guid.NewGuid() : previous.Key;
-					this._cliWindows[key] = new CliWindowEntry { Identity = item.Identity, ExpiresAt = DateTime.UtcNow.AddMinutes(5) };
-					var result = application.Results.FirstOrDefault(value => value.Window == item.Candidate.Window && value.Rule == item.Rule.Id);
-					return new CliAssignmentResult
-					{
-						WindowId = key.ToString(),
-						RuleId = item.Rule.Id.ToString(),
-						Title = item.Title,
-						SourceDesktopId = item.Source == Guid.Empty ? null : item.Source.ToString(),
-						TargetDesktopId = item.Target?.ToString(),
-						CanApply = item.CanApply,
-						Outcome = result != null ? CliPlacementOutcome(result.Outcome)
-							: item.Excluded.HasValue ? CliPlacementOutcome(item.Excluded.Value) : "would_move",
-					};
-				}).ToArray();
-				if (!command.DryRun && results.Any(result => result.Outcome != "moved" && result.Outcome != "already_placed" && result.Outcome != "excluded"))
+				var results = application.Preview.Items.Select(item => this.CliAssignmentInfo(item, application)).ToArray();
+				if (!command.DryRun && results.Any(result => !IsSettledCliAssignment(result.Outcome)))
 				{
 					var unconfirmed = results.Any(result => result.Outcome == "unconfirmed");
 					var response = CliResponse.Fail(command.Operation, unconfirmed ? "result_unconfirmed" : "assignment_failed",
@@ -138,7 +127,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 			catch (PlacementRequestRejectedException ex) when (!submitted)
 			{
-				return CliResponse.Fail(command.Operation, "host_busy", ex.Message, true);
+				return CliResponse.Fail(command.Operation, "host_busy", ex.Message, retryable: true);
 			}
 			catch (CliFailure ex)
 			{
@@ -156,6 +145,32 @@ namespace SylphyHorn.Services.DesktopTransitions
 					"Assignments could not be evaluated or their results could not be confirmed.");
 			}
 		}
+
+		private CliAssignmentResult CliAssignmentInfo(PlacementPreviewItem item, PlacementRuleApplication application)
+		{
+			var key = this.RegisterCliWindow(item.Identity, this.FindCliWindowKey(item.Identity));
+			var applied = application.Results.FirstOrDefault(result => result.Window == item.Candidate.Window && result.Rule == item.Rule.Id);
+			return new CliAssignmentResult
+			{
+				WindowId = key.ToString(),
+				RuleId = item.Rule.Id.ToString(),
+				Title = item.Title,
+				SourceDesktopId = item.Source == Guid.Empty ? null : item.Source.ToString(),
+				TargetDesktopId = item.Target?.ToString(),
+				CanApply = item.CanApply,
+				Outcome = CliAssignmentOutcome(item, applied),
+			};
+		}
+
+		private static string CliAssignmentOutcome(PlacementPreviewItem item, PlacementResult applied)
+		{
+			if (applied != null) return CliPlacementOutcome(applied.Outcome);
+			if (item.Excluded.HasValue) return CliPlacementOutcome(item.Excluded.Value);
+			return "would_move";
+		}
+
+		private static bool IsSettledCliAssignment(string outcome)
+			=> outcome == "moved" || outcome == "already_placed" || outcome == "excluded";
 
 		private static string CliPlacementOutcome(PlacementOutcome outcome)
 		{
