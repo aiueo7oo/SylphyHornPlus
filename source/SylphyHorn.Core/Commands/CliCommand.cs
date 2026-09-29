@@ -168,23 +168,16 @@ namespace SylphyHorn.Commands
 			Shortcut,
 		}
 
+		// The operation is the longest catalog command whose words are the leading arguments.
 		internal static string Recognize(string[] args)
 		{
-			if (args != null && args.Length > 0 && (args[0] == "logs" || args[0] == "version" || args[0] == "exit"))
-			{
-				return args[0];
-			}
-			if (args == null || args.Length < 2) return null;
-			var operation = args[0] + " " + args[1];
-			if ((operation == "app assignment" || operation == "desktop autoclose") && args.Length >= 3)
-			{
-				operation += " " + args[2];
-			}
-			if (operation == "desktop creation" && args.Length >= 4 && args[2] == "wallpaper")
-			{
-				operation += " wallpaper " + args[3];
-			}
-			return CliSpecCatalog.Find(operation) != null ? operation : null;
+			if (args == null) return null;
+			return CliSpecCatalog.All
+				.Select(command => command.Name.Split(' '))
+				.Where(words => words.Length <= args.Length && words.SequenceEqual(args.Take(words.Length)))
+				.OrderByDescending(words => words.Length)
+				.Select(words => string.Join(" ", words))
+				.FirstOrDefault();
 		}
 
 		internal static CliCommand Parse(string[] args)
