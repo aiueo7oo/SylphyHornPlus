@@ -4,8 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
 using SylphyHorn.Services;
+using SylphyHorn.Services.AppPlacement;
 using SylphyHorn.Services.DesktopTransitions;
 using WindowsDesktop;
 using Xunit;
@@ -36,7 +38,8 @@ namespace SylphyHorn.Tests
 			FakeSettings settings,
 			FakeOwner owner,
 			FakeOperations operations,
-			Services.AppPlacement.IPlacementSessionFactory placementFactory, Func<long> closureClock)
+			IPlacementSessionFactory placementFactory,
+			Func<long> closureClock)
 		{
 			this.Provider = provider;
 			this.Settings = settings;
@@ -49,7 +52,14 @@ namespace SylphyHorn.Tests
 		internal FakeOwner Owner { get; }
 		internal FakeOperations Operations { get; }
 		internal DesktopTransitionRuntime Runtime { get; }
-		internal static Harness Create(VirtualDesktopStableBatch batch, Services.AppPlacement.IPlacementSessionFactory placementFactory = null, Func<long> closureClock = null) => new Harness(new FakeProvider(batch), new FakeSettings(DesktopStartupSeed.Empty), new FakeOwner(), new FakeOperations(), placementFactory, closureClock);
+		internal static Harness Create(VirtualDesktopStableBatch batch, IPlacementSessionFactory placementFactory = null, Func<long> closureClock = null)
+			=> new Harness(
+				new FakeProvider(batch),
+				new FakeSettings(DesktopStartupSeed.Empty),
+				new FakeOwner(),
+				new FakeOperations(),
+				placementFactory,
+				closureClock);
 		internal static async Task<Harness> Initialized()
 		{
 			var harness = Create(Batch(1, 1, A, Entry(A, 0, "name", "wall")));
@@ -122,12 +132,12 @@ namespace SylphyHorn.Tests
 
 	internal sealed class FakeSettings : IDesktopSettingsTransactions
 	{
-		internal SylphyHorn.AppPlacement.PlacementCreatedGroup[] CreatedGroups = Array.Empty<SylphyHorn.AppPlacement.PlacementCreatedGroup>();
+		internal PlacementCreatedGroup[] CreatedGroups = Array.Empty<PlacementCreatedGroup>();
 		public DesktopWallpaperOnCreation[] WallpapersOnCreation = Array.Empty<DesktopWallpaperOnCreation>();
 		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => this.WallpapersOnCreation;
 		public bool PerDesktopWallpaperEnabled { get; set; } = true;
-		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this.CreatedGroups;
-		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => this.CreatedGroups = groups;
+		public PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this.CreatedGroups;
+		public void WriteCreatedDesktopGroups(PlacementCreatedGroup[] groups) => this.CreatedGroups = groups;
 		internal FakeSettings(DesktopStartupSeed seed)
 		{
 			this.Seed = seed;

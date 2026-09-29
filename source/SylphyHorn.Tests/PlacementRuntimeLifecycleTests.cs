@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
 using SylphyHorn.Services.AppPlacement;
+using WindowsDesktop;
 using Xunit;
 using static SylphyHorn.Tests.DesktopRuntimeTestData;
 
@@ -151,15 +152,34 @@ namespace SylphyHorn.Tests
 			var request = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token);
 			harness.Owner.Drain();
 			var result = await request;
-			var entries = change == "add" ? new[] { Entry(A, 0, "home", ""), Entry(B, 1, "work", ""), Entry(C, 2, "new", "") }
-				: change == "remove" ? new[] { Entry(A, 0, "home", "") }
-				: change == "reorder" ? new[] { Entry(B, 0, "work", ""), Entry(A, 1, "home", "") }
-				: new[] { Entry(A, 0, "home", ""), Entry(B, 1, change == "name" ? "renamed" : "work", "") };
-			harness.Provider.PublishStable(Batch(change == "reset" ? 2 : 1, 2, change == "current" ? B : A, entries));
+			harness.Provider.PublishStable(DestinationChange(change));
 			Assert.False(result.Permit.TryStart());
 			Assert.Equal(1, session.DesktopChanges);
 			session.Release();
 			await harness.Runtime.ShutdownAsync();
+		}
+
+		private static VirtualDesktopStableBatch DestinationChange(string change)
+		{
+			var home = Entry(A, 0, "home", "");
+			var work = Entry(B, 1, "work", "");
+			switch (change)
+			{
+				case "add":
+					return Batch(1, 2, A, home, work, Entry(C, 2, "new", ""));
+				case "name":
+					return Batch(1, 2, A, home, Entry(B, 1, "renamed", ""));
+				case "remove":
+					return Batch(1, 2, A, home);
+				case "reorder":
+					return Batch(1, 2, A, Entry(B, 0, "work", ""), Entry(A, 1, "home", ""));
+				case "current":
+					return Batch(1, 2, B, home, work);
+				case "reset":
+					return Batch(2, 2, A, home, work);
+				default:
+					throw new ArgumentOutOfRangeException(nameof(change));
+			}
 		}
 
 		[Fact]
@@ -416,11 +436,11 @@ namespace SylphyHorn.Tests
 		}
 
 		[Theory]
-		[InlineData(false, false)]
-		[InlineData(false, true)]
-		[InlineData(true, false)]
-		[InlineData(true, true)]
-		public async Task MissingDestinationsAreCreatedOnlyWhenEnabled(bool enabled, bool named)
+		[InlineData(false, false, 0)]
+		[InlineData(false, true, 0)]
+		[InlineData(true, false, 2)]
+		[InlineData(true, true, 1)]
+		public async Task MissingDestinationsAreCreatedOnlyWhenEnabled(bool enabled, bool named, int expectedCreations)
 		{
 			var factory = new Factory();
 			var harness = await Create(factory);
@@ -435,7 +455,7 @@ namespace SylphyHorn.Tests
 			harness.Owner.Drain();
 			var result = await request;
 			Assert.Equal(enabled ? PlacementResolutionStatus.Resolved : PlacementResolutionStatus.Missing, result.Resolution.Status);
-			Assert.Equal(enabled ? (named ? 1 : 2) : 0, harness.Operations.CreateCalls);
+			Assert.Equal(expectedCreations, harness.Operations.CreateCalls);
 			Assert.Equal(enabled && named ? 1 : 0, harness.Operations.NameCalls);
 			if (enabled)
 			{
@@ -469,24 +489,31 @@ namespace SylphyHorn.Tests
 		}
 
 		[Theory]
-		[InlineData(0)]
-		[InlineData(1)]
-		[InlineData(2)]
-		public async Task CreationOrReconciliationFailureStopsWithoutRollbackOrSwitch(int failure)
+		[InlineData("create", false)]
+		[InlineData("name", true)]
+		[InlineData("reconciliation", false)]
+		public async Task CreationOrReconciliationFailureStopsWithoutRollbackOrSwitch(string failure, bool named)
 		{
 			var factory = new Factory();
 			var harness = await Create(factory);
-			if (failure == 0)
+			switch (failure)
 			{
-				harness.Operations.CreateFailure = new InvalidOperationException("synthetic");
-			}
-			if (failure == 1)
-			{
-				harness.Operations.NameFailure = new InvalidOperationException("synthetic");
+				case "create":
+					harness.Operations.CreateFailure = new InvalidOperationException("synthetic");
+					break;
+				case "name":
+					harness.Operations.NameFailure = new InvalidOperationException("synthetic");
+					break;
+				case "reconciliation":
+					// The provider has no result queued for the refresh after creation.
+					break;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(failure));
 			}
 			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
 			var session = factory.Sessions[0];
-			var request = session.Authorize(failure == 1 ? PlacementDestination.ByName("work") : PlacementDestination.ByNumber(3), session.Cancellation.Token);
+			var destination = named ? PlacementDestination.ByName("work") : PlacementDestination.ByNumber(3);
+			var request = session.Authorize(destination, session.Cancellation.Token);
 			harness.Owner.Drain();
 			await Assert.ThrowsAsync<InvalidOperationException>(() => request);
 			Assert.Equal(1, harness.Operations.CreateCalls);
@@ -500,7 +527,7 @@ namespace SylphyHorn.Tests
 		{
 			var factory = new Factory();
 			var harness = await Create(factory);
-			var refresh = new TaskCompletionSource<WindowsDesktop.VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+			var refresh = new TaskCompletionSource<VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 			harness.Provider.NextRequest = refresh.Task;
 			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
 			var session = factory.Sessions[0];
@@ -511,7 +538,7 @@ namespace SylphyHorn.Tests
 			await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
 			session.Release();
 			await disable;
-			refresh.SetResult(WindowsDesktop.VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
+			refresh.SetResult(VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
 			harness.Owner.Drain();
 			Assert.Equal(1, harness.Operations.CreateCalls);
 			Assert.Empty(harness.Operations.DesktopOperationNames);
@@ -523,7 +550,7 @@ namespace SylphyHorn.Tests
 		{
 			var factory = new Factory();
 			var harness = await Create(factory);
-			var refresh = new TaskCompletionSource<WindowsDesktop.VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+			var refresh = new TaskCompletionSource<VirtualDesktopReconciliationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 			harness.Provider.NextRequest = refresh.Task;
 			harness.Operations.Creating = () => B;
 			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
@@ -533,7 +560,7 @@ namespace SylphyHorn.Tests
 			var second = session.Authorize(PlacementDestination.ByNumber(2), session.Cancellation.Token);
 			harness.Owner.Drain();
 			Assert.Equal(1, harness.Operations.CreateCalls);
-			refresh.SetResult(WindowsDesktop.VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
+			refresh.SetResult(VirtualDesktopReconciliationResult.Succeeded(Batch(1, 2, A, Entry(A, 0, "name", ""), Entry(B, 1, "", ""))));
 			Assert.Equal(B, (await first).Resolution.DesktopId);
 			Assert.Equal(B, (await second).Resolution.DesktopId);
 			Assert.Equal(1, harness.Operations.CreateCalls);
@@ -703,9 +730,25 @@ namespace SylphyHorn.Tests
 
 		private sealed class Session : IPlacementSession
 		{
+			internal readonly AppPlacementConfiguration Configuration;
+			internal readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
+			internal readonly TaskCompletionSource<bool> Ended = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 			internal Func<PlacementOccupancyObservation, CancellationToken, Task<bool>> Close;
 			internal PlacementDesktopMap PreviewMap;
 			internal PlacementPreview AppliedPreview;
+			internal bool Stopping;
+			internal int DesktopChanges;
+			private readonly Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> _authorize;
+
+			internal Session(AppPlacementConfiguration configuration, Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize)
+			{
+				this.Configuration = configuration;
+				this._authorize = authorize;
+			}
+
+			public bool IsReady { get; set; }
+
+			public Task Completion => this.Ended.Task;
 
 			public Task<PlacementRuleApplication> ApplyRulesAsync(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun, CancellationToken cancellation)
 				=> throw new NotSupportedException();
@@ -722,28 +765,7 @@ namespace SylphyHorn.Tests
 				return Task.FromResult(Array.Empty<PlacementResult>());
 			}
 
-			public bool IsReady { get; set; }
-
-			internal readonly AppPlacementConfiguration Configuration;
-			private readonly Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> _authorize;
-
-			internal Task<PlacementAuthorization> Authorize(PlacementDestination destination, CancellationToken cancellation, bool allowCreation = true)
-				=> this._authorize(destination, allowCreation, cancellation);
-			internal readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
-			internal readonly TaskCompletionSource<bool> Ended = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-			internal bool Stopping;
-
-			internal Session(AppPlacementConfiguration configuration, Func<PlacementDestination, bool, CancellationToken, Task<PlacementAuthorization>> authorize)
-			{
-				this.Configuration = configuration;
-				this._authorize = authorize;
-			}
-
-			internal int DesktopChanges;
-
 			public void DesktopChanged() => this.DesktopChanges++;
-
-			public Task Completion => this.Ended.Task;
 
 			public Task StopAsync()
 			{
@@ -751,6 +773,9 @@ namespace SylphyHorn.Tests
 				this.Cancellation.Cancel();
 				return this.Completion;
 			}
+
+			internal Task<PlacementAuthorization> Authorize(PlacementDestination destination, CancellationToken cancellation, bool allowCreation = true)
+				=> this._authorize(destination, allowCreation, cancellation);
 
 			internal void Release() => this.Ended.TrySetResult(true);
 		}

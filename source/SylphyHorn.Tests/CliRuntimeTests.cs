@@ -236,13 +236,27 @@ namespace SylphyHorn.Tests
 			{
 				File.WriteAllText(this._imagePath, "not an image");
 			}
-			var path = kind == "relative" ? "wallpaper.bmp" : kind == "empty" ? "" : this._imagePath;
+			var path = InvalidWallpaperPath(kind, this._imagePath);
 			var before = harness.Runtime.State.Records[A].WallpaperPath.Value;
 			var response = await harness.Runtime.ExecuteCliAsync(
 				CliCommand.Parse(new[] { "desktop", "wallpaper", "--number", "1", "--path", path }), CancellationToken.None);
 			Assert.Equal("invalid_arguments", response.Error.Code);
 			Assert.Equal(0, harness.Operations.WallpaperCalls);
 			Assert.Equal(before, harness.Runtime.State.Records[A].WallpaperPath.Value);
+		}
+
+		private static string InvalidWallpaperPath(string kind, string imagePath)
+		{
+			switch (kind)
+			{
+				case "relative":
+					return "wallpaper.bmp";
+				case "empty":
+					return "";
+				default:
+					// "missing" is never written; "unreadable" is written with text content.
+					return imagePath;
+			}
 		}
 
 		[Fact]

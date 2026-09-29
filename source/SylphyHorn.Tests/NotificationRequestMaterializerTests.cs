@@ -19,7 +19,11 @@ namespace SylphyHorn.Tests
 			var right = new Rect(0, 0, 1920, 1040);
 			var monitors = new[] { new Monitor("Left", left, left), new Monitor("Right", right, right) };
 			var cursorReads = 0;
-			Func<Rect> current = () => { cursorReads++; return left; };
+			Func<Rect> current = () =>
+			{
+				cursorReads++;
+				return left;
+			};
 
 			Assert.Equal(right, Assert.Single(NotificationWindowFactory.ResolveSwitchAreas(2, monitors, current)));
 			Assert.Equal(new[] { left, right }, NotificationWindowFactory.ResolveSwitchAreas(uint.MaxValue, monitors, current));
