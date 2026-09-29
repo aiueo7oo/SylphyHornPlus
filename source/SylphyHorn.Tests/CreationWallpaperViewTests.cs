@@ -42,31 +42,31 @@ namespace SylphyHorn.Tests
 					{
 						Resources.Culture = CultureInfo.GetCultureInfo(culture);
 						var missing = @"D:\Images\presentation.png";
-						using (var f = await CreationWallpaperUiFixture.Create(new[]
+						using (var fixture = await CreationWallpaperUiFixture.Create(new[]
 						{
 							new DesktopWallpaperOnCreation("Presentation", null, missing),
 							new DesktopWallpaperOnCreation("Development", null, @"C:\Users\Public\Pictures\Wallpapers\Development\2026\aurora-borealis-over-the-northern-lake-3840x2160.jpg"),
 							new DesktopWallpaperOnCreation(null, 3, @"C:\Wallpapers\third.jpg")
 						}, missing: new[] { missing }))
 						{
-							f.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Development", ""), Entry(B, 1, "Web", "")));
-							f.Harness.Owner.Drain();
-							f.Model.RefreshDestinationChoices();
-							var draft = f.Model.AddRow(f.Model.NumberGroup);
+							fixture.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Development", ""), Entry(B, 1, "Web", "")));
+							fixture.Harness.Owner.Drain();
+							fixture.Model.RefreshDestinationChoices();
+							var draft = fixture.Model.AddRow(fixture.Model.NumberGroup);
 							var view = new CreationWallpaperSettingsView
 							{
-								DataContext = f.Model,
+								DataContext = fixture.Model,
 								Width = 640,
 								Height = 475,
 								FontFamily = new FontFamily("Segoe UI, Meiryo UI")
 							};
 							Theme(view, theme);
 							AddHeaderStyle(view);
-							await Until(() => f.Model.NameGroup.Rows[0].Error.Length > 0);
-							var saved = f.Settings.DesktopWallpapersOnCreation.Value;
+							await Until(() => fixture.Model.NameGroup.Rows[0].Error.Length > 0);
+							var saved = fixture.Settings.DesktopWallpapersOnCreation.Value;
 							Render(view, scale);
-							AssertLayout(view, f.Model);
-							var longRow = f.Model.NameGroup.Rows[1];
+							AssertLayout(view, fixture.Model);
+							var longRow = fixture.Model.NameGroup.Rows[1];
 							var longBox = PathBox(view, longRow);
 							Assert.Equal(longRow.Saved.WallpaperPath, longBox.Text);
 							Assert.Equal(longRow.WallpaperPath, longBox.ToolTip);
@@ -77,10 +77,10 @@ namespace SylphyHorn.Tests
 								RoutedEvent = System.Windows.Input.Keyboard.LostKeyboardFocusEvent,
 							});
 							Render(view, scale);
-							Assert.Same(saved, f.Settings.DesktopWallpapersOnCreation.Value);
+							Assert.Same(saved, fixture.Settings.DesktopWallpapersOnCreation.Value);
 							Assert.False(longRow.IsEdited);
 							Assert.Equal("", longRow.Error);
-							Assert.Contains(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == f.Model.Text["MissingImage"]);
+							Assert.Contains(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == fixture.Model.Text["MissingImage"]);
 							Assert.DoesNotContain(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text.Contains(Resources.Settings_Background_ChangeBackground));
 							var destinations = Descendants(view).OfType<ComboBox>().ToArray();
 							Assert.Equal(4, destinations.Length);
@@ -89,30 +89,30 @@ namespace SylphyHorn.Tests
 							Assert.Equal("", Assert.Single(destinations, combo => ReferenceEquals(combo.DataContext, draft)).Text);
 
 							// A save failure and a discarded edit are shown together; the retry button stays with the save failure.
-							f.Harness.Settings.Provider.SaveFailure = new System.IO.IOException("synthetic");
-							await f.Add(false, "5", @"C:\Wallpapers\fifth.jpg");
+							fixture.Harness.Settings.Provider.SaveFailure = new System.IO.IOException("synthetic");
+							await fixture.Add(false, "5", @"C:\Wallpapers\fifth.jpg");
 							longRow.WallpaperPath = @"C:\Wallpapers\typing";
-							f.Settings.DesktopWallpapersOnCreation.Value = f.Settings.DesktopWallpapersOnCreation.Value.Where(item => item.Name != "Development").ToArray();
+							fixture.Settings.DesktopWallpapersOnCreation.Value = fixture.Settings.DesktopWallpapersOnCreation.Value.Where(item => item.Name != "Development").ToArray();
 							Render(view, scale);
-							var saveMessage = Assert.Single(Descendants(view).OfType<TextBlock>(), text => text.Text == f.Model.Text["SaveFailed"]);
-							var discarded = Assert.Single(Descendants(view).OfType<TextBlock>(), text => text.Text == f.Model.Text["ConfigurationChanged"]);
-							var retry = Assert.Single(Descendants(view).OfType<Button>(), button => ReferenceEquals(button.Command, f.Model.RetrySaveCommand));
+							var saveMessage = Assert.Single(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["SaveFailed"]);
+							var discarded = Assert.Single(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["ConfigurationChanged"]);
+							var retry = Assert.Single(Descendants(view).OfType<Button>(), button => ReferenceEquals(button.Command, fixture.Model.RetrySaveCommand));
 							Assert.True(Shown(saveMessage) && Shown(discarded) && Shown(retry));
 							Assert.Same(VisualTreeHelper.GetParent(saveMessage), VisualTreeHelper.GetParent(retry));
-							f.Harness.Settings.Provider.SaveFailure = null;
-							await f.Model.RetrySaveCommand.ExecuteAsync(null);
+							fixture.Harness.Settings.Provider.SaveFailure = null;
+							await fixture.Model.RetrySaveCommand.ExecuteAsync(null);
 							Render(view, scale);
 							Assert.False(Shown(saveMessage) || Shown(retry));
 							Assert.True(Shown(discarded));
 
 							// An empty list shows neither its column captions nor its top rule.
-							foreach (var row in f.Model.NameGroup.Rows.ToArray())
+							foreach (var row in fixture.Model.NameGroup.Rows.ToArray())
 							{
-								await f.Model.RemoveAsync(row);
+								await fixture.Model.RemoveAsync(row);
 							}
 							Render(view, scale);
-							Assert.DoesNotContain(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == f.Model.Text["NameColumn"]);
-							Assert.Contains(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == f.Model.Text["NumberColumn"]);
+							Assert.DoesNotContain(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == fixture.Model.Text["NameColumn"]);
+							Assert.Contains(Descendants(view).OfType<TextBlock>(), text => Shown(text) && text.Text == fixture.Model.Text["NumberColumn"]);
 
 							var originalSetting = Settings.General.Culture.Value;
 							try
@@ -121,8 +121,8 @@ namespace SylphyHorn.Tests
 								{
 									SylphyHorn.Services.ResourceService.Current.ChangeCulture(language);
 									Render(view, scale);
-									AssertLayout(view, f.Model);
-									Assert.Contains(Descendants(view).OfType<TextBlock>(), text => text.Text == f.Model.Text["Title"]);
+									AssertLayout(view, fixture.Model);
+									Assert.Contains(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["Title"]);
 									Assert.Contains(Descendants(view).OfType<Button>(), button => Equals(button.Content, language == "en" ? "Delete" : "削除"));
 								}
 							}

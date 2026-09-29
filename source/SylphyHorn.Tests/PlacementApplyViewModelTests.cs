@@ -16,102 +16,102 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task PreviewDoesNotApplyOrPreselectAndExcludedRowsCannotBeChecked()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				Assert.Equal(3, f.Model.Rows.Count);
-				Assert.All(f.Model.Rows, row => Assert.False(row.Selected));
-				Assert.Equal(0, f.Session.ApplyCalls);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				var excluded = f.Model.Rows[2];
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				Assert.Equal(3, fixture.Model.Rows.Count);
+				Assert.All(fixture.Model.Rows, row => Assert.False(row.Selected));
+				Assert.Equal(0, fixture.Session.ApplyCalls);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				var excluded = fixture.Model.Rows[2];
 				excluded.Selected = true;
 				Assert.False(excluded.Selected);
 				Assert.False(excluded.Selectable);
-				Assert.DoesNotContain(A.ToString(), f.Model.Rows[0].Source);
-				Assert.Contains("Development", f.Model.Rows[0].Target);
+				Assert.DoesNotContain(A.ToString(), fixture.Model.Rows[0].Source);
+				Assert.Contains("Development", fixture.Model.Rows[0].Target);
 			}
 		}
 
 		[Fact]
 		public async Task OnlyCheckedWindowsAreSentAndResultsRequireFreshPreviewBeforeReuse()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				var row = f.Model.Rows[1];
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				var row = fixture.Model.Rows[1];
 				row.Selected = true;
-				await f.Model.ApplyCommand.ExecuteAsync(null);
-				Assert.Equal(new[] { row.Item.Id }, f.Session.Selection);
-				Assert.Equal(f.Model.Text["OutcomeMoved"], row.Result);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.All(f.Model.Rows, item => Assert.False(item.Selectable));
-				await f.Model.ApplyCommand.ExecuteAsync(null);
-				Assert.Equal(1, f.Session.ApplyCalls);
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				Assert.All(f.Model.Rows, item => Assert.False(item.Selected));
+				await fixture.Model.ApplyCommand.ExecuteAsync(null);
+				Assert.Equal(new[] { row.Item.Id }, fixture.Session.Selection);
+				Assert.Equal(fixture.Model.Text["OutcomeMoved"], row.Result);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.All(fixture.Model.Rows, item => Assert.False(item.Selectable));
+				await fixture.Model.ApplyCommand.ExecuteAsync(null);
+				Assert.Equal(1, fixture.Session.ApplyCalls);
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				Assert.All(fixture.Model.Rows, item => Assert.False(item.Selected));
 			}
 		}
 
 		[Fact]
 		public async Task CancellingInFlightApplyRetainsConfirmedAndCancelledResults()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				foreach (var row in f.Model.Rows.Take(2))
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				foreach (var row in fixture.Model.Rows.Take(2))
 				{
 					row.Selected = true;
 				}
 				var gate = new TaskCompletionSource<PlacementResult[]>();
-				f.Session.ApplyPending = gate.Task;
-				var applying = f.Model.ApplyCommand.ExecuteAsync(null);
-				Assert.True(f.Model.IsBusy);
-				Assert.False(f.Model.RefreshCommand.CanExecute(null));
-				f.Model.StopCommand.Execute(null);
-				Assert.True(f.Session.Token.IsCancellationRequested);
-				gate.SetResult(new[] { f.Session.Result(0, PlacementOutcome.Moved), f.Session.Result(1, PlacementOutcome.Cancelled) });
+				fixture.Session.ApplyPending = gate.Task;
+				var applying = fixture.Model.ApplyCommand.ExecuteAsync(null);
+				Assert.True(fixture.Model.IsBusy);
+				Assert.False(fixture.Model.RefreshCommand.CanExecute(null));
+				fixture.Model.StopCommand.Execute(null);
+				Assert.True(fixture.Session.Token.IsCancellationRequested);
+				gate.SetResult(new[] { fixture.Session.Result(0, PlacementOutcome.Moved), fixture.Session.Result(1, PlacementOutcome.Cancelled) });
 				await applying;
-				Assert.Equal(f.Model.Text["OutcomeMoved"], f.Model.Rows[0].Result);
-				Assert.Equal(f.Model.Text["OutcomeCancelled"], f.Model.Rows[1].Result);
-				Assert.False(f.Model.IsBusy);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
+				Assert.Equal(fixture.Model.Text["OutcomeMoved"], fixture.Model.Rows[0].Result);
+				Assert.Equal(fixture.Model.Text["OutcomeCancelled"], fixture.Model.Rows[1].Result);
+				Assert.False(fixture.Model.IsBusy);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
 			}
 		}
 
 		[Fact]
 		public async Task ClosingDuringApplyCancelsPendingWorkAndDoesNotPublishLateSuccess()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				var row = f.Model.Rows[0];
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				var row = fixture.Model.Rows[0];
 				row.Selected = true;
 				var gate = new TaskCompletionSource<PlacementResult[]>();
-				f.Session.ApplyPending = gate.Task;
-				var applying = f.Model.ApplyCommand.ExecuteAsync(null);
-				f.Model.Dispose();
-				Assert.True(f.Session.Token.IsCancellationRequested);
-				gate.SetResult(new[] { f.Session.Result(0, PlacementOutcome.Moved) });
+				fixture.Session.ApplyPending = gate.Task;
+				var applying = fixture.Model.ApplyCommand.ExecuteAsync(null);
+				fixture.Model.Dispose();
+				Assert.True(fixture.Session.Token.IsCancellationRequested);
+				gate.SetResult(new[] { fixture.Session.Result(0, PlacementOutcome.Moved) });
 				await applying;
-				Assert.NotEqual(f.Model.Text["OutcomeMoved"], row.Result);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.False(f.Model.RefreshCommand.CanExecute(null));
+				Assert.NotEqual(fixture.Model.Text["OutcomeMoved"], row.Result);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.False(fixture.Model.RefreshCommand.CanExecute(null));
 			}
 		}
 
 		[Fact]
 		public async Task ExpiredOrFailedApplicationIsNotReportedAsSuccessOrRetried()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				f.Model.Rows[0].Selected = true;
-				f.Session.ApplyPending = Task.FromException<PlacementResult[]>(new InvalidOperationException("expired"));
-				await f.Model.ApplyCommand.ExecuteAsync(null);
-				Assert.Equal(f.Model.Text["ApplyFailed"], f.Model.Status);
-				Assert.Equal(f.Model.Text["OutcomeUnconfirmed"], f.Model.Rows[0].Result);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.Equal(1, f.Session.ApplyCalls);
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				fixture.Model.Rows[0].Selected = true;
+				fixture.Session.ApplyPending = Task.FromException<PlacementResult[]>(new InvalidOperationException("expired"));
+				await fixture.Model.ApplyCommand.ExecuteAsync(null);
+				Assert.Equal(fixture.Model.Text["ApplyFailed"], fixture.Model.Status);
+				Assert.Equal(fixture.Model.Text["OutcomeUnconfirmed"], fixture.Model.Rows[0].Result);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.Equal(1, fixture.Session.ApplyCalls);
 			}
 		}
 
@@ -120,59 +120,59 @@ namespace SylphyHorn.Tests
 		[InlineData(true)]
 		public async Task ClosedOrChangedPreviewCannotPublishLateRows(bool stateChanged)
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
 				var gate = new TaskCompletionSource<PlacementPreview>();
-				f.Session.PreviewPending = gate.Task;
-				var loading = f.Model.RefreshCommand.ExecuteAsync(null);
+				fixture.Session.PreviewPending = gate.Task;
+				var loading = fixture.Model.RefreshCommand.ExecuteAsync(null);
 				if (stateChanged)
 				{
-					f.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Renamed", ""), Entry(B, 1, "Other", "")));
-					f.Harness.Owner.Drain();
+					fixture.Harness.Provider.PublishStable(Batch(1, 2, A, Entry(A, 0, "Renamed", ""), Entry(B, 1, "Other", "")));
+					fixture.Harness.Owner.Drain();
 				}
 				else
 				{
-					f.Model.Dispose();
+					fixture.Model.Dispose();
 				}
-				Assert.True(f.Session.Token.IsCancellationRequested);
-				gate.SetResult(f.Session.Preview);
+				Assert.True(fixture.Session.Token.IsCancellationRequested);
+				gate.SetResult(fixture.Session.Preview);
 				await loading;
-				Assert.Empty(f.Model.Rows);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.Equal(0, f.Session.ApplyCalls);
+				Assert.Empty(fixture.Model.Rows);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.Equal(0, fixture.Session.ApplyCalls);
 			}
 		}
 
 		[Fact]
 		public async Task StoppedMonitoringInvalidatesSelectionAndExplainsWhy()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				f.Model.Rows[0].Selected = true;
-				await f.Harness.Runtime.ConfigurePlacementAsync(AppPlacementConfiguration.Empty);
-				f.Model.RefreshStatus();
-				Assert.Equal(f.Model.Text["ApplyDisabled"], f.Model.Status);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.False(f.Model.RefreshCommand.CanExecute(null));
-				Assert.All(f.Model.Rows, row => Assert.False(row.Selectable));
-				Assert.Equal(0, f.Session.ApplyCalls);
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				fixture.Model.Rows[0].Selected = true;
+				await fixture.Harness.Runtime.ConfigurePlacementAsync(AppPlacementConfiguration.Empty);
+				fixture.Model.RefreshStatus();
+				Assert.Equal(fixture.Model.Text["ApplyDisabled"], fixture.Model.Status);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.False(fixture.Model.RefreshCommand.CanExecute(null));
+				Assert.All(fixture.Model.Rows, row => Assert.False(row.Selectable));
+				Assert.Equal(0, fixture.Session.ApplyCalls);
 			}
 		}
 
 		[Fact]
 		public async Task EmptyAndFailedPreviewHaveDistinctMessagesAndCannotApply()
 		{
-			using (var f = await PlacementApplyFixture.Create())
+			using (var fixture = await PlacementApplyFixture.Create())
 			{
-				f.Session.PreviewPending = Task.FromResult(new PlacementPreview(Array.Empty<PlacementPreviewItem>(), 0));
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				Assert.Equal(f.Model.Text["ApplyEmpty"], f.Model.Status);
-				f.Session.PreviewPending = Task.FromException<PlacementPreview>(new TimeoutException());
-				await f.Model.RefreshCommand.ExecuteAsync(null);
-				Assert.Equal(f.Model.Text["ApplyQueryFailed"], f.Model.Status);
-				Assert.False(f.Model.ApplyCommand.CanExecute(null));
-				Assert.Equal(0, f.Session.ApplyCalls);
+				fixture.Session.PreviewPending = Task.FromResult(new PlacementPreview(Array.Empty<PlacementPreviewItem>(), 0));
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				Assert.Equal(fixture.Model.Text["ApplyEmpty"], fixture.Model.Status);
+				fixture.Session.PreviewPending = Task.FromException<PlacementPreview>(new TimeoutException());
+				await fixture.Model.RefreshCommand.ExecuteAsync(null);
+				Assert.Equal(fixture.Model.Text["ApplyQueryFailed"], fixture.Model.Status);
+				Assert.False(fixture.Model.ApplyCommand.CanExecute(null));
+				Assert.Equal(0, fixture.Session.ApplyCalls);
 			}
 		}
 	}
@@ -185,12 +185,12 @@ namespace SylphyHorn.Tests
 
 		internal static async Task<PlacementApplyFixture> Create()
 		{
-			var f = new PlacementApplyFixture();
-			f.Harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "Web", ""), Entry(B, 1, "Development", "")), new Factory(f.Session));
-			await f.Harness.Runtime.InitializeAsync(cancellationToken: CancellationToken.None);
-			await f.Harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, f.Session.Preview.Items.Select(item => item.Rule).GroupBy(rule => rule.Id).Select(group => group.First())));
-			f.Model = new PlacementApplyViewModel(f.Harness.Runtime);
-			return f;
+			var fixture = new PlacementApplyFixture();
+			fixture.Harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "Web", ""), Entry(B, 1, "Development", "")), new Factory(fixture.Session));
+			await fixture.Harness.Runtime.InitializeAsync(cancellationToken: CancellationToken.None);
+			await fixture.Harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, fixture.Session.Preview.Items.Select(item => item.Rule).GroupBy(rule => rule.Id).Select(group => group.First())));
+			fixture.Model = new PlacementApplyViewModel(fixture.Harness.Runtime);
+			return fixture;
 		}
 
 		public void Dispose()

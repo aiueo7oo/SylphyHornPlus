@@ -35,7 +35,7 @@ namespace SylphyHorn.Tests
 				response = await service.ExecuteAsync(CliCommand.Parse(new[] { "app", "assignment", "configure", "--follow-foreground", "false" }), CancellationToken.None);
 				Assert.False(response.Data.FollowForeground);
 				Assert.False(Assert.Single(response.Data.Assignments).EffectiveFollowForeground);
-				var edited = Assert.Single(fixture.Model.Groups[1].Rows);
+				var edited = Assert.Single(fixture.Model.NumberGroup.Rows);
 				edited.FollowForeground = true;
 				await fixture.Model.CommitAsync(edited);
 				edited.Destination = "4";
@@ -153,8 +153,8 @@ namespace SylphyHorn.Tests
 				Assert.Equal(2, list.Data.ClosingTargets.Length);
 				Assert.Equal(99, list.Data.ClosingTargets[1].DesktopNumber);
 				Assert.Null(list.Data.Assignments);
-				Assert.Single(fixture.Model.ClosingGroups[0].Rows);
-				Assert.Single(fixture.Model.ClosingGroups[1].Rows);
+				Assert.Single(fixture.Model.NameClosingGroup.Rows);
+				Assert.Single(fixture.Model.NumberClosingGroup.Rows);
 				Assert.Empty(fixture.Harness.Operations.DesktopOperationIds);
 			}
 		}
@@ -384,7 +384,7 @@ namespace SylphyHorn.Tests
 				Assert.Equal("work", rule.Destination.Name);
 				Assert.True(fixture.Settings.Configuration.Value.CreateMissingDesktops);
 				Assert.True(fixture.Settings.Configuration.Value.CloseCreatedDesktops);
-				Assert.Equal("work", Assert.Single(fixture.Model.Groups[0].Rows).Destination);
+				Assert.Equal("work", Assert.Single(fixture.Model.NameGroup.Rows).Destination);
 				Assert.Empty(fixture.Harness.Operations.DesktopOperationIds);
 			}
 		}
