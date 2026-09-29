@@ -34,8 +34,6 @@ namespace SylphyHorn.Services
 		{
 			this.Display = display;
 			this.Placement = placement;
-			this.PinOffsetX = pinOffsetX;
-			this.PinOffsetY = pinOffsetY;
 			this.OffsetX = offsetX;
 			this.OffsetY = offsetY;
 			this.WindowStyle = windowStyle;
@@ -52,6 +50,8 @@ namespace SylphyHorn.Services
 			this.SimpleNotificationMinWidth = simpleNotificationMinWidth;
 			this.PinWindowMinWidth = pinWindowMinWidth;
 			this.NotificationMinHeight = notificationMinHeight;
+			this.PinOffsetX = pinOffsetX;
+			this.PinOffsetY = pinOffsetY;
 		}
 
 		internal uint Display { get; }
@@ -85,25 +85,25 @@ namespace SylphyHorn.Services
 				: defaultFont;
 
 			return new NotificationVisualSettings(
-				settings.Display.Value,
-				(WindowPlacement)settings.Placement.Value,
-				settings.NotificationOffsetX,
-				settings.NotificationOffsetY,
-				settings.NotificationWindowStyle.Value,
-				settings.NotificationCornerStyle.Value,
-				resolvedFontFamily,
-				settings.NotificationHeaderFontSize,
-				settings.NotificationBodyFontSize,
-				(HorizontalAlignment)settings.NotificationHeaderAlignment.Value,
-				(HorizontalAlignment)settings.NotificationBodyAlignment.Value,
-				settings.NotificationLineSpacing.Value,
-				settings.SimpleNotification,
-				settings.NotificationMinWidth,
-				settings.SimpleNotificationMinWidth,
-				settings.PinWindowMinWidth,
-				settings.NotificationMinHeight,
-				settings.PinWindowOffsetX,
-				settings.PinWindowOffsetY);
+				display: settings.Display.Value,
+				placement: (WindowPlacement)settings.Placement.Value,
+				offsetX: settings.NotificationOffsetX,
+				offsetY: settings.NotificationOffsetY,
+				windowStyle: settings.NotificationWindowStyle.Value,
+				cornerStyle: settings.NotificationCornerStyle.Value,
+				fontFamily: resolvedFontFamily,
+				headerFontSize: settings.NotificationHeaderFontSize,
+				bodyFontSize: settings.NotificationBodyFontSize,
+				headerAlignment: (HorizontalAlignment)settings.NotificationHeaderAlignment.Value,
+				bodyAlignment: (HorizontalAlignment)settings.NotificationBodyAlignment.Value,
+				lineSpacing: settings.NotificationLineSpacing.Value,
+				simpleNotification: settings.SimpleNotification,
+				notificationMinWidth: settings.NotificationMinWidth,
+				simpleNotificationMinWidth: settings.SimpleNotificationMinWidth,
+				pinWindowMinWidth: settings.PinWindowMinWidth,
+				notificationMinHeight: settings.NotificationMinHeight,
+				pinOffsetX: settings.PinWindowOffsetX,
+				pinOffsetY: settings.PinWindowOffsetY);
 		}
 
 		private static string CreateHeaderMargin(HorizontalAlignment alignment, int lineSpacing)
@@ -229,17 +229,17 @@ namespace SylphyHorn.Services
 	internal static class NotificationRequestMaterializer
 	{
 		internal static DesktopNotificationRequest CreateCurrent(int number, string name, NotificationSettingsSnapshot settings)
-			=> CreateDesktop(number, name, NotificationTextFormatter.CreateResidentHeader(settings.Visual.SimpleNotification), false, settings);
+			=> CreateDesktop(number, name, NotificationTextFormatter.CreateResidentHeader(settings.Visual.SimpleNotification), moved: false, settings);
 
 		internal static DesktopNotificationRequest CreateSwitched(int number, string name, NotificationSettingsSnapshot settings)
-			=> CreateDesktop(number, name, NotificationTextFormatter.CreateSwitchedHeader(settings.Visual.SimpleNotification), false, settings);
+			=> CreateDesktop(number, name, NotificationTextFormatter.CreateSwitchedHeader(settings.Visual.SimpleNotification), moved: false, settings);
 
 		internal static DesktopNotificationRequest CreateMoved(int currentNumber, string name, int oldNumber, int newNumber, NotificationSettingsSnapshot settings)
 			=> CreateDesktop(
 				currentNumber,
 				name,
 				NotificationTextFormatter.CreateMovedHeader(oldNumber, newNumber, settings.Visual.SimpleNotification),
-				true,
+				moved: true,
 				settings);
 
 		internal static PinNotificationRequest CreatePin(PinOperations operation, PinTargetGeometry geometry, NotificationSettingsSnapshot settings)

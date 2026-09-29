@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
 using WindowsDesktop;
 
@@ -22,8 +23,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 		DesktopStartupSeed CaptureStartupSeed();
 		DesktopWallpaperOnCreation[] ReadWallpapersOnCreation();
 		bool PerDesktopWallpaperEnabled { get; }
-		SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups();
-		void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups);
+		PlacementCreatedGroup[] ReadCreatedDesktopGroups();
+		void WriteCreatedDesktopGroups(PlacementCreatedGroup[] groups);
 		void ApplyProjection(DesktopSettingsProjection projection);
 		long SettingsRevision { get; }
 		Task<SettingsSaveResult> RequestSaveAsync(long stateRevision);

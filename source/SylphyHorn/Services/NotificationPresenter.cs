@@ -153,7 +153,10 @@ namespace SylphyHorn.Services
 			if (display == uint.MaxValue)
 			{
 				var areas = new Rect[monitors.Count];
-				for (var index = 0; index < monitors.Count; index++) areas[index] = monitors[index].WorkArea;
+				for (var index = 0; index < monitors.Count; index++)
+				{
+					areas[index] = monitors[index].WorkArea;
+				}
 				return areas;
 			}
 			if (display == 0 || display > monitors.Count)

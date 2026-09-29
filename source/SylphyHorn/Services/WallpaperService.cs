@@ -1,7 +1,9 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using SylphyHorn.Interop;
 using SylphyHorn.Properties;
 using SylphyHorn.Serialization;
@@ -78,10 +80,9 @@ namespace SylphyHorn.Services
 
 		internal static void ValidateImage(string path)
 		{
-			using (var stream = System.IO.File.OpenRead(path))
+			using (var stream = File.OpenRead(path))
 			{
-				System.Windows.Media.Imaging.BitmapDecoder.Create(stream,
-					System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+				BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
 			}
 		}
 

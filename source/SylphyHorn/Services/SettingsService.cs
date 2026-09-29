@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SylphyHorn.Lifetime;
 using SylphyHorn.Serialization;
 using SylphyHorn.Services.DesktopTransitions;
 
@@ -14,43 +15,46 @@ namespace SylphyHorn.Services
 
 		internal static IDisposable BindGeneralSettings(GeneralSettings settings, Action reloadInput, Action<bool> showNotification, Action reloadTray)
 		{
-			var subscriptions = new SylphyHorn.Lifetime.DisposableCollection();
-			subscriptions.Add(ObserveChange(settings.LoopDesktop, _ => reloadInput()));
-			subscriptions.Add(ObserveChange(settings.OverrideWindowsDefaultKeyCombination, _ => reloadInput()));
+			var subscriptions = new DisposableCollection();
+			subscriptions.Add(ObserveChange(settings.LoopDesktop, reloadInput));
+			subscriptions.Add(ObserveChange(settings.OverrideWindowsDefaultKeyCombination, reloadInput));
 			subscriptions.Add(ObserveChange(settings.AlwaysShowDesktopNotification, showNotification));
-			subscriptions.Add(ObserveChange(settings.TrayShowDesktop, _ => reloadTray()));
-			subscriptions.Add(ObserveChange(settings.TrayShowOnlyCurrentNumber, _ => reloadTray()));
+			subscriptions.Add(ObserveChange(settings.TrayShowDesktop, reloadTray));
+			subscriptions.Add(ObserveChange(settings.TrayShowOnlyCurrentNumber, reloadTray));
 			return subscriptions;
 		}
 
 		internal static IDisposable ObserveNotificationAppearance(GeneralSettings settings, Action changed)
 		{
-			var subscriptions = new SylphyHorn.Lifetime.DisposableCollection();
-			subscriptions.Add(ObserveChange(settings.Display, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.Placement, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationOffsetX, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationOffsetY, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationMinWidth, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.SimpleNotificationMinWidth, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationMinHeight, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.PinWindowMinWidth, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.PinWindowOffsetX, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.PinWindowOffsetY, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.SimpleNotification, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.UseDesktopName, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationWindowStyle, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationCornerStyle, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationFontFamily, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationHeaderFontSize, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationBodyFontSize, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationHeaderAlignment, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationBodyAlignment, _ => changed()));
-			subscriptions.Add(ObserveChange(settings.NotificationLineSpacing, _ => changed()));
+			var subscriptions = new DisposableCollection();
+			subscriptions.Add(ObserveChange(settings.Display, changed));
+			subscriptions.Add(ObserveChange(settings.Placement, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationOffsetX, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationOffsetY, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationMinWidth, changed));
+			subscriptions.Add(ObserveChange(settings.SimpleNotificationMinWidth, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationMinHeight, changed));
+			subscriptions.Add(ObserveChange(settings.PinWindowMinWidth, changed));
+			subscriptions.Add(ObserveChange(settings.PinWindowOffsetX, changed));
+			subscriptions.Add(ObserveChange(settings.PinWindowOffsetY, changed));
+			subscriptions.Add(ObserveChange(settings.SimpleNotification, changed));
+			subscriptions.Add(ObserveChange(settings.UseDesktopName, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationWindowStyle, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationCornerStyle, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationFontFamily, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationHeaderFontSize, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationBodyFontSize, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationHeaderAlignment, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationBodyAlignment, changed));
+			subscriptions.Add(ObserveChange(settings.NotificationLineSpacing, changed));
 			return subscriptions;
 		}
 
 		internal static IDisposable ObserveWallpaperSettings(GeneralSettings settings, Action changed)
-			=> ObserveChange(settings.ChangeBackgroundEachDesktop, _ => changed());
+			=> ObserveChange(settings.ChangeBackgroundEachDesktop, changed);
+
+		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action changed)
+			=> ObserveChange(property, (T _) => changed());
 
 		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action<T> changed)
 		{

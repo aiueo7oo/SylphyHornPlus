@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using SylphyHorn.AppPlacement;
 using SylphyHorn.Serialization;
+using SylphyHorn.Services.AppPlacement;
 using WindowsDesktop;
 
 namespace SylphyHorn.Services.DesktopTransitions
@@ -58,8 +60,8 @@ namespace SylphyHorn.Services.DesktopTransitions
 		public DesktopStartupSeed CaptureStartupSeed() => SettingsService.CaptureDesktopStartupSeed();
 		public DesktopWallpaperOnCreation[] ReadWallpapersOnCreation() => this._general.DesktopWallpapersOnCreation.Value;
 		public bool PerDesktopWallpaperEnabled => this._general.ChangeBackgroundEachDesktop.Value;
-		public SylphyHorn.AppPlacement.PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this._placement.CreatedDesktopGroups.Value;
-		public void WriteCreatedDesktopGroups(SylphyHorn.AppPlacement.PlacementCreatedGroup[] groups) => this._placement.CreatedDesktopGroups.Value = groups;
+		public PlacementCreatedGroup[] ReadCreatedDesktopGroups() => this._placement.CreatedDesktopGroups.Value;
+		public void WriteCreatedDesktopGroups(PlacementCreatedGroup[] groups) => this._placement.CreatedDesktopGroups.Value = groups;
 		public void ApplyProjection(DesktopSettingsProjection projection) => SettingsService.ApplyDesktopProjection(projection);
 		public long SettingsRevision => this._provider.SettingsRevision;
 		public Task<SettingsSaveResult> RequestSaveAsync(long stateRevision) => this._provider.SaveWithResultAsync(stateRevision);
@@ -118,7 +120,7 @@ namespace SylphyHorn.Services.DesktopTransitions
 			{
 				return false;
 			}
-			var observation = new AppPlacement.PlacementDesktopOccupancyReader().Read(CancellationToken.None, () => true);
+			var observation = new PlacementDesktopOccupancyReader().Read(CancellationToken.None, () => true);
 			if (!observation.Complete || observation.Occupied.Contains(desktopId)) return false;
 			// Recheck topology after COM-based occupancy inspection, which can pump native events.
 			var latest = VirtualDesktop.GetDesktops();
