@@ -4,6 +4,11 @@
              xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls"
              Loaded="OnLoaded"
              Unloaded="OnUnloaded">
+	<UserControl.Resources>
+		<!-- The column captions and every window row use these widths, so each caption stays above its values. -->
+		<GridLength x:Key="CheckColumnWidth">32</GridLength>
+		<GridLength x:Key="ValueColumnWidth">145</GridLength>
+	</UserControl.Resources>
 	<Grid Margin="16">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
@@ -19,11 +24,11 @@
 			</Grid.RowDefinitions>
 			<Grid Margin="12,0,12,4">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="32" />
+					<ColumnDefinition Width="{StaticResource CheckColumnWidth}" />
 					<ColumnDefinition />
-					<ColumnDefinition Width="145" />
-					<ColumnDefinition Width="145" />
-					<ColumnDefinition Width="145" />
+					<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
+					<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
+					<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
 				</Grid.ColumnDefinitions>
 				<TextBlock Grid.Column="1" Text="{Binding Text[WindowColumn]}" />
 				<TextBlock Grid.Column="2" Text="{Binding Text[SourceColumn]}" />
@@ -41,11 +46,11 @@
 					<DataTemplate>
 						<Grid Margin="4,6">
 							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="32" />
+								<ColumnDefinition Width="{StaticResource CheckColumnWidth}" />
 								<ColumnDefinition />
-								<ColumnDefinition Width="145" />
-								<ColumnDefinition Width="145" />
-								<ColumnDefinition Width="145" />
+								<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
+								<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
+								<ColumnDefinition Width="{StaticResource ValueColumnWidth}" />
 							</Grid.ColumnDefinitions>
 							<CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
 							          IsEnabled="{Binding Selectable}"

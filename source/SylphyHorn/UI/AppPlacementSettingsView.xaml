@@ -6,47 +6,28 @@
              Unloaded="OnUnloaded"
              IsVisibleChanged="OnVisibleChanged">
 	<UserControl.Resources>
-		<DataTemplate x:Key="PlacementDialogContent">
-			<DockPanel>
-				<DockPanel DockPanel.Dock="Top" metro:MetroWindow.IsCaptionBar="True">
-					<Border DockPanel.Dock="Bottom" Height="8" />
-					<StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-					            HorizontalAlignment="Right" VerticalAlignment="Top"
-					            WindowChrome.IsHitTestVisibleInChrome="True">
-						<metro:SystemButtons />
-					</StackPanel>
-					<TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
-					           FontFamily="Segoe UI Light, Meiryo UI" FontSize="18" Margin="12,8" />
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/SylphyHorn;component/UI/SettingsPageResources.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+			<DataTemplate x:Key="PlacementDialogContent">
+				<DockPanel>
+					<DockPanel DockPanel.Dock="Top" metro:MetroWindow.IsCaptionBar="True">
+						<Border DockPanel.Dock="Bottom" Height="8" />
+						<StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+						            HorizontalAlignment="Right" VerticalAlignment="Top"
+						            WindowChrome.IsHitTestVisibleInChrome="True">
+							<metro:SystemButtons />
+						</StackPanel>
+						<TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+						           FontFamily="Segoe UI Light, Meiryo UI" FontSize="18" Margin="12,8" />
+					</DockPanel>
+					<ContentPresenter Content="{Binding}" />
 				</DockPanel>
-				<ContentPresenter Content="{Binding}" />
-			</DockPanel>
-		</DataTemplate>
-		<BooleanToVisibilityConverter x:Key="Visible" />
-		<Style x:Key="InlineMessage" TargetType="TextBlock">
-			<Setter Property="TextWrapping" Value="Wrap" />
-			<Setter Property="Margin" Value="0,4" />
-			<Style.Triggers>
-				<Trigger Property="Text" Value="">
-					<Setter Property="Visibility" Value="Collapsed" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
-		<!-- Sections after the first are separated here, so HeaderStyleKey keeps its shared margin. -->
-		<Style x:Key="Section" TargetType="StackPanel">
-			<Setter Property="Margin" Value="0,16,0,0" />
-		</Style>
-		<!-- Each entry is bounded by rules: one above the list and one below every entry. -->
-		<Style x:Key="EntryList" TargetType="Border">
-			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrushKey}" />
-			<Setter Property="BorderThickness" Value="0,.99,0,0" />
-			<Style.Triggers>
-				<DataTrigger Binding="{Binding Rows.Count}" Value="0">
-					<Setter Property="BorderThickness" Value="0" />
-				</DataTrigger>
-			</Style.Triggers>
-		</Style>
-		<!-- Shown in the path box when there is no confirmed application icon: a window outline, not a real app. -->
-		<Geometry x:Key="EmptyAppGlyph">M1.5,2.5 H14.5 V13.5 H1.5 Z M1.5,5.5 H14.5</Geometry>
+			</DataTemplate>
+			<!-- Shown in the path box when there is no confirmed application icon: a window outline, not a real app. -->
+			<Geometry x:Key="EmptyAppGlyph">M1.5,2.5 H14.5 V13.5 H1.5 Z M1.5,5.5 H14.5</Geometry>
+		</ResourceDictionary>
 	</UserControl.Resources>
 	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
 		<!-- Text generated from the templates below does not receive the settings window's implicit TextBlock style;

@@ -3,35 +3,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
 	<UserControl.Resources>
-		<BooleanToVisibilityConverter x:Key="Visible" />
-		<Style x:Key="InlineMessage" TargetType="TextBlock">
-			<Setter Property="TextWrapping" Value="Wrap" />
-			<Setter Property="Margin" Value="0,4" />
-			<Style.Triggers>
-				<Trigger Property="Text" Value="">
-					<Setter Property="Visibility" Value="Collapsed" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
-		<Style x:Key="Section" TargetType="StackPanel">
-			<Setter Property="Margin" Value="0,16,0,0" />
-		</Style>
-		<Style x:Key="Captions" TargetType="Grid">
-			<Style.Triggers>
-				<DataTrigger Binding="{Binding Rows.Count}" Value="0">
-					<Setter Property="Visibility" Value="Collapsed" />
-				</DataTrigger>
-			</Style.Triggers>
-		</Style>
-		<Style x:Key="EntryList" TargetType="Border">
-			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrushKey}" />
-			<Setter Property="BorderThickness" Value="0,.99,0,0" />
-			<Style.Triggers>
-				<DataTrigger Binding="{Binding Rows.Count}" Value="0">
-					<Setter Property="BorderThickness" Value="0" />
-				</DataTrigger>
-			</Style.Triggers>
-		</Style>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/SylphyHorn;component/UI/SettingsPageResources.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+			<Style x:Key="Captions" TargetType="Grid">
+				<Style.Triggers>
+					<DataTrigger Binding="{Binding Rows.Count}" Value="0">
+						<Setter Property="Visibility" Value="Collapsed" />
+					</DataTrigger>
+				</Style.Triggers>
+			</Style>
+		</ResourceDictionary>
 	</UserControl.Resources>
 	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
 		<!-- See AppPlacementSettingsView: templated text would otherwise inherit the selected tab item's accent foreground. -->

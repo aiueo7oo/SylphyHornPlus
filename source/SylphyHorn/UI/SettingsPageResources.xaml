@@ -1,0 +1,28 @@
+﻿<!-- Resources shared by the app placement, desktop auto-close and creation wallpaper settings pages. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<BooleanToVisibilityConverter x:Key="Visible" />
+	<Style x:Key="InlineMessage" TargetType="TextBlock">
+		<Setter Property="TextWrapping" Value="Wrap" />
+		<Setter Property="Margin" Value="0,4" />
+		<Style.Triggers>
+			<Trigger Property="Text" Value="">
+				<Setter Property="Visibility" Value="Collapsed" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+	<!-- Sections after the first are separated here, so HeaderStyleKey keeps its shared margin. -->
+	<Style x:Key="Section" TargetType="StackPanel">
+		<Setter Property="Margin" Value="0,16,0,0" />
+	</Style>
+	<!-- Each entry is bounded by rules: one above the list and one below every entry. -->
+	<Style x:Key="EntryList" TargetType="Border">
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrushKey}" />
+		<Setter Property="BorderThickness" Value="0,.99,0,0" />
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding Rows.Count}" Value="0">
+				<Setter Property="BorderThickness" Value="0" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+</ResourceDictionary>

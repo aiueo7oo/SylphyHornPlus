@@ -4,19 +4,11 @@
              xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
 	<!-- Shares AppPlacementSettingsViewModel with the app placement tab: one settings owner and one save path. -->
 	<UserControl.Resources>
-		<BooleanToVisibilityConverter x:Key="Visible" />
-		<Style x:Key="InlineMessage" TargetType="TextBlock">
-			<Setter Property="TextWrapping" Value="Wrap" />
-			<Setter Property="Margin" Value="0,4" />
-			<Style.Triggers>
-				<Trigger Property="Text" Value="">
-					<Setter Property="Visibility" Value="Collapsed" />
-				</Trigger>
-			</Style.Triggers>
-		</Style>
-		<Style x:Key="Section" TargetType="StackPanel">
-			<Setter Property="Margin" Value="0,16,0,0" />
-		</Style>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="pack://application:,,,/SylphyHorn;component/UI/SettingsPageResources.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
 	</UserControl.Resources>
 	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
 		<!-- See AppPlacementSettingsView: templated text would otherwise inherit the selected tab item's accent foreground. -->
