@@ -15,8 +15,9 @@ namespace SylphyHorn.Serialization
 {
 	internal static class SettingsDictionarySnapshot
 	{
-	internal static Dictionary<string, object> CloneDictionary(IEnumerable<KeyValuePair<string, object>> source)
-		=> source?.ToDictionary(pair => pair.Key, pair => CloneValue(pair.Value), StringComparer.Ordinal) ?? new Dictionary<string, object>(StringComparer.Ordinal);
+		internal static Dictionary<string, object> CloneDictionary(IEnumerable<KeyValuePair<string, object>> source)
+			=> source?.ToDictionary(pair => pair.Key, pair => CloneValue(pair.Value), StringComparer.Ordinal) ?? new Dictionary<string, object>(StringComparer.Ordinal);
+
 		internal static object CloneValue(object value)
 		{
 			if (value == null || value is string || value.GetType().IsValueType) return value;
@@ -41,23 +42,26 @@ namespace SylphyHorn.Serialization
 			if (value is IList list)
 			{
 				var copy = new ArrayList(list.Count);
-				foreach (var item in list) copy.Add(CloneValue(item));
+				foreach (var item in list)
+				{
+					copy.Add(CloneValue(item));
+				}
 				return copy;
 			}
 			return value;
 		}
 
 		internal static string ComputeFingerprint(IEnumerable<KeyValuePair<string, object>> settings)
-	{
-		var builder = new StringBuilder();
-		foreach (var pair in settings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
 		{
-			builder.Append(pair.Key.Length.ToString(CultureInfo.InvariantCulture)).Append(':').Append(pair.Key).Append('=');
-			AppendValue(builder, pair.Value);
-			builder.Append(';');
+			var builder = new StringBuilder();
+			foreach (var pair in settings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+			{
+				builder.Append(pair.Key.Length.ToString(CultureInfo.InvariantCulture)).Append(':').Append(pair.Key).Append('=');
+				AppendValue(builder, pair.Value);
+				builder.Append(';');
+			}
+			using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", string.Empty).ToLowerInvariant();
 		}
-		using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", string.Empty).ToLowerInvariant();
-	}
 
 		private static void AppendValue(StringBuilder builder, object value)
 		{
@@ -77,16 +81,7 @@ namespace SylphyHorn.Serialization
 				builder.Append('[');
 				foreach (var rule in placement.Rules)
 				{
-					AppendValue(builder, rule.Id);
-					AppendValue(builder, rule.Enabled);
-					AppendValue(builder, rule.FollowForeground);
-					AppendValue(builder, rule.App.Kind);
-					AppendValue(builder, rule.App.Value);
-					AppendValue(builder, rule.Destination.Kind);
-					AppendValue(builder, rule.Destination.Name);
-					AppendValue(builder, rule.Destination.Number);
-					AppendValue(builder, rule.DisplayName);
-					AppendValue(builder, rule.DisplayExecutablePath);
+					AppendRuleFields(builder, rule);
 					builder.Append(';');
 				}
 				builder.Append(']');
@@ -101,9 +96,7 @@ namespace SylphyHorn.Serialization
 			}
 			if (value is PlacementDestination destination)
 			{
-				AppendValue(builder, destination.Kind);
-				AppendValue(builder, destination.Name);
-				AppendValue(builder, destination.Number);
+				AppendDestinationFields(builder, destination);
 				return;
 			}
 			if (value is PlacementCreatedGroup group)
@@ -117,7 +110,7 @@ namespace SylphyHorn.Serialization
 				builder.Append(text.Length.ToString(CultureInfo.InvariantCulture)).Append(':').Append(text);
 				return;
 			}
-			if (value is IEnumerable enumerable && !(value is string))
+			if (value is IEnumerable enumerable)
 			{
 				builder.Append('[');
 				foreach (var item in enumerable)
@@ -129,6 +122,26 @@ namespace SylphyHorn.Serialization
 				return;
 			}
 			builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture));
+		}
+
+		// A rule contributes its members inline; neither the rule nor its destination writes a type prefix.
+		private static void AppendRuleFields(StringBuilder builder, AppPlacementRule rule)
+		{
+			AppendValue(builder, rule.Id);
+			AppendValue(builder, rule.Enabled);
+			AppendValue(builder, rule.FollowForeground);
+			AppendValue(builder, rule.App.Kind);
+			AppendValue(builder, rule.App.Value);
+			AppendDestinationFields(builder, rule.Destination);
+			AppendValue(builder, rule.DisplayName);
+			AppendValue(builder, rule.DisplayExecutablePath);
+		}
+
+		private static void AppendDestinationFields(StringBuilder builder, PlacementDestination destination)
+		{
+			AppendValue(builder, destination.Kind);
+			AppendValue(builder, destination.Name);
+			AppendValue(builder, destination.Number);
 		}
 	}
 }

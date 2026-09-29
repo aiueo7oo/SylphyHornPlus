@@ -8,6 +8,7 @@ namespace SylphyHorn.Serialization
 {
 	public class GeneralSettings : SettingsHost
 	{
+		internal const string DesktopWallpapersOnCreationKey = "GeneralSettings.DesktopWallpapersOnCreation";
 		private readonly ISerializationProvider _provider;
 
 		public GeneralSettings(ISerializationProvider provider)

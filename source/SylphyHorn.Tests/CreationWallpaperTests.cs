@@ -282,7 +282,7 @@ namespace SylphyHorn.Tests
 			var importResult = await reader.CommitStagedImportAsync(import, import.CreateCommitDictionary());
 			Assert.True(importResult.Succeeded);
 			Assert.Equal(entry.WallpaperPath, Assert.Single(new GeneralSettings(reader).DesktopWallpapersOnCreation.Value).WallpaperPath);
-			Assert.Throws<System.Runtime.Serialization.SerializationException>(() => writer.SetValue(DesktopWallpaperOnCreation.SettingsKey, new[] { entry, entry }));
+			Assert.Throws<System.Runtime.Serialization.SerializationException>(() => writer.SetValue(GeneralSettings.DesktopWallpapersOnCreationKey, new[] { entry, entry }));
 		}
 	}
 }

@@ -8,7 +8,7 @@ namespace SylphyHorn.Serialization
 	[DataContract]
 	public sealed class DesktopWallpaperOnCreation
 	{
-		internal const string SettingsKey = "GeneralSettings.DesktopWallpapersOnCreation";
+		internal const string SettingsKey = GeneralSettings.DesktopWallpapersOnCreationKey;
 
 		[DataMember(Order = 0, EmitDefaultValue = false)]
 		public string Name { get; private set; }
@@ -29,7 +29,9 @@ namespace SylphyHorn.Serialization
 
 		private void Validate()
 		{
-			if ((this.Name == null) == !this.Number.HasValue || (this.Name != null && string.IsNullOrWhiteSpace(this.Name))
+			var hasName = this.Name != null;
+			var identifiesOneDesktop = hasName != this.Number.HasValue;
+			if (!identifiesOneDesktop || (hasName && string.IsNullOrWhiteSpace(this.Name))
 				|| (this.Number.HasValue && this.Number.Value < 1))
 			{
 				throw new SerializationException("Specify a desktop name or a positive number.");
@@ -46,7 +48,7 @@ namespace SylphyHorn.Serialization
 
 		internal static void ValidateEntry(string key, object value)
 		{
-			if (key != SettingsKey) return;
+			if (key != GeneralSettings.DesktopWallpapersOnCreationKey) return;
 			if (!(value is DesktopWallpaperOnCreation[] entries) || entries.Any(item => item == null)
 				|| entries.GroupBy(item => item.Name, StringComparer.Ordinal).Any(group => group.Key != null && group.Count() > 1)
 				|| entries.GroupBy(item => item.Number).Any(group => group.Key.HasValue && group.Count() > 1))

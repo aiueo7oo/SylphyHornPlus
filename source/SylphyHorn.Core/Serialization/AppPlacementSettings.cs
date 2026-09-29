@@ -31,6 +31,5 @@ namespace SylphyHorn.Serialization
 				throw new SerializationException("Invalid app placement configuration.");
 			}
 		}
-
 	}
 }

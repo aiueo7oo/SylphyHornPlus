@@ -173,6 +173,9 @@ namespace SylphyHorn.AppPlacement
 			this.Validate();
 		}
 
+		public AppPlacementRule WithEnabled(bool enabled)
+			=> new AppPlacementRule(this.Id, enabled, this.App, this.Destination, this.DisplayName, this.DisplayExecutablePath, this.FollowForeground);
+
 		private void Validate()
 		{
 			if (this.Id == Guid.Empty || this.App == null || this.Destination == null)

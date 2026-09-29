@@ -172,7 +172,7 @@ namespace SylphyHorn.Tests
 				{
 					[AppPlacementSettings.ConfigurationKey] = configuration,
 					[AppPlacementSettings.CreatedDesktopGroupsKey] = groups,
-					[DesktopWallpaperOnCreation.SettingsKey] = wallpapers,
+					[GeneralSettings.DesktopWallpapersOnCreationKey] = wallpapers,
 					["GeneralSettings.ChangeBackgroundEachDesktop"] = true,
 					["Future.Unknown"] = "preserved",
 				};
@@ -200,7 +200,7 @@ namespace SylphyHorn.Tests
 					oldValues = (IDictionary<string, object>)oldSerializer.ReadObject(stream);
 				Assert.IsType<string>(oldValues[AppPlacementSettings.ConfigurationKey]);
 				Assert.IsType<string>(oldValues[AppPlacementSettings.CreatedDesktopGroupsKey]);
-				Assert.IsType<string>(oldValues[DesktopWallpaperOnCreation.SettingsKey]);
+				Assert.IsType<string>(oldValues[GeneralSettings.DesktopWallpapersOnCreationKey]);
 				Assert.True(Assert.IsType<bool>(oldValues["GeneralSettings.ChangeBackgroundEachDesktop"]));
 				oldValues["GeneralSettings.ChangeBackgroundEachDesktop"] = false;
 				using (var stream = File.Create(file.FullName)) oldSerializer.WriteObject(stream, oldValues);
@@ -212,7 +212,7 @@ namespace SylphyHorn.Tests
 				Assert.Equal(SerializeValue(configuration), SerializeValue(restored));
 				Assert.True(provider.TryGetValue<PlacementCreatedGroup[]>(AppPlacementSettings.CreatedDesktopGroupsKey, out var restoredGroups));
 				Assert.Equal(SerializeValue(groups), SerializeValue(restoredGroups));
-				Assert.True(provider.TryGetValue<DesktopWallpaperOnCreation[]>(DesktopWallpaperOnCreation.SettingsKey, out var restoredWallpapers));
+				Assert.True(provider.TryGetValue<DesktopWallpaperOnCreation[]>(GeneralSettings.DesktopWallpapersOnCreationKey, out var restoredWallpapers));
 				Assert.Equal(SerializeValue(wallpapers), SerializeValue(restoredWallpapers));
 				Assert.True(provider.TryGetValue<bool>("GeneralSettings.ChangeBackgroundEachDesktop", out var changed));
 				Assert.False(changed);

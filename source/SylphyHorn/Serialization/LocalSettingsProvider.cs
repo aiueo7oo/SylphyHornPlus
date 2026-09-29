@@ -90,7 +90,7 @@ namespace SylphyHorn.Serialization
 		{
 			[AppPlacementSettings.ConfigurationKey] = typeof(AppPlacementConfiguration),
 			[AppPlacementSettings.CreatedDesktopGroupsKey] = typeof(PlacementCreatedGroup[]),
-			[DesktopWallpaperOnCreation.SettingsKey] = typeof(DesktopWallpaperOnCreation[]),
+			[GeneralSettings.DesktopWallpapersOnCreationKey] = typeof(DesktopWallpaperOnCreation[]),
 		};
 
 		private static IDictionary<string, object> EncodeValues(IDictionary<string, object> values)
@@ -111,6 +111,23 @@ namespace SylphyHorn.Serialization
 				}
 			}
 			return stored;
+		}
+
+		private static void DecodeValues(IDictionary<string, object> values)
+		{
+			foreach (var entry in StructuredTypes)
+			{
+				if (!values.TryGetValue(entry.Key, out var value) || !(value is string xml)) continue;
+				using (var input = new StringReader(xml))
+				using (var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }))
+				{
+					values[entry.Key] = new DataContractSerializer(entry.Value).ReadObject(reader);
+					if (reader.MoveToContent() != XmlNodeType.None)
+					{
+						throw new SerializationException("Unexpected content after a settings value.");
+					}
+				}
+			}
 		}
 
 		internal static Task WriteAsync(IDictionary<string, object> dictionary, FileInfo targetFile, Type[] knownTypes)
@@ -156,21 +173,7 @@ namespace SylphyHorn.Serialization
 				{
 					var values = serializer.ReadObject(stream) as IDictionary<string, object>;
 					if (values == null) return null;
-					foreach (var entry in StructuredTypes)
-					{
-						if (values.TryGetValue(entry.Key, out var value) && value is string xml)
-						{
-							using (var input = new StringReader(xml))
-							using (var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }))
-							{
-								values[entry.Key] = new DataContractSerializer(entry.Value).ReadObject(reader);
-								if (reader.MoveToContent() != XmlNodeType.None)
-								{
-									throw new SerializationException("Unexpected content after a settings value.");
-								}
-							}
-						}
-					}
+					DecodeValues(values);
 					return values;
 				}
 			});

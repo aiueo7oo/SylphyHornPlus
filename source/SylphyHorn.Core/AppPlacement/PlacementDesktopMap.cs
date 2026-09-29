@@ -8,7 +8,6 @@ namespace SylphyHorn.AppPlacement
 	{
 		Resolved,
 		Missing,
-		AmbiguousName,
 		StateUnavailable
 	}
 

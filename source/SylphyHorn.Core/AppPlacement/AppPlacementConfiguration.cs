@@ -12,11 +12,13 @@ namespace SylphyHorn.AppPlacement
 		[DataMember(Order = 0, IsRequired = true)]
 		public bool Enabled { get; private set; }
 
+		[DataMember(Name = "Rules", Order = 1, IsRequired = true)]
+		private AppPlacementRule[] _rules;
+		private ReadOnlyCollection<AppPlacementRule> _rulesView;
+		private Dictionary<PlacementAppIdentity, AppPlacementRule> _enabledRules;
+
 		[DataMember(Order = 2, EmitDefaultValue = false)]
 		public bool CreateMissingDesktops { get; private set; }
-
-		[DataMember(Order = 5)]
-		public bool FollowForeground { get; private set; }
 
 		[DataMember(Order = 3, EmitDefaultValue = false)]
 		public bool CloseCreatedDesktops { get; private set; }
@@ -25,18 +27,16 @@ namespace SylphyHorn.AppPlacement
 		private PlacementDestination[] _closingTargets;
 		private ReadOnlyCollection<PlacementDestination> _closingView;
 
-		public IReadOnlyList<PlacementDestination> ClosingTargets => this._closingView;
-
-		public bool HasClosingTargets => this.CloseCreatedDesktops || this._closingTargets.Length != 0;
-
-		[DataMember(Name = "Rules", Order = 1, IsRequired = true)]
-		private AppPlacementRule[] _rules;
-		private ReadOnlyCollection<AppPlacementRule> _view;
-		private Dictionary<PlacementAppIdentity, AppPlacementRule> _enabledRules;
+		[DataMember(Order = 5)]
+		public bool FollowForeground { get; private set; }
 
 		public static AppPlacementConfiguration Empty { get; } = new AppPlacementConfiguration(false, Array.Empty<AppPlacementRule>());
 
-		public IReadOnlyList<AppPlacementRule> Rules => this._view;
+		public IReadOnlyList<AppPlacementRule> Rules => this._rulesView;
+
+		public IReadOnlyList<PlacementDestination> ClosingTargets => this._closingView;
+
+		public bool HasClosingTargets => this.CloseCreatedDesktops || this._closingTargets.Length != 0;
 
 		public AppPlacementConfiguration(bool enabled, IEnumerable<AppPlacementRule> rules, bool createMissingDesktops = false,
 			bool closeCreatedDesktops = false, IEnumerable<PlacementDestination> closingTargets = null, bool followForeground = true)
@@ -49,6 +49,18 @@ namespace SylphyHorn.AppPlacement
 			this._rules = rules?.ToArray() ?? throw new ArgumentNullException(nameof(rules));
 			this.Initialize();
 		}
+
+		public AppPlacementConfiguration WithRules(IEnumerable<AppPlacementRule> rules)
+			=> new AppPlacementConfiguration(this.Enabled, rules, this.CreateMissingDesktops, this.CloseCreatedDesktops,
+				this.ClosingTargets, this.FollowForeground);
+
+		public AppPlacementConfiguration WithClosingTargets(IEnumerable<PlacementDestination> closingTargets)
+			=> new AppPlacementConfiguration(this.Enabled, this.Rules, this.CreateMissingDesktops, this.CloseCreatedDesktops,
+				closingTargets, this.FollowForeground);
+
+		public AppPlacementConfiguration WithOptions(bool enabled, bool createMissingDesktops, bool closeCreatedDesktops, bool followForeground)
+			=> new AppPlacementConfiguration(enabled, this.Rules, createMissingDesktops, closeCreatedDesktops,
+				this.ClosingTargets, followForeground);
 
 		public AppPlacementRule FindEnabledRule(PlacementAppIdentity app)
 		{
@@ -83,7 +95,7 @@ namespace SylphyHorn.AppPlacement
 				}
 				index.Add(rule.App, rule);
 			}
-			this._view = Array.AsReadOnly(this._rules);
+			this._rulesView = Array.AsReadOnly(this._rules);
 			this._enabledRules = index;
 		}
 
