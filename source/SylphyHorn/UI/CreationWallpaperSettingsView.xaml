@@ -1,7 +1,8 @@
 ﻿<UserControl x:Class="SylphyHorn.UI.CreationWallpaperSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
+             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls"
+             xmlns:ui="clr-namespace:SylphyHorn.UI">
 	<UserControl.Resources>
 		<ResourceDictionary>
 			<ResourceDictionary.MergedDictionaries>
@@ -60,6 +61,7 @@
 													                      IsTextSearchEnabled="False"
 													                      ItemsSource="{Binding Group.Choices, Mode=OneTime}"
 													                      Text="{Binding Destination, UpdateSourceTrigger=PropertyChanged}"
+													                      ui:EditableRowInput.UsesInputMethod="{Binding Group.UsesInputMethod, Mode=OneTime}"
 													                      VerticalAlignment="Center"
 													                      LostKeyboardFocus="Commit"
 													                      DropDownOpened="DestinationOpened"

@@ -20,6 +20,9 @@ namespace SylphyHorn.UI.Bindings
 
 		public string Title => this.Owner.Text[this.Kind == PlacementDestinationKind.Name ? "CloseByName" : "CloseByNumber"];
 
+		// Names may need the IME; number fields turn it off so that digits are typed as ASCII.
+		public bool UsesInputMethod => this.Kind == PlacementDestinationKind.Name;
+
 		public ObservableCollection<PlacementClosingRow> Rows { get; } = new ObservableCollection<PlacementClosingRow>();
 
 		// The same desktop choices as the placement rules of this kind.

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -74,6 +75,10 @@ namespace SylphyHorn.Tests
 							Assert.Equal(3, destinations.Length);
 							Assert.Equal(new[] { "1", "2", "3" }, destinations[1].Items.Cast<string>());
 							Assert.Equal("Development", destinations[0].Text);
+							Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+							// Name destinations keep the IME; number destinations turn it off, including the editor inside the combo box.
+							Assert.True(InputMethod.GetIsInputMethodEnabled(EditorOf(destinations[0])));
+							Assert.All(destinations.Skip(1), combo => Assert.False(InputMethod.GetIsInputMethodEnabled(EditorOf(combo))));
 							destinations[0].SelectedItem = "Web";
 							Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
 							Assert.Equal("Web", named.Destination);
@@ -163,6 +168,8 @@ namespace SylphyHorn.Tests
 									Assert.Contains(Descendants(view).OfType<TextBlock>(), text => text.Text == fixture.Model.Text["NameList"]);
 									Assert.Contains(Descendants(closeView).OfType<CheckBox>(), box => Equals(box.Content, fixture.Model.Text["CloseCreated"]));
 									Assert.Contains(Descendants(closeView).OfType<ComboBox>(), combo => ReferenceEquals(combo.DataContext, closing) && combo.Text == "3");
+									var closingEditor = EditorOf(Descendants(closeView).OfType<ComboBox>().Single(combo => ReferenceEquals(combo.DataContext, closing)));
+									Assert.False(InputMethod.GetIsInputMethodEnabled(closingEditor));
 									Assert.Contains(Descendants(view).OfType<CheckBox>(), box => Equals(box.Content, fixture.Model.Text["Enable"]));
 									Assert.Contains(Descendants(view).OfType<Button>(), button => Equals(button.Content, language == "en" ? "Delete" : "削除"));
 									foreach (var button in Descendants(view).OfType<Button>().Where(button => Equals(button.Content, fixture.Model.Text["DeleteLabel"])))
@@ -299,6 +306,8 @@ namespace SylphyHorn.Tests
 				96 * scale, 96 * scale, PixelFormats.Pbgra32);
 			bitmap.Render(view);
 		}
+
+		internal static TextBox EditorOf(ComboBox combo) => (TextBox)combo.Template.FindName("PART_EditableTextBox", combo);
 
 		internal static IEnumerable<DependencyObject> Descendants(DependencyObject root)
 		{

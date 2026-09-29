@@ -72,6 +72,9 @@ namespace SylphyHorn.UI.Bindings
 
 		public string DestinationLabel => this.Owner.Text[this.Kind == PlacementDestinationKind.Name ? "NameColumn" : "NumberColumn"];
 
+		// Names may need the IME; number fields turn it off so that digits are typed as ASCII.
+		public bool UsesInputMethod => this.Kind == PlacementDestinationKind.Name;
+
 		public ObservableCollection<PlacementRuleRow> Rows { get; } = new ObservableCollection<PlacementRuleRow>();
 
 		internal void RefreshLanguage()

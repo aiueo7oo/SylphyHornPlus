@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using SylphyHorn.Properties;
@@ -86,6 +87,9 @@ namespace SylphyHorn.Tests
 							Assert.Equal(4, destinations.Length);
 							Assert.Equal(new[] { "Development", "Web" }, destinations[0].Items.Cast<string>());
 							Assert.Equal(new[] { "1", "2" }, destinations[2].Items.Cast<string>());
+							Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+							Assert.True(InputMethod.GetIsInputMethodEnabled(EditorOf(destinations[0])));
+							Assert.False(InputMethod.GetIsInputMethodEnabled(EditorOf(destinations[2])));
 							Assert.Equal("", Assert.Single(destinations, combo => ReferenceEquals(combo.DataContext, draft)).Text);
 
 							// A save failure and a discarded edit are shown together; the retry button stays with the save failure.

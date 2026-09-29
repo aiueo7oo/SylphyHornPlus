@@ -84,6 +84,9 @@ namespace SylphyHorn.UI.Bindings
 
 		public string DestinationLabel => this.Owner.Text[this.ByName ? "NameColumn" : "NumberColumn"];
 
+		// Names may need the IME; number fields turn it off so that digits are typed as ASCII.
+		public bool UsesInputMethod => this.ByName;
+
 		public IReadOnlyList<string> Choices { get; internal set; } = Array.Empty<string>();
 
 		public ObservableCollection<CreationWallpaperRow> Rows { get; } = new ObservableCollection<CreationWallpaperRow>();

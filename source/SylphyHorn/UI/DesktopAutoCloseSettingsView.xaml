@@ -1,7 +1,8 @@
 ﻿<UserControl x:Class="SylphyHorn.UI.DesktopAutoCloseSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls">
+             xmlns:metro="http://schemes.grabacr.net/winfx/2014/controls"
+             xmlns:ui="clr-namespace:SylphyHorn.UI">
 	<!-- Shares AppPlacementSettingsViewModel with the app placement tab: one settings owner and one save path. -->
 	<UserControl.Resources>
 		<ResourceDictionary>
@@ -33,6 +34,7 @@
 												        ToolTip="{Binding Group.Owner.Text[Delete]}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
 												<metro:PromptComboBox Prompt="" IsEditable="True"
 												                      Text="{Binding Destination, UpdateSourceTrigger=PropertyChanged}"
+												                      ui:EditableRowInput.UsesInputMethod="{Binding Group.UsesInputMethod, Mode=OneTime}"
 												                      DropDownOpened="ClosingDestinationOpened" DropDownClosed="ClosingDestinationClosed"
 												                      LostKeyboardFocus="ClosingCommit" AutomationProperties.Name="{Binding Group.Title}" />
 											</DockPanel>

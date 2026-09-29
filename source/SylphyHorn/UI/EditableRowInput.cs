@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace SylphyHorn.UI
 {
@@ -18,6 +19,42 @@ namespace SylphyHorn.UI
 			"TextBeforeListOpened",
 			typeof(string),
 			typeof(EditableRowInput));
+
+		// Whether the IME is on while typing in an editable combo box; false for desktop numbers.
+		// InputMethod.IsInputMethodEnabled is read from the focused text box inside the template and is not inherited
+		// from the combo box, so the value is copied to that text box.
+		public static readonly DependencyProperty UsesInputMethodProperty = DependencyProperty.RegisterAttached(
+			"UsesInputMethod",
+			typeof(bool),
+			typeof(EditableRowInput),
+			new PropertyMetadata(true, OnUsesInputMethodChanged));
+
+		public static bool GetUsesInputMethod(DependencyObject element) => (bool)element.GetValue(UsesInputMethodProperty);
+
+		public static void SetUsesInputMethod(DependencyObject element, bool value) => element.SetValue(UsesInputMethodProperty, value);
+
+		private static void OnUsesInputMethodChanged(DependencyObject element, DependencyPropertyChangedEventArgs args)
+		{
+			var combo = (ComboBox)element;
+			if (!TryCopyInputMethodToEditor(combo))
+			{
+				// A combo box created from a data template gets its template during the first layout.
+				combo.Dispatcher.BeginInvoke(new Action(() => TryCopyInputMethodToEditor(combo)), DispatcherPriority.Loaded);
+			}
+			// Copied again before focus enters, in case the template has been replaced since.
+			combo.PreviewGotKeyboardFocus -= CopyInputMethodBeforeFocus;
+			combo.PreviewGotKeyboardFocus += CopyInputMethodBeforeFocus;
+		}
+
+		private static void CopyInputMethodBeforeFocus(object sender, KeyboardFocusChangedEventArgs args)
+			=> TryCopyInputMethodToEditor((ComboBox)sender);
+
+		private static bool TryCopyInputMethodToEditor(ComboBox combo)
+		{
+			if (!(combo.Template?.FindName("PART_EditableTextBox", combo) is TextBox editor)) return false;
+			InputMethod.SetIsInputMethodEnabled(editor, GetUsesInputMethod(combo));
+			return true;
+		}
 
 		// Shows the current destination choices in this control only, preserving text typed in other rows
 		// even when a desktop was renamed or removed.
