@@ -161,12 +161,12 @@ namespace SylphyHorn.Commands
 			const string fields = "wallpapersOnCreation changed";
 			var queries = Queries("desktop creation wallpaper list", "desktop list");
 
-			yield return Command("desktop creation wallpaper list", "list wallpaper settings applied to newly created desktops.", fields,
+			yield return Command("desktop creation wallpaper list", "List wallpaper settings applied to newly created desktops.", fields,
 				notes: notes,
 				effects: "read-settings",
 				queries: queries);
 
-			yield return Command("desktop creation wallpaper set", "set wallpaper settings applied to newly created desktops.", fields,
+			yield return Command("desktop creation wallpaper set", "Set wallpaper settings applied to newly created desktops.", fields,
 				arguments: new[]
 				{
 					DesktopOption("--name"), DesktopOption("--number"),
@@ -178,7 +178,7 @@ namespace SylphyHorn.Commands
 				example: "--number 3 --path C:\\Wallpapers\\work.jpg",
 				queries: queries);
 
-			yield return Command("desktop creation wallpaper remove", "remove wallpaper settings applied to newly created desktops.", fields,
+			yield return Command("desktop creation wallpaper remove", "Remove wallpaper settings applied to newly created desktops.", fields,
 				arguments: new[] { DesktopOption("--name"), DesktopOption("--number") },
 				constraints: new[] { ExactlyOne("--name --number") },
 				notes: notes,
@@ -200,7 +200,7 @@ namespace SylphyHorn.Commands
 
 			foreach (var verb in new[] { "add", "remove" })
 			{
-				yield return Command("desktop autoclose " + verb, verb + " an automatic desktop closure target.", fields,
+				yield return Command("desktop autoclose " + verb, Capitalized(verb) + " an automatic desktop closure target.", fields,
 					arguments: new[] { DesktopOption("--name"), DesktopOption("--number") },
 					constraints: new[] { ExactlyOne("--name --number") },
 					notes: notes,
@@ -305,7 +305,7 @@ namespace SylphyHorn.Commands
 				example: "--enabled true",
 				queries: Queries("app assignment status"));
 
-			yield return Command("app assignment set", "set a saved application assignment rule.", ruleFields,
+			yield return Command("app assignment set", "Set a saved application assignment rule.", ruleFields,
 				arguments: new[]
 				{
 					RuleId(required: false),
@@ -325,7 +325,7 @@ namespace SylphyHorn.Commands
 				example: "--id <RULE_ID> --desktop-number 2",
 				queries: Queries("app assignment list", "app assignment status", "app list", "desktop list"));
 
-			yield return Command("app assignment remove", "remove a saved application assignment rule.", ruleFields,
+			yield return Command("app assignment remove", "Remove a saved application assignment rule.", ruleFields,
 				arguments: new[] { RuleId(required: false), ExecutablePath() },
 				constraints: new[] { ExactlyOne("--id --path") },
 				notes: ruleNotes,
@@ -345,7 +345,7 @@ namespace SylphyHorn.Commands
 
 			foreach (var verb in new[] { "enable", "disable" })
 			{
-				yield return Command("app assignment " + verb, verb + " a saved application assignment rule.", ruleFields,
+				yield return Command("app assignment " + verb, Capitalized(verb) + " a saved application assignment rule.", ruleFields,
 					arguments: new[] { RuleId(required: true) },
 					notes: ruleNotes,
 					effects: "persist-rules",
@@ -516,7 +516,7 @@ namespace SylphyHorn.Commands
 				WhenPresent = "--action",
 			};
 
-			yield return Command("shortcut list", "list keyboard or mouse shortcut bindings.", "shortcuts changed",
+			yield return Command("shortcut list", "List keyboard or mouse shortcut bindings.", "shortcuts changed",
 				arguments: new[] { Option("--device", "string", values: "keyboard mouse", omission: "both") },
 				notes: notes,
 				queries: Queries("shortcut list"));
@@ -527,7 +527,7 @@ namespace SylphyHorn.Commands
 				example: "--device keyboard",
 				queries: bindingQueries);
 
-			yield return Command("shortcut set", "set keyboard or mouse shortcut bindings.", "shortcuts changed",
+			yield return Command("shortcut set", "Set keyboard or mouse shortcut bindings.", "shortcuts changed",
 				arguments: new[]
 				{
 					Device(),
@@ -544,7 +544,7 @@ namespace SylphyHorn.Commands
 				example: "--device keyboard --action desktop-switch-left --trigger LControlKey+LWin+Left",
 				queries: bindingQueries);
 
-			yield return Command("shortcut clear", "clear keyboard or mouse shortcut bindings.", "shortcuts changed",
+			yield return Command("shortcut clear", "Clear keyboard or mouse shortcut bindings.", "shortcuts changed",
 				arguments: new[] { Device(), ShortcutAction(), ShortcutNumber() },
 				constraints: new[] { numberedAction },
 				notes: notes,
@@ -566,6 +566,8 @@ namespace SylphyHorn.Commands
 		#endregion
 
 		#region Builders
+
+		private static string Capitalized(string word) => char.ToUpperInvariant(word[0]) + word.Substring(1);
 
 		private static CliCommandSpec Command(string name, string summary, string resultFields,
 			CliSpecArgument[] arguments = null, CliSpecConstraint[] constraints = null, string notes = null,

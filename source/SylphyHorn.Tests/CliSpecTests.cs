@@ -23,6 +23,7 @@ namespace SylphyHorn.Tests
 			{
 				Assert.Null(entry.Arguments);
 				Assert.DoesNotContain("settings settings", entry.Summary);
+				Assert.True(char.IsUpper(entry.Summary[0]), entry.Summary);
 				var response = await CliSpecService.ExecuteAsync(new[] { "spec" }.Concat(entry.Name.Split(' ')).ToArray(), NeverQuery);
 				Assert.True(response.Success);
 				Assert.Equal(entry.Name, response.Data.Target);
