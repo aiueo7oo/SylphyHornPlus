@@ -65,8 +65,8 @@ namespace SylphyHorn.UI
 			}
 			else if (args.Key == Key.Enter)
 			{
-				await row.Group.Owner.CommitClosingAsync(row);
 				args.Handled = true;
+				await row.Group.Owner.CommitClosingAsync(row);
 			}
 		}
 	}
