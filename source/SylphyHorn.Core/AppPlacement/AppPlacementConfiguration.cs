@@ -9,6 +9,10 @@ namespace SylphyHorn.AppPlacement
 	[DataContract]
 	public sealed class AppPlacementConfiguration
 	{
+		// One placement creates at most this many missing desktops. A numbered destination needing more is left
+		// unavailable, so that a mistyped number cannot fill the desktop list.
+		public const int MaximumCreatedDesktops = 10;
+
 		[DataMember(Order = 0, IsRequired = true)]
 		public bool Enabled { get; private set; }
 

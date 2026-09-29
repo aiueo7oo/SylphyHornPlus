@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using SylphyHorn.AppPlacement;
+using SylphyHorn.Serialization;
 
 namespace SylphyHorn.Commands
 {
@@ -300,7 +303,9 @@ namespace SylphyHorn.Commands
 				constraints: new[] { AtLeastOne(configureOptions) },
 				notes: "Omitted settings are preserved. Closing created desktops also covers them without an individual closing target; " +
 					"closure still uses the application's occupancy conditions. Follow is a default for rules without an override, " +
-					"applies only to foreground windows, and never follows explicit apply.",
+					"applies only to foreground windows, and never follows explicit apply. Creating missing desktops adds at most " +
+					AppPlacementConfiguration.MaximumCreatedDesktops.ToString(CultureInfo.InvariantCulture) + " desktops for one placement; " +
+					"a numbered destination that needs more is reported unavailable.",
 				effects: "persist-settings change-monitoring",
 				example: "--enabled true",
 				queries: Queries("app assignment status"));

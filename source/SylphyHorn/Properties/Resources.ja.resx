@@ -688,7 +688,7 @@
     <value>デスクトップ名</value>
   </data>
   <data name="Placement_CreateMissing" xml:space="preserve">
-    <value>一致するアプリを開いたときに不足しているデスクトップを作成する</value>
+    <value>一致するアプリを開いたときに不足しているデスクトップを作成する（一度に10個まで）</value>
   </data>
   <data name="Placement_NameMatchHint" xml:space="preserve">
     <value>同じ名前が複数ある場合は、番号が最も小さいデスクトップに配置します。</value>

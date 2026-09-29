@@ -252,6 +252,9 @@ namespace SylphyHorn.Services.DesktopTransitions
 			}
 		}
 
+		private int MissingDesktopCount(PlacementDestination destination)
+			=> destination.Kind == PlacementDestinationKind.Name ? 1 : Math.Max(0, destination.Number - this.State.Order.Count);
+
 		private async Task CreatePlacementDestinationAsync(PlacementAuthorizationRequest request)
 		{
 			var entered = false;
@@ -262,8 +265,11 @@ namespace SylphyHorn.Services.DesktopTransitions
 				var remaining = 0;
 				await this.OnPlacementOwnerAsync(request, () =>
 				{
-					remaining = request.Destination.Kind == PlacementDestinationKind.Name
-						? 1 : Math.Max(0, request.Destination.Number - this.State.Order.Count);
+					remaining = this.MissingDesktopCount(request.Destination);
+					if (remaining > AppPlacementConfiguration.MaximumCreatedDesktops)
+					{
+						remaining = 0;
+					}
 				}).ConfigureAwait(false);
 				while (true)
 				{

@@ -602,6 +602,23 @@ namespace SylphyHorn.Tests
 			await harness.Runtime.ShutdownAsync();
 		}
 
+		[Fact]
+		public async Task DestinationNeedingMoreDesktopsThanTheCreationLimitIsLeftMissing()
+		{
+			var factory = new Factory();
+			var harness = await Create(factory);
+			await harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, PlacementProcessorTests.Configuration().Rules, true));
+			var session = factory.Sessions[0];
+			// The harness starts with one desktop.
+			var tooFar = PlacementDestination.ByNumber(1 + AppPlacementConfiguration.MaximumCreatedDesktops + 1);
+			var request = session.Authorize(tooFar, session.Cancellation.Token);
+			harness.Owner.Drain();
+			Assert.Equal(PlacementResolutionStatus.Missing, (await request).Resolution.Status);
+			Assert.Equal(0, harness.Operations.CreateCalls);
+			session.Release();
+			await harness.Runtime.ShutdownAsync();
+		}
+
 		[Theory]
 		[InlineData(false, false)]
 		[InlineData(true, false)]

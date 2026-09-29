@@ -688,7 +688,7 @@
     <value>Desktop name</value>
   </data>
   <data name="Placement_CreateMissing" xml:space="preserve">
-    <value>Create missing desktops when a matching app opens</value>
+    <value>Create missing desktops when a matching app opens (up to 10 at a time)</value>
   </data>
   <data name="Placement_NameMatchHint" xml:space="preserve">
     <value>If multiple desktops have the same name, windows are placed on the lowest-numbered desktop.</value>

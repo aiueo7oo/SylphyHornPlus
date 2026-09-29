@@ -367,7 +367,7 @@ namespace SylphyHorn.Properties {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Create missing desktops when a matching app opens.
+        ///   Looks up a localized string similar to Create missing desktops when a matching app opens (up to 10 at a time).
         /// </summary>
         public static string Placement_CreateMissing {
             get {
