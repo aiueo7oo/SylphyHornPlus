@@ -8,6 +8,7 @@ using SylphyHorn.Serialization;
 using SylphyHorn.Services;
 using SylphyHorn.Services.Commands;
 using Xunit;
+using Monitor = SylphyHorn.Services.Monitor;
 
 namespace SylphyHorn.Tests
 {
@@ -16,10 +17,9 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task SaveRetriesCurrentSettingsWithoutReplayingFailedChanges()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null);
+			var service = CreateService(settings, provider);
 			settings.LoopDesktop.Value = true;
 			provider.SaveFailure = new IOException("synthetic");
 			Assert.Equal("settings_save_failed", (await Run(service, "settings save")).Error.Code);
@@ -38,7 +38,7 @@ namespace SylphyHorn.Tests
 		public async Task SaveRejectsBusyOrCancelledRequestsBeforePersistence()
 		{
 			var available = false;
-			var service = new CliSettingsService(null, () => throw new Exception("Must not save."), () => available, null);
+			var service = CreateService(settings: null, save: () => throw new Exception("Must not save."), available: () => available);
 			Assert.Equal("host_busy", (await Run(service, "settings save")).Error.Code);
 			available = true;
 			var cancelled = await service.ExecuteAsync(CliCommand.Parse(new[] { "settings", "save" }), new CancellationToken(true));
@@ -49,7 +49,7 @@ namespace SylphyHorn.Tests
 		public async Task SaveCancellationAfterSubmissionDoesNotClaimFailureOrSuccess()
 		{
 			var pending = new TaskCompletionSource<SettingsSaveResult>();
-			var service = new CliSettingsService(null, () => pending.Task, () => true, null);
+			var service = CreateService(settings: null, save: () => pending.Task);
 			using (var cancellation = new CancellationTokenSource())
 			{
 				var request = service.ExecuteAsync(CliCommand.Parse(new[] { "settings", "save" }), cancellation.Token);
@@ -65,11 +65,9 @@ namespace SylphyHorn.Tests
 		[InlineData(false, false)]
 		public async Task BackgroundSettingsRespectCapabilitiesAndDoNotPartiallyApply(bool nativeWallpaper, bool names)
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>(), nativeWallpaper, names);
+			var service = CreateService(settings, provider, nativeWallpaperSupported: nativeWallpaper, nameSupported: names);
 			var changes = 0;
 			using (SettingsService.ObserveWallpaperSettings(settings, () => changes++))
 			{
@@ -105,15 +103,14 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task GeometryUsesSharedSettingsAndKeepsPinOffsetsSeparate()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var monitors = new[]
 			{
-				new SylphyHorn.Services.Monitor("Main",
+				new Monitor("Main",
 					new System.Windows.Rect(0, 0, 1920, 1080), new System.Windows.Rect(0, 0, 1920, 1040)),
 			};
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null, () => monitors);
+			var service = CreateService(settings, provider, monitors: () => monitors);
 			var changes = 0;
 			using (SettingsService.ObserveNotificationAppearance(settings, () => changes++))
 			{
@@ -146,15 +143,14 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task MissingMonitorRejectsAllChangesAndDisconnectedPreferenceRemainsReadable()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var monitors = new[]
 			{
-				new SylphyHorn.Services.Monitor("Left",
+				new Monitor("Left",
 					new System.Windows.Rect(-1920, 0, 1920, 1080), new System.Windows.Rect(-1920, 0, 1920, 1040)),
 			};
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null, () => monitors);
+			var service = CreateService(settings, provider, monitors: () => monitors);
 			var list = await Run(service, "monitor list");
 			var monitor = Assert.Single(list.Data.Monitors);
 			Assert.Equal(1, monitor.Number);
@@ -166,7 +162,7 @@ namespace SylphyHorn.Tests
 			Assert.False(settings.SimpleNotification.Value);
 			Assert.Empty(provider.SavedDictionaries);
 			Assert.True((await Run(service, "notification configure --monitor 1")).Success);
-			monitors = Array.Empty<SylphyHorn.Services.Monitor>();
+			monitors = Array.Empty<Monitor>();
 			var saved = await Run(service, "notification settings");
 			Assert.Equal("1", saved.Data.Monitor);
 			Assert.False(saved.Data.MonitorAvailable);
@@ -193,11 +189,9 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task AppearanceSettingsReachNotificationSnapshotsAndRepeatedRequestsDoNotNotify()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider);
 			var changes = 0;
 			using (SettingsService.ObserveNotificationAppearance(settings, () => changes++))
 			{
@@ -241,11 +235,9 @@ namespace SylphyHorn.Tests
 		[InlineData("accent", "Accent")]
 		public async Task ThemeNamesMapToTheExistingGuiValues(string name, string value)
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider);
 			Assert.True((await Run(service, "notification configure --theme " + name)).Success);
 			Assert.Equal(GuiEnumValue("BlurWindowThemeMode", value), settings.NotificationWindowStyle.Value);
 			Assert.Equal(name, (await Run(service, "notification settings")).Data.Theme);
@@ -254,11 +246,9 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task FontResetPreservesDefaultsAndInvalidRenderingSizesDoNotPartiallyApply()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider);
 			settings.NotificationFontFamily.Value = "Consolas";
 			var reset = CliCommand.Parse(new[] { "notification", "configure", "--font-family", "" });
 			Assert.True((await service.ExecuteAsync(reset, CancellationToken.None)).Success);
@@ -274,14 +264,12 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task SettingsApplyWithoutASettingsWindowAndSubscriptionsAreDisposed()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var inputChanges = 0;
 			var trayChanges = 0;
 			bool? visible = null;
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider);
 			using (SettingsService.BindGeneralSettings(settings, () => inputChanges++, value => visible = value, () => trayChanges++))
 			{
 				Assert.Equal(0, inputChanges);
@@ -313,11 +301,9 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task LanguageReportsRestartUntilStartupPreferenceIsRestored()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider);
 			Assert.Equal("auto", (await Run(service, "settings get")).Data.Language);
 			Assert.Empty(provider.SavedDictionaries);
 			var changed = await Run(service, "settings configure --language ja");
@@ -332,14 +318,12 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task SaveFailureCanBeRetriedWithoutRepeatingRuntimeEffects()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var changes = 0;
 			using (SettingsService.BindGeneralSettings(settings, () => changes++, _ => { }, () => { }))
 			{
-				var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+				var service = CreateService(settings, provider);
 				provider.SaveFailure = new IOException("synthetic");
 				Assert.Equal("settings_save_failed", (await Run(service, "desktop configure --loop true")).Error.Code);
 				Assert.True(settings.LoopDesktop.Value);
@@ -354,12 +338,10 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task BusyAndCancelledRequestsDoNotMutateSettings()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var available = false;
-			var service = new CliSettingsService(settings, () => provider.SaveWithResultAsync(), () => available, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, provider, available: () => available);
 			Assert.Equal("host_busy", (await Run(service, "desktop configure --loop true")).Error.Code);
 			Assert.True((await Run(service, "desktop settings")).Success);
 			available = true;
@@ -372,17 +354,32 @@ namespace SylphyHorn.Tests
 		[Fact]
 		public async Task AConcurrentChangeDuringSaveIsReportedInsteadOfReturningStaleValues()
 		{
-			var provider = new TestDictionaryProvider();
-			await provider.InitializeAsync();
+			var provider = await CreateProviderAsync();
 			var settings = new GeneralSettings(provider);
 			var pending = new TaskCompletionSource<SettingsSaveResult>();
-			var service = new CliSettingsService(settings, () => pending.Task, () => true, null,
-				() => Array.Empty<SylphyHorn.Services.Monitor>());
+			var service = CreateService(settings, save: () => pending.Task);
 			var request = Run(service, "desktop configure --loop true");
 			settings.LoopDesktop.Value = false;
 			pending.SetResult(await provider.SaveWithResultAsync());
 			Assert.Equal("state_changed", (await request).Error.Code);
 		}
+
+		private static async Task<TestDictionaryProvider> CreateProviderAsync()
+		{
+			var provider = new TestDictionaryProvider();
+			await provider.InitializeAsync();
+			return provider;
+		}
+
+		private static CliSettingsService CreateService(GeneralSettings settings, TestDictionaryProvider provider,
+			Func<bool> available = null, Func<Monitor[]> monitors = null, bool? nativeWallpaperSupported = null, bool? nameSupported = null)
+			=> CreateService(settings, () => provider.SaveWithResultAsync(), available, monitors, nativeWallpaperSupported, nameSupported);
+
+		private static CliSettingsService CreateService(GeneralSettings settings, Func<Task<SettingsSaveResult>> save,
+			Func<bool> available = null, Func<Monitor[]> monitors = null, bool? nativeWallpaperSupported = null, bool? nameSupported = null)
+			=> new CliSettingsService(settings, save, available ?? (() => true), startupCulture: null,
+				monitors: monitors ?? (() => Array.Empty<Monitor>()),
+				nativeWallpaperSupported: nativeWallpaperSupported, nameSupported: nameSupported);
 
 		private static uint GuiEnumValue(string type, string name)
 			=> Convert.ToUInt32(Enum.Parse(

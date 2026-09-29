@@ -103,8 +103,16 @@ namespace SylphyHorn.Tests
 				{
 					NormalRegistered = this.Normal, ElevatedRegistered = this.Elevated,
 					Administrator = this.Administrator, TargetMatches = this.Matches,
-					Mode = this.Normal ? this.Elevated ? "mixed" : "normal" : this.Elevated ? "elevated" : "disabled",
+					Mode = this.DescribeMode(),
 				};
+			}
+
+			private string DescribeMode()
+			{
+				if (this.Normal && this.Elevated) return "mixed";
+				if (this.Normal) return "normal";
+				if (this.Elevated) return "elevated";
+				return "disabled";
 			}
 
 			public void CreateNormal() { this.Calls.Add("normal+"); this.Normal = true; }
