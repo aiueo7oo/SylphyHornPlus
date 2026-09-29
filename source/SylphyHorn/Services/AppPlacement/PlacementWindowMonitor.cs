@@ -4,12 +4,26 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
 	/// <summary>Opt-in native observation. Owns one hook thread and never activates, moves or closes a window.</summary>
 	internal sealed class PlacementWindowMonitor : IDisposable
 	{
+		private const uint MaximumEventAgeMilliseconds = 5000;
+		private const int MessagesPerPump = 64;
+
+		private const uint WINEVENT_OUTOFCONTEXT = 0;
+		private const int OBJID_WINDOW = 0;
+		private const int CHILDID_SELF = 0;
+		private const uint PM_NOREMOVE = 0;
+		private const uint PM_REMOVE = 1;
+		private const uint QS_ALLINPUT = 0x04FF;
+		private const uint MWMO_INPUTAVAILABLE = 0x0004;
+		private const uint INFINITE = uint.MaxValue;
+		private const uint WAIT_FAILED = uint.MaxValue;
+
 		private readonly object _gate = new object();
 		private readonly ManualResetEvent _stop = new ManualResetEvent(false);
 		private readonly AutoResetEvent _changed = new AutoResetEvent(false);
@@ -81,9 +95,10 @@ namespace SylphyHorn.Services.AppPlacement
 			try
 			{
 				Message message;
-				PeekMessage(out message, IntPtr.Zero, 0, 0, 0);
+				// Create this thread's message queue before the hook can post to it.
+				PeekMessage(out message, IntPtr.Zero, 0, 0, PM_NOREMOVE);
 				if (this._stop.WaitOne(0)) return;
-				hook = SetWinEventHook(0x8000, 0x8003, IntPtr.Zero, callback, 0, 0, 0);
+				hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE, IntPtr.Zero, callback, 0, 0, WINEVENT_OUTOFCONTEXT);
 				if (hook == IntPtr.Zero)
 				{
 					throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -123,20 +138,22 @@ namespace SylphyHorn.Services.AppPlacement
 				// window in the same excluded tick. Wait only on this hook thread, cancellably.
 				var boundary = GetTickCount64();
 				while (GetTickCount64() <= boundary)
+				{
 					if (this._stop.WaitOne(1)) return;
+				}
 				if (this._stop.WaitOne(0)) return;
 				this._ready.TrySetResult(this.Events.Ready(baseline, checked((long)boundary), initiallyHidden));
 				var handles = new[] { this._stop.SafeWaitHandle.DangerousGetHandle() };
 				while (!this._stop.WaitOne(0) && this.Events.State != PlacementMonitorState.Paused)
 				{
-					for (var n = 0; n < 64 && PeekMessage(out message, IntPtr.Zero, 0, 0, 1); n++)
+					for (var n = 0; n < MessagesPerPump && PeekMessage(out message, IntPtr.Zero, 0, 0, PM_REMOVE); n++)
 					{
 						TranslateMessage(ref message);
 						DispatchMessage(ref message);
 					}
 					if (this.Events.State == PlacementMonitorState.Paused) break;
-					var result = MsgWaitForMultipleObjectsEx(1, handles, uint.MaxValue, 0x04FF, 4);
-					if (result == uint.MaxValue)
+					var result = MsgWaitForMultipleObjectsEx(1, handles, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+					if (result == WAIT_FAILED)
 					{
 						throw new Win32Exception(Marshal.GetLastWin32Error());
 					}
@@ -185,7 +202,7 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private void Receive(IntPtr hook, uint kind, IntPtr window, int objectId, int childId, uint thread, uint time)
 		{
-			if (window == IntPtr.Zero || objectId != 0 || childId != 0) return;
+			if (window == IntPtr.Zero || objectId != OBJID_WINDOW || childId != CHILDID_SELF) return;
 			try
 			{
 				// Keep the native 32-bit timestamp until this callback reaches the ordered drain.
@@ -202,8 +219,8 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			// OBJID_WINDOW is also raised for child HWNDs. Keep them out of the lifetime budget.
 			// A destroyed HWND may no longer be queryable, so DESTROY always reaches the tracker.
-			if (value.Kind != PlacementWindowEventKind.Destroy && GetAncestor(value.Window, 2) != value.Window) return;
-			var occurred = NormalizeRecentTime(unchecked((uint)value.OccurredAt), checked((long)GetTickCount64()), 5000);
+			if (value.Kind != PlacementWindowEventKind.Destroy && GetAncestor(value.Window, GA_ROOT) != value.Window) return;
+			var occurred = NormalizeRecentTime(unchecked((uint)value.OccurredAt), checked((long)GetTickCount64()), MaximumEventAgeMilliseconds);
 			if (!occurred.HasValue)
 			{
 				this.Events.Pause("EventTimeUnavailable");
@@ -221,8 +238,6 @@ namespace SylphyHorn.Services.AppPlacement
 		}
 
 		private delegate void WinEvent(IntPtr hook, uint kind, IntPtr window, int objectId, int childId, uint thread, uint time);
-
-		private delegate bool EnumWindow(IntPtr window, IntPtr state);
 
 		[StructLayout(LayoutKind.Sequential)]
 		private struct Message
@@ -242,16 +257,6 @@ namespace SylphyHorn.Services.AppPlacement
 		[DllImport("user32.dll", SetLastError = true)]
 		private static extern bool UnhookWinEvent(IntPtr hook);
 
-		[DllImport("user32.dll", SetLastError = true)]
-		private static extern bool EnumWindows(EnumWindow callback, IntPtr state);
-
-		[DllImport("user32.dll")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool IsWindowVisible(IntPtr window);
-
-		[DllImport("user32.dll")]
-		private static extern IntPtr GetAncestor(IntPtr window, uint flags);
-
 		[DllImport("user32.dll")]
 		private static extern bool PeekMessage(out Message message, IntPtr window, uint min, uint max, uint remove);
 
@@ -263,8 +268,5 @@ namespace SylphyHorn.Services.AppPlacement
 
 		[DllImport("user32.dll", SetLastError = true)]
 		private static extern uint MsgWaitForMultipleObjectsEx(uint count, IntPtr[] handles, uint timeout, uint mask, uint flags);
-
-		[DllImport("kernel32.dll")]
-		private static extern ulong GetTickCount64();
 	}
 }

@@ -4,12 +4,13 @@ using System.Linq;
 
 namespace SylphyHorn.Services.AppPlacement
 {
+	// The WinEvent callback casts the native event code directly to this type.
 	internal enum PlacementWindowEventKind
 	{
-		Create = 0x8000,
-		Destroy,
-		Show,
-		Hide
+		Create = (int)PlacementNativeMethods.EVENT_OBJECT_CREATE,
+		Destroy = (int)PlacementNativeMethods.EVENT_OBJECT_DESTROY,
+		Show = (int)PlacementNativeMethods.EVENT_OBJECT_SHOW,
+		Hide = (int)PlacementNativeMethods.EVENT_OBJECT_HIDE
 	}
 
 	internal enum PlacementMonitorState
@@ -120,6 +121,7 @@ namespace SylphyHorn.Services.AppPlacement
 		private PlacementMonitorState _state = PlacementMonitorState.Preparing;
 		private string _pauseReason;
 		private long _skippedCandidates;
+		private long _version;
 
 		internal PlacementWindowEvents(int eventLimit, int trackingLimit, int candidateLimit)
 		{
@@ -193,9 +195,13 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
-		private long _version;
-
-		internal long Version { get { lock (this._gate) return this._version; } }
+		internal long Version
+		{
+			get
+			{
+				lock (this._gate) return this._version;
+			}
+		}
 
 		internal void Receive(PlacementWindowEvent value)
 		{
@@ -207,12 +213,14 @@ namespace SylphyHorn.Services.AppPlacement
 				}
 				if (value.Window == IntPtr.Zero) return;
 				this._version++;
+				// A SHOW repeated for the same window replaces the last buffered one instead of using capacity.
 				if (value.Kind == PlacementWindowEventKind.Show && this._count > 0)
 				{
-					var last = this._events[(this._head + this._count - 1) % this._events.Length];
+					var lastIndex = this.BufferIndex(this._count - 1);
+					var last = this._events[lastIndex];
 					if (last.Kind == value.Kind && last.Window == value.Window && last.OccurredAt <= value.OccurredAt)
 					{
-						this._events[(this._head + this._count - 1) % this._events.Length] = value;
+						this._events[lastIndex] = value;
 						return;
 					}
 				}
@@ -221,7 +229,8 @@ namespace SylphyHorn.Services.AppPlacement
 					this.PauseUnderLock("EventCapacity");
 					return;
 				}
-				this._events[(this._head + this._count++) % this._events.Length] = value;
+				this._events[this.BufferIndex(this._count)] = value;
+				this._count++;
 			}
 		}
 
@@ -237,7 +246,7 @@ namespace SylphyHorn.Services.AppPlacement
 				while (maximum-- > 0 && this._count > 0 && this._state == PlacementMonitorState.Running)
 				{
 					var value = this._events[this._head];
-					this._head = (this._head + 1) % this._events.Length;
+					this._head = this.BufferIndex(1);
 					this._count--;
 					if (value.OccurredAt <= this._boundary) continue;
 					if (value.OccurredAt < this._lastEventTime)
@@ -353,6 +362,9 @@ namespace SylphyHorn.Services.AppPlacement
 				this._state = PlacementMonitorState.Stopped;
 			}
 		}
+
+		// Position in the event ring buffer, counted from the oldest buffered event.
+		private int BufferIndex(int offset) => (this._head + offset) % this._events.Length;
 
 		private bool IsCurrentUnderLock(PlacementCandidate candidate)
 			=> candidate != null && this._state == PlacementMonitorState.Running && candidate.Epoch == this._epoch

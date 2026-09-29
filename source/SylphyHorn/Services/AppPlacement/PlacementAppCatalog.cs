@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Xml;
 using System.Xml.Linq;
 using SylphyHorn.AppPlacement;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
@@ -83,6 +84,13 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal sealed class PlacementAppCatalog : IPlacementAppCatalog
 	{
+		private const int WindowLimit = 4096;
+		private const int PackageLimit = 128;
+		private const int PackageNamesBufferLimit = 1048576;
+		private const int PackagePathCapacity = 32768;
+		private const int ManifestCharacterLimit = 4194304;
+		private const int IconSize = 24;
+
 		// Only explicit user queries enumerate applications/windows. One Shell operation at a time, including across reopened settings.
 		private static readonly SemaphoreSlim Gate = new SemaphoreSlim(1);
 
@@ -182,7 +190,7 @@ namespace SylphyHorn.Services.AppPlacement
 			var ok = EnumWindows(
 				(window, state) =>
 				{
-					if (cancellation.IsCancellationRequested || handles.Count == 4096) return false;
+					if (cancellation.IsCancellationRequested || handles.Count == WindowLimit) return false;
 					if (IsWindowVisible(window))
 					{
 						handles.Add(window);
@@ -204,18 +212,22 @@ namespace SylphyHorn.Services.AppPlacement
 				cancellation.ThrowIfCancellationRequested();
 				var read = reader.Read(window);
 				if (read.Status == PlacementInspectionStatus.Excluded || read.Identity?.Owner.Id == own) continue;
-				var title = new StringBuilder(1024);
-				GetWindowText(window, title, title.Capacity);
+				var title = GetWindowTitle(window);
 				if (title.Length == 0) continue;
 				var identity = read.Identity;
 				var path = identity?.AppProcess?.Path ?? (identity?.App.Kind == PlacementAppKind.ExecutablePath ? identity.Owner.Path : null);
-				var name = path == null ? title.ToString() : System.IO.Path.GetFileNameWithoutExtension(path);
+				var name = path == null ? title : System.IO.Path.GetFileNameWithoutExtension(path);
+				BitmapSource icon = null;
+				if (includeIcons && path != null)
+				{
+					icon = Icon(path) ?? DefaultApplicationIcon();
+				}
 				choices.Add(new PlacementAppChoice(
 					name,
-					title.ToString(),
+					title,
 					path,
 					identity?.App,
-					!includeIcons || path == null ? null : Icon(path) ?? DefaultApplicationIcon(),
+					icon,
 					problem: identity == null ? "IdentityUnavailable" : null));
 			}
 			return choices.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
@@ -223,96 +235,79 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private static IReadOnlyList<PlacementAppChoice> ReadInstalled(CancellationToken cancellation, bool includeIcons)
 		{
-			object shell = null, folder = null, items = null;
-			try
+			using (var appsFolder = PlacementAppsFolder.Open())
 			{
-				shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application", true));
-				folder = ((dynamic)shell).NameSpace("shell:AppsFolder");
-				if (folder == null)
+				if (!appsFolder.IsAvailable)
 				{
 					throw new InvalidOperationException("AppsFolder unavailable.");
 				}
-				items = ((dynamic)folder).Items();
-				int count = ((dynamic)items).Count;
-				if (count > 10000)
+				if (appsFolder.Count > PlacementAppsFolder.ItemLimit)
 				{
 					throw new InvalidOperationException("AppsFolder over capacity.");
 				}
 				var choices = new List<PlacementAppChoice>();
+				// Package family -> application ID -> manifest executable, read once per family.
 				var packages = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
-				for (var i = 0; i < count; i++)
-				{
-					cancellation.ThrowIfCancellationRequested();
-					object item = null;
-					try
-					{
-						item = ((dynamic)items).Item(i);
-						string name = ((dynamic)item).Name;
-						string id = ((dynamic)item).ExtendedProperty("System.AppUserModel.ID") as string;
-						string target = ((dynamic)item).ExtendedProperty("System.Link.TargetParsingPath") as string;
-						string path = ((dynamic)item).Path;
-						PlacementAppIdentity identity = null;
-						bool confirm = false;
-						string problem = null;
-						if (PlacementAppIdentityResolver.IsPackageApp(id, null))
-						{
-							var family = id.Substring(0, id.IndexOf('!'));
-							if (!packages.TryGetValue(family, out var applications))
-							{
-								packages[family] = applications = ReadPackage(family);
-							}
-							if (applications.TryGetValue(id.Substring(id.IndexOf('!') + 1), out target))
-							{
-								identity = new PlacementAppIdentity(PlacementAppKind.PackageAppId, id);
-							}
-							else
-							{
-								problem = "IdentityUnavailable";
-							}
-						}
-						else
-						{
-							try
-							{
-								// Shell parsing names can be virtual items or commands, not filesystem paths.
-								if (string.IsNullOrEmpty(target) && System.IO.Path.IsPathRooted(path ?? "") && string.Equals(System.IO.Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase))
-								{
-									target = path;
-								}
-								if (File.Exists(target))
-								{
-									identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, target);
-									confirm = true;
-								}
-							}
-							catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is System.Runtime.Serialization.SerializationException) { }
-							if (identity == null)
-							{
-								problem = "LauncherOnly";
-							}
-						}
-						choices.Add(new PlacementAppChoice(
-							name,
-							identity?.Kind == PlacementAppKind.PackageAppId ? id : target ?? path,
-							target,
-							identity,
-							includeIcons ? Icon("shell:AppsFolder\\" + (id ?? path)) : null,
-							confirm,
-							problem));
-					}
-					finally
-					{
-						Release(item);
-					}
-				}
+				appsFolder.ForEachItem(item => choices.Add(ResolveInstalledItem(item, packages, includeIcons)), cancellation);
 				return choices.OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
 			}
-			finally
+		}
+
+		private static PlacementAppChoice ResolveInstalledItem(object item, Dictionary<string, Dictionary<string, string>> packages, bool includeIcons)
+		{
+			string name = ((dynamic)item).Name;
+			string id = ((dynamic)item).ExtendedProperty("System.AppUserModel.ID") as string;
+			string target = ((dynamic)item).ExtendedProperty("System.Link.TargetParsingPath") as string;
+			string path = ((dynamic)item).Path;
+			PlacementAppIdentity identity = null;
+			var confirm = false;
+			string problem = null;
+			if (PlacementAppIdentityResolver.IsPackageApp(id, null))
 			{
-				Release(items);
-				Release(folder);
-				Release(shell);
+				var family = id.Substring(0, id.IndexOf('!'));
+				if (!packages.TryGetValue(family, out var applications))
+				{
+					packages[family] = applications = ReadPackage(family);
+				}
+				// Replaces the Shell link target with the manifest executable, or null when the ID is unresolved.
+				if (applications.TryGetValue(id.Substring(id.IndexOf('!') + 1), out target))
+				{
+					identity = new PlacementAppIdentity(PlacementAppKind.PackageAppId, id);
+				}
+				else
+				{
+					problem = "IdentityUnavailable";
+				}
 			}
+			else
+			{
+				try
+				{
+					// Shell parsing names can be virtual items or commands, not filesystem paths.
+					if (string.IsNullOrEmpty(target) && System.IO.Path.IsPathRooted(path ?? "") && string.Equals(System.IO.Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase))
+					{
+						target = path;
+					}
+					if (File.Exists(target))
+					{
+						identity = new PlacementAppIdentity(PlacementAppKind.ExecutablePath, target);
+						confirm = true;
+					}
+				}
+				catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is System.Runtime.Serialization.SerializationException) { }
+				if (identity == null)
+				{
+					problem = "LauncherOnly";
+				}
+			}
+			return new PlacementAppChoice(
+				name,
+				identity?.Kind == PlacementAppKind.PackageAppId ? id : target ?? path,
+				target,
+				identity,
+				includeIcons ? Icon("shell:AppsFolder\\" + (id ?? path)) : null,
+				confirm,
+				problem);
 		}
 
 		// Read current-user registration and manifest; never equate a shared host or launch command with the app executable.
@@ -321,49 +316,20 @@ namespace SylphyHorn.Services.AppPlacement
 			var applications = new Dictionary<string, string>(StringComparer.Ordinal);
 			uint count = 0, length = 0;
 			var status = GetPackagesByPackageFamily(family, ref count, IntPtr.Zero, ref length, IntPtr.Zero);
-			if (status != 122 || count == 0 || count > 128 || length > 1048576) return applications;
+			if (status != ERROR_INSUFFICIENT_BUFFER || count == 0 || count > PackageLimit || length > PackageNamesBufferLimit) return applications;
 			var names = Marshal.AllocHGlobal(checked((int)count * IntPtr.Size));
 			var buffer = Marshal.AllocHGlobal(checked((int)length * 2));
 			try
 			{
-				if (GetPackagesByPackageFamily(family, ref count, names, ref length, buffer) != 0) return applications;
+				if (GetPackagesByPackageFamily(family, ref count, names, ref length, buffer) != ERROR_SUCCESS) return applications;
 				for (var i = 0; i < count; i++)
 				{
 					var fullName = Marshal.PtrToStringUni(Marshal.ReadIntPtr(names, i * IntPtr.Size));
 					uint capacity = 0;
-					if (GetPackagePathByFullName(fullName, ref capacity, null) != 122 || capacity > 32768) continue;
+					if (GetPackagePathByFullName(fullName, ref capacity, null) != ERROR_INSUFFICIENT_BUFFER || capacity > PackagePathCapacity) continue;
 					var path = new StringBuilder((int)capacity);
-					if (GetPackagePathByFullName(fullName, ref capacity, path) != 0) continue;
-					try
-					{
-						using (var xml = XmlReader.Create(
-							System.IO.Path.Combine(path.ToString(), "AppxManifest.xml"),
-							new XmlReaderSettings
-{
-	DtdProcessing = DtdProcessing.Prohibit,
-	XmlResolver = null,
-	MaxCharactersInDocument = 4194304
-}))
-						{
-							foreach (var app in XDocument.Load(xml).Descendants().Where(node => node.Name.LocalName == "Application" && node.Parent?.Name.LocalName == "Applications"))
-							{
-								var id = (string)app.Attribute("Id");
-								if (string.IsNullOrEmpty(id)) continue;
-								string executable = null;
-								var relative = (string)app.Attribute("Executable");
-								if (!string.IsNullOrEmpty(relative))
-								{
-									var resolved = System.IO.Path.GetFullPath(System.IO.Path.Combine(path.ToString(), relative));
-									if (resolved.StartsWith(path + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(resolved))
-									{
-										executable = resolved;
-									}
-								}
-								applications[id] = applications.ContainsKey(id) ? null : executable;
-							}
-						}
-					}
-					catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is XmlException || ex is ArgumentException) { }
+					if (GetPackagePathByFullName(fullName, ref capacity, path) != ERROR_SUCCESS) continue;
+					ReadManifestApplications(path.ToString(), applications);
 				}
 				return applications;
 			}
@@ -372,6 +338,40 @@ namespace SylphyHorn.Services.AppPlacement
 				Marshal.FreeHGlobal(buffer);
 				Marshal.FreeHGlobal(names);
 			}
+		}
+
+		private static void ReadManifestApplications(string packagePath, Dictionary<string, string> applications)
+		{
+			var settings = new XmlReaderSettings
+			{
+				DtdProcessing = DtdProcessing.Prohibit,
+				XmlResolver = null,
+				MaxCharactersInDocument = ManifestCharacterLimit
+			};
+			try
+			{
+				using (var xml = XmlReader.Create(System.IO.Path.Combine(packagePath, "AppxManifest.xml"), settings))
+				{
+					foreach (var app in XDocument.Load(xml).Descendants().Where(node => node.Name.LocalName == "Application" && node.Parent?.Name.LocalName == "Applications"))
+					{
+						var id = (string)app.Attribute("Id");
+						if (string.IsNullOrEmpty(id)) continue;
+						string executable = null;
+						var relative = (string)app.Attribute("Executable");
+						if (!string.IsNullOrEmpty(relative))
+						{
+							var resolved = System.IO.Path.GetFullPath(System.IO.Path.Combine(packagePath, relative));
+							if (resolved.StartsWith(packagePath + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(resolved))
+							{
+								executable = resolved;
+							}
+						}
+						// An application ID declared more than once across the family's packages is ambiguous; record no executable.
+						applications[id] = applications.ContainsKey(id) ? null : executable;
+					}
+				}
+			}
+			catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is XmlException || ex is ArgumentException) { }
 		}
 
 		private static BitmapSource Icon(string parsingName)
@@ -384,9 +384,9 @@ namespace SylphyHorn.Services.AppPlacement
 				if (SHCreateItemFromParsingName(parsingName, IntPtr.Zero, ref iid, out item) != 0) return null;
 				((IShellItemImageFactory)item).GetImage(new NativeSize
 				{
-					Width = 24,
-					Height = 24
-				}, 4, out bitmap);
+					Width = IconSize,
+					Height = IconSize
+				}, SIIGBF_ICONONLY, out bitmap);
 				var source = Imaging.CreateBitmapSourceFromHBitmap(bitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
 				source.Freeze();
 				return source;
@@ -401,7 +401,7 @@ namespace SylphyHorn.Services.AppPlacement
 				{
 					DeleteObject(bitmap);
 				}
-				Release(item);
+				ReleaseComObject(item);
 			}
 		}
 
@@ -412,7 +412,7 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			if (_defaultApplicationIcon != null) return _defaultApplicationIcon;
 			var info = new StockIconInfo { Size = (uint)Marshal.SizeOf<StockIconInfo>() };
-			if (SHGetStockIconInfo(StockIconApplication, StockIconHandle, ref info) != 0 || info.Icon == IntPtr.Zero)
+			if (SHGetStockIconInfo(SIID_APPLICATION, SHGSI_ICON, ref info) != 0 || info.Icon == IntPtr.Zero)
 			{
 				return null;
 			}
@@ -432,33 +432,13 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
-		private static void Release(object value)
-		{
-			if (value != null && Marshal.IsComObject(value))
-			{
-				Marshal.ReleaseComObject(value);
-			}
-		}
+		private const uint SIIGBF_ICONONLY = 0x4;
 
 		[StructLayout(LayoutKind.Sequential)]
 		private struct NativeSize { internal int Width, Height; }
 
 		[ComImport, Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 		private interface IShellItemImageFactory { void GetImage(NativeSize size, uint flags, out IntPtr bitmap); }
-
-		private delegate bool EnumWindow(IntPtr window, IntPtr parameter);
-
-		[DllImport("user32.dll")]
-		private static extern bool EnumWindows(EnumWindow callback, IntPtr parameter);
-
-		[DllImport("user32.dll")]
-		private static extern bool IsWindowVisible(IntPtr window);
-
-		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
-
-		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetPackagesByPackageFamily(string family, ref uint count, IntPtr names, ref uint length, IntPtr buffer);
 
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
 		private static extern int GetPackagePathByFullName(string name, ref uint length, StringBuilder path);
@@ -469,7 +449,7 @@ namespace SylphyHorn.Services.AppPlacement
 		[DllImport("gdi32.dll")]
 		private static extern bool DeleteObject(IntPtr value);
 
-		private const uint StockIconApplication = 2, StockIconHandle = 0x100;
+		private const uint SIID_APPLICATION = 2, SHGSI_ICON = 0x100;
 
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 		private struct StockIconInfo

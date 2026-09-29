@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using System.Threading;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
@@ -31,63 +32,34 @@ namespace SylphyHorn.Services.AppPlacement
 			if (!this._ids.Contains(appId)) return false;
 			uint count = 0, length = 0;
 			var status = GetPackagesByPackageFamily(appId.Substring(0, appId.IndexOf('!')), ref count, IntPtr.Zero, ref length, IntPtr.Zero);
-			return (status == 0 || status == 122) && count > 0;
+			return (status == ERROR_SUCCESS || status == ERROR_INSUFFICIENT_BUFFER) && count > 0;
 		}
 
 		private static HashSet<string> Read()
 		{
-			object shell = null, folder = null, items = null;
-			try
+			using (var appsFolder = PlacementAppsFolder.Open())
 			{
-				shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application", true));
-				folder = ((dynamic)shell).NameSpace("shell:AppsFolder");
-				if (folder == null)
+				if (!appsFolder.IsAvailable)
 				{
 					throw new InvalidOperationException("The installed app catalog is unavailable.");
 				}
-				items = ((dynamic)folder).Items();
-				int count = ((dynamic)items).Count;
-				if (count > 10000)
+				if (appsFolder.Count > PlacementAppsFolder.ItemLimit)
 				{
 					throw new InvalidOperationException("The installed app catalog exceeds its limit.");
 				}
 				var result = new HashSet<string>(StringComparer.Ordinal);
-				for (var i = 0; i < count; i++)
-				{
-					object item = null;
-					try
+				appsFolder.ForEachItem(
+					item =>
 					{
-						item = ((dynamic)items).Item(i);
 						string id = ((dynamic)item).ExtendedProperty("System.AppUserModel.ID") as string;
 						if (PlacementAppIdentityResolver.IsPackageApp(id, null))
 						{
 							result.Add(id);
 						}
-					}
-					finally
-					{
-						Release(item);
-					}
-				}
+					},
+					CancellationToken.None);
 				return result;
 			}
-			finally
-			{
-				Release(items);
-				Release(folder);
-				Release(shell);
-			}
 		}
-
-		private static void Release(object value)
-		{
-			if (value != null && Marshal.IsComObject(value))
-			{
-				Marshal.ReleaseComObject(value);
-			}
-		}
-
-		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetPackagesByPackageFamily(string family, ref uint count, IntPtr names, ref uint length, IntPtr buffer);
 	}
 }

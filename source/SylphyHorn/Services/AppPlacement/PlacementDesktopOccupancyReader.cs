@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using WindowsDesktop;
 using WindowsDesktop.Interop;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
@@ -29,6 +30,9 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal sealed class PlacementDesktopOccupancyReader
 	{
+		private const int WindowLimit = 4096;
+		private const int ClassNameCapacity = 256;
+
 		internal PlacementOccupancyObservation Read(CancellationToken cancellation, Func<bool> stillCurrent)
 		{
 			var occupied = new HashSet<Guid>();
@@ -37,40 +41,53 @@ namespace SylphyHorn.Services.AppPlacement
 			var manager = (IVirtualDesktopManager)Activator.CreateInstance(Type.GetTypeFromCLSID(CLSID.VirtualDesktopManager));
 			try
 			{
-				var enumerated = EnumWindows((window, _) =>
-				{
-					if (cancellation.IsCancellationRequested || ++count > 4096) { complete = false; return false; }
-					if (!IsWindowVisible(window)) return true;
-					var name = new StringBuilder(256);
-					if (GetClassName(window, name, name.Capacity) == 0) { complete = false; return false; }
-					// Shell surfaces are not user windows. Owned dialogs and tool windows are deliberately included.
-					var type = name.ToString();
-					if (type == "Progman" || type == "WorkerW" || type == "Shell_TrayWnd" || type == "Shell_SecondaryTrayWnd")
+				var enumerated = EnumWindows(
+					(window, _) =>
 					{
-						return true;
-					}
-					try
-					{
-						var desktop = LocateDesktop(() => manager.GetWindowDesktopId(window), () => VirtualDesktop.IsPinnedWindow(window));
-						if (!desktop.HasValue) return true;
+						if (cancellation.IsCancellationRequested || ++count > WindowLimit)
+						{
+							complete = false;
+							return false;
+						}
+						if (!IsWindowVisible(window)) return true;
+						var name = new StringBuilder(ClassNameCapacity);
+						if (GetClassName(window, name, name.Capacity) == 0)
+						{
+							complete = false;
+							return false;
+						}
+						// Shell surfaces are not user windows. Owned dialogs and tool windows are deliberately included.
+						if (IsShellSurface(name.ToString())) return true;
 						try
 						{
-							if (VirtualDesktop.IsPinnedWindow(window)) return true;
-							var appId = ApplicationHelper.GetAppId(window);
-							if (!string.IsNullOrEmpty(appId) && VirtualDesktop.IsPinnedApplication(appId)) return true;
+							var desktop = LocateDesktop(() => manager.GetWindowDesktopId(window), () => VirtualDesktop.IsPinnedWindow(window));
+							if (!desktop.HasValue) return true;
+							try
+							{
+								if (VirtualDesktop.IsPinnedWindow(window)) return true;
+								var appId = ApplicationHelper.GetAppId(window);
+								if (!string.IsNullOrEmpty(appId) && VirtualDesktop.IsPinnedApplication(appId)) return true;
+							}
+							catch (COMException ex) when (IsMissingView(ex))
+							{
+								// A known desktop still counts as occupied when pin metadata is unavailable.
+							}
+							occupied.Add(desktop.Value);
 						}
-						catch (COMException ex) when (IsMissingView(ex))
+						catch (Exception)
 						{
-							// A known desktop still counts as occupied when pin metadata is unavailable.
+							complete = false;
+							return false;
 						}
-						occupied.Add(desktop.Value);
-					}
-					catch (Exception) { complete = false; return false; }
-					return true;
-				}, IntPtr.Zero);
+						return true;
+					},
+					IntPtr.Zero);
 				return new PlacementOccupancyObservation(enumerated && complete && !cancellation.IsCancellationRequested, occupied, stillCurrent);
 			}
-			finally { Marshal.ReleaseComObject(manager); }
+			finally
+			{
+				Marshal.ReleaseComObject(manager);
+			}
 		}
 
 		internal static Guid? LocateDesktop(Func<Guid> locate, Func<bool> pinned)
@@ -95,20 +112,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
-		private static bool IsMissingView(COMException exception)
-			=> exception.HResult == unchecked((int)0x8002802B) || exception.HResult == unchecked((int)0x80070490);
-
-		private delegate bool EnumWindow(IntPtr window, IntPtr state);
-
-		[DllImport("user32.dll")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool EnumWindows(EnumWindow callback, IntPtr state);
-
-		[DllImport("user32.dll")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool IsWindowVisible(IntPtr window);
-
-		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetClassName(IntPtr window, StringBuilder name, int maximum);
+		private static bool IsShellSurface(string windowClass)
+			=> windowClass == "Progman" || windowClass == "WorkerW" || windowClass == "Shell_TrayWnd" || windowClass == "Shell_SecondaryTrayWnd";
 	}
 }

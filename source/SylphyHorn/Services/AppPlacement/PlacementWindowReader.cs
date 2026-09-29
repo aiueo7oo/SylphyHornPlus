@@ -4,12 +4,42 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
 	/// <summary>Candidate-only inspection on the placement worker, never inside a WinEvent callback.</summary>
 	internal sealed class PlacementWindowReader
 	{
+		private const string ApplicationFrameWindowClass = "ApplicationFrameWindow";
+		private const int ClassNameCapacity = 256;
+		// A frame host with more child windows or child processes than this is not inspected.
+		private const int HostChildWindowLimit = 128;
+		private const int HostChildProcessLimit = 8;
+		private const int ProcessPathCapacity = 32768;
+		private const int ProcessStringLimit = 4096;
+
+		private const int GWL_EXSTYLE = -20;
+		private const uint WS_EX_TOOLWINDOW = 0x00000080;
+		private const uint WS_EX_APPWINDOW = 0x00040000;
+		private const uint WS_EX_NOACTIVATE = 0x08000000;
+		private const uint GW_OWNER = 4;
+		private const int DWMWA_CLOAKED = 14;
+		private const int DWM_CLOAKED_SHELL = 0x2;
+		private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+		private const int ERROR_ACCESS_DENIED = 5;
+		private const int ERROR_INVALID_HANDLE = 6;
+		private const int APPMODEL_ERROR_NO_PACKAGE = 15700;
+		private const int APPMODEL_ERROR_NO_APPLICATION = 15703;
+		private const ushort VT_EMPTY = 0;
+		private const ushort VT_LPWSTR = 31;
+
+		private static readonly PropertyKey PKEY_AppUserModel_ID = new PropertyKey
+		{
+			Format = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
+			Id = 5
+		};
+
 		private readonly PlacementPackageCatalog _catalog = new PlacementPackageCatalog();
 
 		internal PlacementWindowInspection Read(IntPtr window)
@@ -23,59 +53,38 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				return Result(PlacementInspectionStatus.Unavailable, "WindowOwnerUnavailable");
 			}
-			if (GetAncestor(window, 2) != window)
+			if (GetAncestor(window, GA_ROOT) != window)
 			{
 				return Result(PlacementInspectionStatus.Excluded, "ChildWindow");
 			}
-			var style = unchecked((uint)GetWindowLong(window, -20));
-			if ((style & (0x80u | 0x08000000u)) != 0 || (GetWindow(window, 4) != IntPtr.Zero && (style & 0x40000u) == 0))
+			if (IsAuxiliaryWindow(window))
 			{
 				return Result(PlacementInspectionStatus.Excluded, "AuxiliaryWindow");
 			}
 			try
 			{
-				var name = new StringBuilder(256);
+				var name = new StringBuilder(ClassNameCapacity);
 				if (GetClassName(window, name, name.Capacity) == 0)
 				{
 					return Result(PlacementInspectionStatus.Unavailable, "WindowClassUnavailable");
 				}
+				var className = name.ToString();
 				var owner = ReadProcess(pid);
 				var explicitId = ReadWindowAppId(window);
 				var children = new List<PlacementProcessIdentity>();
-				if (name.ToString() == "ApplicationFrameWindow")
+				if (className == ApplicationFrameWindowClass)
 				{
-					var childIds = new HashSet<uint>();
-					var count = 0;
-					var overflow = false;
-					EnumChildWindows(
-						window,
-						(child, state) =>
-						{
-							if (++count > 128)
-							{
-								overflow = true;
-								return false;
-							}
-							GetWindowThreadProcessId(child, out var childPid);
-							if (childPid != 0 && childPid != pid)
-							{
-								childIds.Add(childPid);
-							}
-							if (childIds.Count > 8)
-							{
-								overflow = true;
-								return false;
-							}
-							return true;
-						},
-						IntPtr.Zero);
-					if (overflow)
+					var childIds = ReadHostChildProcessIds(window, pid);
+					if (childIds == null)
 					{
 						return Result(PlacementInspectionStatus.Unavailable, "HostChildCapacity");
 					}
-					foreach (var child in childIds) children.Add(ReadProcess(child));
+					foreach (var child in childIds)
+					{
+						children.Add(ReadProcess(child));
+					}
 				}
-				var resolved = PlacementAppIdentityResolver.Resolve(window, thread, name.ToString(), owner, explicitId, children, this._catalog.Contains);
+				var resolved = PlacementAppIdentityResolver.Resolve(window, thread, className, owner, explicitId, children, this._catalog.Contains);
 				if (GetWindowThreadProcessId(window, out var afterPid) != thread || afterPid != pid || !IsWindow(window))
 				{
 					return Result(PlacementInspectionStatus.Excluded, "WindowOwnerChanged");
@@ -85,13 +94,13 @@ namespace SylphyHorn.Services.AppPlacement
 				{
 					return Result(PlacementInspectionStatus.NotReady, "WindowNotVisible", resolved.Identity);
 				}
-				var status = DwmGetWindowAttribute(window, 14, out var cloaked, sizeof(int));
+				var status = DwmGetWindowAttribute(window, DWMWA_CLOAKED, out var cloaked, sizeof(int));
 				if (status < 0)
 				{
 					return Result(PlacementInspectionStatus.Unavailable, "CloakStateUnavailable", resolved.Identity);
 				}
-				// DWM_CLOAKED_SHELL (2) includes windows on another virtual desktop; do not reject those.
-				if ((cloaked & ~2) != 0)
+				// DWM_CLOAKED_SHELL includes windows on another virtual desktop; do not reject those.
+				if ((cloaked & ~DWM_CLOAKED_SHELL) != 0)
 				{
 					return Result(PlacementInspectionStatus.NotReady, "WindowPreparing", resolved.Identity);
 				}
@@ -99,7 +108,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			catch (Win32Exception ex)
 			{
-				return Result(PlacementInspectionStatus.Unavailable, ex.NativeErrorCode == 5 ? "AccessDenied" : "ProcessInformationUnavailable");
+				return Result(PlacementInspectionStatus.Unavailable, ex.NativeErrorCode == ERROR_ACCESS_DENIED ? "AccessDenied" : "ProcessInformationUnavailable");
 			}
 			catch (COMException)
 			{
@@ -114,15 +123,54 @@ namespace SylphyHorn.Services.AppPlacement
 		private static PlacementWindowInspection Result(PlacementInspectionStatus status, string reason, PlacementWindowIdentity identity = null)
 			=> new PlacementWindowInspection(status, reason, identity);
 
+		// Tool and no-activate windows are auxiliary, as is an owned window that does not opt into the taskbar.
+		private static bool IsAuxiliaryWindow(IntPtr window)
+		{
+			var exStyle = unchecked((uint)GetWindowLong(window, GWL_EXSTYLE));
+			if ((exStyle & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) != 0) return true;
+			return GetWindow(window, GW_OWNER) != IntPtr.Zero && (exStyle & WS_EX_APPWINDOW) == 0;
+		}
+
+		// Processes other than the frame host that own its child windows. Null when a limit is exceeded.
+		private static HashSet<uint> ReadHostChildProcessIds(IntPtr frame, uint hostPid)
+		{
+			var childIds = new HashSet<uint>();
+			var count = 0;
+			var overflow = false;
+			EnumChildWindows(
+				frame,
+				(child, state) =>
+				{
+					if (++count > HostChildWindowLimit)
+					{
+						overflow = true;
+						return false;
+					}
+					GetWindowThreadProcessId(child, out var childPid);
+					if (childPid != 0 && childPid != hostPid)
+					{
+						childIds.Add(childPid);
+					}
+					if (childIds.Count > HostChildProcessLimit)
+					{
+						overflow = true;
+						return false;
+					}
+					return true;
+				},
+				IntPtr.Zero);
+			return overflow ? null : childIds;
+		}
+
 		private static PlacementProcessIdentity ReadProcess(uint pid)
 		{
-			using (var process = OpenProcess(0x1000, false, pid))
+			using (var process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid))
 			{
 				if (process.IsInvalid)
 				{
 					throw new Win32Exception(Marshal.GetLastWin32Error());
 				}
-				uint length = 32768;
+				uint length = ProcessPathCapacity;
 				var path = new StringBuilder((int)length);
 				if (!QueryFullProcessImageName(process, 0, path, ref length))
 				{
@@ -132,30 +180,31 @@ namespace SylphyHorn.Services.AppPlacement
 				{
 					throw new Win32Exception(Marshal.GetLastWin32Error());
 				}
+				// An exit time means the handle refers to a process that has already ended.
 				if (exit != 0)
 				{
-					throw new Win32Exception(6);
+					throw new Win32Exception(ERROR_INVALID_HANDLE);
 				}
-				var family = ReadProcessString(process, GetPackageFamilyName, 15700);
-				var appId = ReadProcessString(process, GetApplicationUserModelId, 15703);
+				var family = ReadProcessString(process, GetPackageFamilyName, APPMODEL_ERROR_NO_PACKAGE);
+				var appId = ReadProcessString(process, GetApplicationUserModelId, APPMODEL_ERROR_NO_APPLICATION);
 				return new PlacementProcessIdentity(pid, created, path.ToString(), family, appId);
 			}
 		}
 
 		private delegate int ProcessString(SafeProcessHandle process, ref uint length, StringBuilder value);
 
-		private static string ReadProcessString(SafeProcessHandle process, ProcessString read, int absent)
+		private static string ReadProcessString(SafeProcessHandle process, ProcessString read, int absentStatus)
 		{
 			uint length = 0;
 			var status = read(process, ref length, null);
-			if (status == absent) return null;
-			if (status != 122 || length == 0 || length > 4096)
+			if (status == absentStatus) return null;
+			if (status != ERROR_INSUFFICIENT_BUFFER || length == 0 || length > ProcessStringLimit)
 			{
 				throw new Win32Exception(status);
 			}
 			var value = new StringBuilder((int)length);
 			status = read(process, ref length, value);
-			if (status != 0)
+			if (status != ERROR_SUCCESS)
 			{
 				throw new Win32Exception(status);
 			}
@@ -169,17 +218,13 @@ namespace SylphyHorn.Services.AppPlacement
 			try
 			{
 				Marshal.ThrowExceptionForHR(SHGetPropertyStoreForWindow(window, ref iid, out store));
-				var key = new PropertyKey
-				{
-					Format = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
-					Id = 5
-				};
+				var key = PKEY_AppUserModel_ID;
 				var value = new PropVariant();
 				try
 				{
 					Marshal.ThrowExceptionForHR(store.GetValue(ref key, out value));
-					if (value.Type == 0) return null;
-					if (value.Type != 31)
+					if (value.Type == VT_EMPTY) return null;
+					if (value.Type != VT_LPWSTR)
 					{
 						throw new COMException("Unexpected AppUserModelId property type.");
 					}
@@ -198,8 +243,6 @@ namespace SylphyHorn.Services.AppPlacement
 				}
 			}
 		}
-
-		private delegate bool EnumWindow(IntPtr window, IntPtr state);
 
 		[StructLayout(LayoutKind.Sequential)]
 		private struct PropertyKey
@@ -234,13 +277,7 @@ namespace SylphyHorn.Services.AppPlacement
 		private static extern bool IsWindow(IntPtr window);
 
 		[DllImport("user32.dll")]
-		private static extern bool IsWindowVisible(IntPtr window);
-
-		[DllImport("user32.dll")]
 		private static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
-
-		[DllImport("user32.dll")]
-		private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
 		[DllImport("user32.dll")]
 		private static extern IntPtr GetWindow(IntPtr window, uint command);
@@ -248,11 +285,8 @@ namespace SylphyHorn.Services.AppPlacement
 		[DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
 		private static extern int GetWindowLong(IntPtr window, int index);
 
-		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetClassName(IntPtr window, StringBuilder name, int size);
-
 		[DllImport("user32.dll")]
-		private static extern bool EnumChildWindows(IntPtr window, EnumWindow callback, IntPtr state);
+		private static extern bool EnumChildWindows(IntPtr window, EnumWindowsProc callback, IntPtr state);
 
 		[DllImport("dwmapi.dll")]
 		private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);

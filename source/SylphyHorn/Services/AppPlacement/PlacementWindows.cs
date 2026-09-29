@@ -50,7 +50,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			// A newly created HWND can precede its Shell application view. Both lookup failures
 			// mean location is not available yet; the processor owns the bounded readiness retry.
-			catch (COMException ex) when (ex.HResult == unchecked((int)0x8002802B) || ex.HResult == unchecked((int)0x80070490))
+			catch (COMException ex) when (PlacementNativeMethods.IsMissingView(ex))
 			{
 				return null;
 			}
