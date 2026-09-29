@@ -75,6 +75,12 @@ namespace SylphyHorn.Services.AppPlacement
 	/// <summary>Preview and explicit application on the session's existing serial worker.</summary>
 	internal sealed class PlacementExplicitApplication
 	{
+		// Both the preview and a selection from it hold at most this many windows.
+		internal const int SelectionLimit = 256;
+		private const long PreviewTimeLimitMilliseconds = 5000;
+		private const long PreviewLifetimeMilliseconds = 60000;
+		private const long BatchTimeLimitMilliseconds = 30000;
+
 		private readonly AppPlacementConfiguration _configuration;
 		private readonly IPlacementWindows _windows;
 		private readonly Func<PlacementCandidate[]> _existing;
@@ -105,15 +111,11 @@ namespace SylphyHorn.Services.AppPlacement
 		internal PlacementPreview Preview(PlacementDesktopMap map, CancellationToken cancellation, PlacementAppIdentity app = null)
 		{
 			this._preview = null;
-			var deadline = this._now() + 5000;
+			var deadline = this._now() + PreviewTimeLimitMilliseconds;
 			var items = new List<PlacementPreviewItem>();
 			foreach (var candidate in this._existing())
 			{
-				cancellation.ThrowIfCancellationRequested();
-				if (this._now() >= deadline)
-				{
-					throw new TimeoutException("Preview exceeded its time limit.");
-				}
+				this.ThrowIfPreviewStopped(deadline, cancellation);
 				if (!this._current(candidate)) continue;
 				var inspection = this._windows.Inspect(candidate.Window);
 				if (inspection.Identity == null) continue;
@@ -122,37 +124,48 @@ namespace SylphyHorn.Services.AppPlacement
 				if (rule == null) continue;
 				var location = this._windows.Locate(candidate.Window);
 				var target = map.Resolve(rule.Destination);
-				PlacementOutcome? excluded = null;
-				if (inspection.Status != PlacementInspectionStatus.Ready || location == null)
-				{
-					excluded = PlacementOutcome.Unavailable;
-				}
-				else if (location.Pinned)
-				{
-					excluded = PlacementOutcome.Excluded;
-				}
-				else if (target.Status != PlacementResolutionStatus.Resolved)
-				{
-					excluded = PlacementOutcome.DestinationUnavailable;
-				}
-				else if (location.Desktop == target.DesktopId)
-				{
-					excluded = PlacementOutcome.AlreadyPlaced;
-				}
+				var excluded = PreviewExclusion(inspection, location, target);
 				if (!this._current(candidate)) continue;
-				if (items.Count == 256)
+				if (items.Count == SelectionLimit)
 				{
 					throw new InvalidOperationException("Preview exceeds 256 matching windows.");
 				}
 				items.Add(new PlacementPreviewItem(candidate, inspection.Identity, rule, this._title(candidate.Window),
 					location?.Desktop ?? Guid.Empty, target.DesktopId, excluded));
 			}
+			this.ThrowIfPreviewStopped(deadline, cancellation);
+			return this._preview = new PlacementPreview(items, this._now() + PreviewLifetimeMilliseconds);
+		}
+
+		private void ThrowIfPreviewStopped(long deadline, CancellationToken cancellation)
+		{
 			cancellation.ThrowIfCancellationRequested();
 			if (this._now() >= deadline)
 			{
 				throw new TimeoutException("Preview exceeded its time limit.");
 			}
-			return this._preview = new PlacementPreview(items, this._now() + 60000);
+		}
+
+		// The outcome that makes a matching window unselectable, or null when it can be applied.
+		private static PlacementOutcome? PreviewExclusion(PlacementWindowInspection inspection, PlacementWindowLocation location, PlacementResolution target)
+		{
+			if (inspection.Status != PlacementInspectionStatus.Ready || location == null)
+			{
+				return PlacementOutcome.Unavailable;
+			}
+			if (location.Pinned)
+			{
+				return PlacementOutcome.Excluded;
+			}
+			if (target.Status != PlacementResolutionStatus.Resolved)
+			{
+				return PlacementOutcome.DestinationUnavailable;
+			}
+			if (location.Desktop == target.DesktopId)
+			{
+				return PlacementOutcome.AlreadyPlaced;
+			}
+			return null;
 		}
 
 		internal PlacementRuleApplication ApplyRules(PlacementDesktopMap map, PlacementAppIdentity app, bool dryRun,
@@ -184,7 +197,7 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				throw new InvalidOperationException("Preview is stale or already consumed.");
 			}
-			if (selection == null || selection.Length == 0 || selection.Length > 256 || selection.Distinct().Count() != selection.Length)
+			if (selection == null || selection.Length == 0 || selection.Length > SelectionLimit || selection.Distinct().Count() != selection.Length)
 			{
 				throw new ArgumentException("Select distinct preview items.", nameof(selection));
 			}
@@ -196,7 +209,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			this._preview = null; // A reviewed selection is single-use, even when execution is cancelled.
 			var results = new List<PlacementResult>();
-			var batchDeadline = this._now() + 30000;
+			var batchDeadline = this._now() + BatchTimeLimitMilliseconds;
 			var processor = new PlacementProcessor(
 				this._configuration,
 				this._windows,
@@ -218,10 +231,13 @@ namespace SylphyHorn.Services.AppPlacement
 					processor.Step(work);
 					if (work.Result == null)
 					{
-						try { this._wait((int)Math.Max(0, Math.Min(work.NextAt, batchDeadline) - this._now()), cancellation); }
+						try
+						{
+							this._wait((int)Math.Max(0, Math.Min(work.NextAt, batchDeadline) - this._now()), cancellation);
+						}
 						catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
 						{
-							work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : PlacementOutcome.Cancelled);
+							work.FinishIncomplete(PlacementOutcome.Cancelled);
 						}
 					}
 				}

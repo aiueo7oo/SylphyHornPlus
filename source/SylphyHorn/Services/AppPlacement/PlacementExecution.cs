@@ -45,6 +45,8 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal sealed class PlacementHistory
 	{
+		private const int Capacity = 200;
+
 		private readonly object _gate = new object();
 		private readonly Queue<PlacementResult> _results = new Queue<PlacementResult>();
 
@@ -52,7 +54,7 @@ namespace SylphyHorn.Services.AppPlacement
 		{
 			lock (this._gate)
 			{
-				if (this._results.Count == 200)
+				if (this._results.Count == Capacity)
 				{
 					this._results.Dequeue();
 				}
@@ -69,11 +71,15 @@ namespace SylphyHorn.Services.AppPlacement
 	// Cancellation never waits for native COM. Once started, the session's completion is the join point.
 	internal sealed class PlacementMovePermit
 	{
-		private int _state;
+		private const int NotStarted = 0;
+		private const int Started = 1;
+		private const int Cancelled = 2;
 
-		internal bool TryStart() => Interlocked.CompareExchange(ref this._state, 1, 0) == 0;
+		private int _state = NotStarted;
 
-		internal void Cancel() => Interlocked.CompareExchange(ref this._state, 2, 0);
+		internal bool TryStart() => Interlocked.CompareExchange(ref this._state, Started, NotStarted) == NotStarted;
+
+		internal void Cancel() => Interlocked.CompareExchange(ref this._state, Cancelled, NotStarted);
 	}
 
 	internal sealed class PlacementAuthorization
@@ -129,10 +135,12 @@ namespace SylphyHorn.Services.AppPlacement
 
 	internal sealed class PlacementWorkItem
 	{
+		internal const long TimeLimitMilliseconds = 5000;
+
 		internal PlacementWorkItem(PlacementCandidate candidate)
 		{
 			this.Candidate = candidate;
-			this.Deadline = candidate.ObservedAt + 5000;
+			this.Deadline = candidate.ObservedAt + TimeLimitMilliseconds;
 		}
 
 		internal PlacementCandidate Candidate { get; }
@@ -162,11 +170,19 @@ namespace SylphyHorn.Services.AppPlacement
 		internal PlacementResult Result { get; set; }
 
 		internal void Finish(PlacementOutcome outcome, string reason = null) => this.Result = new PlacementResult(this.Candidate.Window, this.Rule?.Id, outcome, reason);
+
+		// Once the native move was requested its effect is unknown, so it can only end unconfirmed.
+		internal void FinishIncomplete(PlacementOutcome outcome, string reason = null)
+			=> this.Finish(this.Requested ? PlacementOutcome.Unconfirmed : outcome, reason);
 	}
 
 	/// <summary>One bounded attempt. Scheduling belongs to the session; there are no sleeps or per-event tasks here.</summary>
 	internal sealed class PlacementProcessor
 	{
+		private const int MaximumAttempts = 5;
+		private const long FirstRetryDelayMilliseconds = 250;
+		private const long ReadbackIntervalMilliseconds = 100;
+
 		private readonly AppPlacementConfiguration _configuration;
 		private readonly IPlacementWindows _windows;
 		private readonly Func<PlacementDestination, long, PlacementAuthorization> _authorize;
@@ -199,12 +215,12 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				if (!this._current(work.Candidate))
 				{
-					work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : PlacementOutcome.Cancelled);
+					work.FinishIncomplete(PlacementOutcome.Cancelled);
 					return;
 				}
-				if (this._now() >= work.Deadline)
+				if (this.HasExpired(work))
 				{
-					work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : PlacementOutcome.TimedOut);
+					work.FinishIncomplete(PlacementOutcome.TimedOut);
 					return;
 				}
 				if (work.Requested)
@@ -213,143 +229,192 @@ namespace SylphyHorn.Services.AppPlacement
 					return;
 				}
 				work.Attempts++;
-				var inspection = this._windows.Inspect(work.Candidate.Window);
-				if (inspection.Status == PlacementInspectionStatus.Excluded)
-				{
-					work.Finish(PlacementOutcome.Excluded, inspection.Reason);
-					return;
-				}
-				if (inspection.Status == PlacementInspectionStatus.Unavailable)
-				{
-					work.Finish(PlacementOutcome.Unavailable, inspection.Reason);
-					return;
-				}
-				if (inspection.Identity == null)
-				{
-					this.Retry(work);
-					return;
-				}
-				if (work.Identity != null && !work.Identity.SameInstance(inspection.Identity))
-				{
-					work.Finish(PlacementOutcome.Changed, "IdentityChanged");
-					return;
-				}
-				work.Identity = inspection.Identity;
-				work.Rule = this._configuration.FindEnabledRule(work.Identity.App);
-				if (work.Rule == null)
-				{
-					work.Finish(PlacementOutcome.NoRule);
-					return;
-				}
-				var location = this._windows.Locate(work.Candidate.Window);
-				if (location == null)
-				{
-					this.Retry(work);
-					return;
-				}
-				if (location.Pinned)
-				{
-					work.Finish(PlacementOutcome.Excluded, "Pinned");
-					return;
-				}
-				if (work.Source.HasValue && work.Source.Value != location.Desktop)
-				{
-					work.Finish(PlacementOutcome.Changed, "DesktopChanged");
-					return;
-				}
-				work.Source = location.Desktop;
+				var inspection = this.InspectCandidate(work);
+				if (inspection == null) return;
+				if (!this.LocateSource(work)) return;
 				if (inspection.Status == PlacementInspectionStatus.NotReady)
 				{
 					this.Retry(work);
 					return;
 				}
-				var authorization = this._authorize(work.Rule.Destination, work.Deadline);
-				if (authorization.Resolution.Status != PlacementResolutionStatus.Resolved)
-				{
-					work.Finish(PlacementOutcome.DestinationUnavailable, authorization.Resolution.Status.ToString());
-					return;
-				}
-				work.Target = authorization.Resolution.DesktopId;
-				if (work.ExpectedTarget.HasValue && work.ExpectedTarget != work.Target)
-				{
-					authorization.Permit?.Cancel();
-					work.Finish(PlacementOutcome.Changed, "DestinationChanged");
-					return;
-				}
-				if (!this._current(work.Candidate) || this._now() >= work.Deadline)
-				{
-					authorization.Permit?.Cancel();
-					work.Finish(this._now() >= work.Deadline ? PlacementOutcome.TimedOut : PlacementOutcome.Cancelled);
-					return;
-				}
-				work.MoveAttempted = true;
-				PlacementMoveStatus moved;
-				using (this._cancellation.Register(() => authorization.Permit?.Cancel()))
-					moved = this._windows.Move(
-						work.Identity,
-						work.Source.Value,
-						work.Target.Value,
-						authorization.Permit,
-						() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline,
-						() =>
-						{
-							if (this._automatic && (work.Rule.FollowForeground ?? this._configuration.FollowForeground)
-								&& this._windows is IPlacementForeground foreground)
-							{
-								work.Follow = foreground.PrepareFollow(work.Identity, work.Source.Value, work.Target.Value,
-									() => !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline);
-							}
-						});
-				switch (moved)
-				{
-					case PlacementMoveStatus.Requested:
-						work.Requested = true;
-						this.Verify(work);
-						break;
-					case PlacementMoveStatus.AlreadyPlaced:
-						work.Finish(PlacementOutcome.AlreadyPlaced);
-						break;
-					case PlacementMoveStatus.Pinned:
-						work.Finish(PlacementOutcome.Excluded, "Pinned");
-						break;
-					case PlacementMoveStatus.Changed:
-						work.Finish(PlacementOutcome.Changed);
-						break;
-					case PlacementMoveStatus.MissingDestination:
-						work.Finish(PlacementOutcome.DestinationUnavailable, "Missing");
-						break;
-					default:
-						work.Finish(PlacementOutcome.Cancelled);
-						break;
-				}
+				var authorization = this.AuthorizeTarget(work);
+				if (authorization == null) return;
+				this.RequestMove(work, authorization);
 			}
 			catch (OperationCanceledException)
 			{
-				work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : this._now() >= work.Deadline ? PlacementOutcome.TimedOut : PlacementOutcome.Cancelled);
+				this.FinishInterrupted(work);
 			}
 			catch (Exception ex)
 			{
-				work.Finish(
-					work.Requested ? PlacementOutcome.Unconfirmed : work.MoveAttempted ? PlacementOutcome.MoveFailed : PlacementOutcome.Unavailable,
+				work.FinishIncomplete(
+					work.MoveAttempted ? PlacementOutcome.MoveFailed : PlacementOutcome.Unavailable,
 					ex.GetType().Name + ":" + ex.HResult.ToString("X8"));
 			}
 		}
 
+		// Returns null when the work item finished or was rescheduled.
+		private PlacementWindowInspection InspectCandidate(PlacementWorkItem work)
+		{
+			var inspection = this._windows.Inspect(work.Candidate.Window);
+			if (inspection.Status == PlacementInspectionStatus.Excluded)
+			{
+				work.Finish(PlacementOutcome.Excluded, inspection.Reason);
+				return null;
+			}
+			if (inspection.Status == PlacementInspectionStatus.Unavailable)
+			{
+				work.Finish(PlacementOutcome.Unavailable, inspection.Reason);
+				return null;
+			}
+			if (inspection.Identity == null)
+			{
+				this.Retry(work);
+				return null;
+			}
+			if (work.Identity != null && !work.Identity.SameInstance(inspection.Identity))
+			{
+				work.Finish(PlacementOutcome.Changed, "IdentityChanged");
+				return null;
+			}
+			work.Identity = inspection.Identity;
+			work.Rule = this._configuration.FindEnabledRule(work.Identity.App);
+			if (work.Rule == null)
+			{
+				work.Finish(PlacementOutcome.NoRule);
+				return null;
+			}
+			return inspection;
+		}
+
+		// Returns false when the work item finished or was rescheduled.
+		private bool LocateSource(PlacementWorkItem work)
+		{
+			var location = this._windows.Locate(work.Candidate.Window);
+			if (location == null)
+			{
+				this.Retry(work);
+				return false;
+			}
+			if (location.Pinned)
+			{
+				work.Finish(PlacementOutcome.Excluded, "Pinned");
+				return false;
+			}
+			if (work.Source.HasValue && work.Source.Value != location.Desktop)
+			{
+				work.Finish(PlacementOutcome.Changed, "DesktopChanged");
+				return false;
+			}
+			work.Source = location.Desktop;
+			return true;
+		}
+
+		// Returns null when the work item finished. A permit that will not be used is cancelled.
+		private PlacementAuthorization AuthorizeTarget(PlacementWorkItem work)
+		{
+			var authorization = this._authorize(work.Rule.Destination, work.Deadline);
+			if (authorization.Resolution.Status != PlacementResolutionStatus.Resolved)
+			{
+				work.Finish(PlacementOutcome.DestinationUnavailable, authorization.Resolution.Status.ToString());
+				return null;
+			}
+			work.Target = authorization.Resolution.DesktopId;
+			if (work.ExpectedTarget.HasValue && work.ExpectedTarget != work.Target)
+			{
+				authorization.Permit?.Cancel();
+				work.Finish(PlacementOutcome.Changed, "DestinationChanged");
+				return null;
+			}
+			if (!this._current(work.Candidate) || this.HasExpired(work))
+			{
+				authorization.Permit?.Cancel();
+				this.FinishInterrupted(work);
+				return null;
+			}
+			return authorization;
+		}
+
+		private void RequestMove(PlacementWorkItem work, PlacementAuthorization authorization)
+		{
+			work.MoveAttempted = true;
+			PlacementMoveStatus status;
+			using (this._cancellation.Register(() => authorization.Permit?.Cancel()))
+			{
+				status = this._windows.Move(
+					work.Identity,
+					work.Source.Value,
+					work.Target.Value,
+					authorization.Permit,
+					() => this.IsWorkCurrent(work),
+					() => this.PrepareFollow(work));
+			}
+			switch (status)
+			{
+				case PlacementMoveStatus.Requested:
+					work.Requested = true;
+					this.Verify(work);
+					break;
+				case PlacementMoveStatus.AlreadyPlaced:
+					work.Finish(PlacementOutcome.AlreadyPlaced);
+					break;
+				case PlacementMoveStatus.Pinned:
+					work.Finish(PlacementOutcome.Excluded, "Pinned");
+					break;
+				case PlacementMoveStatus.Changed:
+					work.Finish(PlacementOutcome.Changed);
+					break;
+				case PlacementMoveStatus.MissingDestination:
+					work.Finish(PlacementOutcome.DestinationUnavailable, "Missing");
+					break;
+				default:
+					work.Finish(PlacementOutcome.Cancelled);
+					break;
+			}
+		}
+
+		// Runs immediately before the native move request.
+		private void PrepareFollow(PlacementWorkItem work)
+		{
+			if (this._automatic && (work.Rule.FollowForeground ?? this._configuration.FollowForeground)
+				&& this._windows is IPlacementForeground foreground)
+			{
+				work.Follow = foreground.PrepareFollow(work.Identity, work.Source.Value, work.Target.Value, () => this.IsWorkCurrent(work));
+			}
+		}
+
+		private bool IsWorkCurrent(PlacementWorkItem work)
+			=> !this._cancellation.IsCancellationRequested && this._current(work.Candidate) && this._now() < work.Deadline;
+
+		private bool HasExpired(PlacementWorkItem work) => this._now() >= work.Deadline;
+
+		// Before a move is requested, distinguish expiry from cancellation.
+		private void FinishInterrupted(PlacementWorkItem work)
+		{
+			if (work.Requested)
+			{
+				work.Finish(PlacementOutcome.Unconfirmed);
+				return;
+			}
+			work.Finish(this.HasExpired(work) ? PlacementOutcome.TimedOut : PlacementOutcome.Cancelled);
+		}
+
 		private void Retry(PlacementWorkItem work)
 		{
-			if (work.Attempts >= 5 || this._now() >= work.Deadline)
+			if (work.Attempts >= MaximumAttempts || this.HasExpired(work))
 			{
 				work.Finish(PlacementOutcome.TimedOut);
 			}
 			else
 			{
-				work.NextAt = Math.Min(work.Deadline, this._now() + (250L << (work.Attempts - 1)));
+				// The delay doubles with each attempt and never passes the deadline.
+				work.NextAt = Math.Min(work.Deadline, this._now() + (FirstRetryDelayMilliseconds << (work.Attempts - 1)));
 			}
 		}
 
 		private void Verify(PlacementWorkItem work)
 		{
-			if (!this._current(work.Candidate) || this._now() >= work.Deadline)
+			if (!this._current(work.Candidate) || this.HasExpired(work))
 			{
 				work.Finish(PlacementOutcome.Unconfirmed);
 				return;
@@ -374,7 +439,10 @@ namespace SylphyHorn.Services.AppPlacement
 					work.Follow?.Invoke();
 					work.Finish(PlacementOutcome.Moved);
 				}
-				catch (Exception ex) { work.Finish(PlacementOutcome.Moved, "FollowFailed:" + ex.GetType().Name); }
+				catch (Exception ex)
+				{
+					work.Finish(PlacementOutcome.Moved, "FollowFailed:" + ex.GetType().Name);
+				}
 			}
 			else if (location != null && (location.Pinned || (location.Desktop != work.Source && location.Desktop != work.Target)))
 			{
@@ -382,7 +450,7 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 			else
 			{
-				work.NextAt = Math.Min(work.Deadline, this._now() + 100);
+				work.NextAt = Math.Min(work.Deadline, this._now() + ReadbackIntervalMilliseconds);
 			}
 		}
 	}

@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using SylphyHorn.AppPlacement;
+using static SylphyHorn.Services.AppPlacement.PlacementNativeMethods;
 
 namespace SylphyHorn.Services.AppPlacement
 {
@@ -54,6 +53,7 @@ namespace SylphyHorn.Services.AppPlacement
 	internal sealed class PlacementSession : IPlacementSession
 	{
 		private const int CandidateLimit = 256;
+		private const int DrainBatchLimit = 32;
 		private readonly object _gate = new object();
 		private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
 		private readonly ManualResetEvent _stop = new ManualResetEvent(false);
@@ -120,16 +120,19 @@ namespace SylphyHorn.Services.AppPlacement
 
 		public Task<PlacementResult[]> ApplyAsync(PlacementPreview preview, Guid[] selection, CancellationToken cancellation)
 		{
-			if (selection == null || selection.Length > 256)
+			if (selection == null || selection.Length > PlacementExplicitApplication.SelectionLimit)
 			{
-				throw new ArgumentException(nameof(selection));
+				throw new ArgumentException("Selection is missing or exceeds the preview item limit.", nameof(selection));
 			}
 			var selected = (Guid[])selection.Clone();
 			return this.Submit(
 				token =>
 				{
 					var results = this._explicit.Apply(preview, selected, (destination, deadline) => this.Authorize(destination, deadline, token, false), token);
-					foreach (var result in results) this._history.Add(result);
+					foreach (var result in results)
+					{
+						this._history.Add(result);
+					}
 					return results;
 				},
 				cancellation);
@@ -140,7 +143,10 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				var application = this._explicit.ApplyRules(map, app, dryRun,
 					(destination, deadline) => this.Authorize(destination, deadline, token, false), token);
-				foreach (var result in application.Results) this._history.Add(result);
+				foreach (var result in application.Results)
+				{
+					this._history.Add(result);
+				}
 				return application;
 			}, cancellation);
 
@@ -258,15 +264,23 @@ namespace SylphyHorn.Services.AppPlacement
 
 		private bool IsCurrent(PlacementCandidate candidate)
 		{
-			// Bound ingress work even under sustained activity. If continuity cannot be checked now, skip.
-			for (var n = 0; n < 32 && this._monitor.Events.BufferedCount != 0; n++) this._monitor.Events.ProcessBatch();
+			this.DrainEvents();
 			return !this._cancellation.IsCancellationRequested && this._monitor.Events.IsCurrent(candidate);
 		}
 
 		private bool IsExistingCurrent(PlacementCandidate candidate)
 		{
-			for (var n = 0; n < 32 && this._monitor.Events.BufferedCount != 0; n++) this._monitor.Events.ProcessBatch();
+			this.DrainEvents();
 			return !this._cancellation.IsCancellationRequested && this._monitor.Events.IsExistingCurrent(candidate);
+		}
+
+		// Bound ingress work even under sustained activity. If continuity cannot be checked now, skip.
+		private void DrainEvents()
+		{
+			for (var n = 0; n < DrainBatchLimit && this._monitor.Events.BufferedCount != 0; n++)
+			{
+				this._monitor.Events.ProcessBatch();
+			}
 		}
 
 		private void Run()
@@ -275,12 +289,7 @@ namespace SylphyHorn.Services.AppPlacement
 			var pending = new List<PlacementWorkItem>();
 			try
 			{
-				lock (this._gate)
-				{
-					if (this._cancellation.IsCancellationRequested) return;
-					this._monitor = PlacementWindowMonitor.Start(candidateLimit: CandidateLimit);
-				}
-				if (!this._monitor.Ready.GetAwaiter().GetResult()) return;
+				if (!this.StartMonitor()) return;
 				Volatile.Write(ref this._ready, 1);
 				var windows = new PlacementWindows();
 				this._explicit = new PlacementExplicitApplication(
@@ -288,84 +297,28 @@ namespace SylphyHorn.Services.AppPlacement
 					windows,
 					() => this._monitor.Events.Existing(Now()),
 					this.IsExistingCurrent,
-					Title,
+					GetWindowTitle,
 					Now,
 					(delay, token) => WaitHandle.WaitAny(new[] { this._stop, this._monitor.Changed, token.WaitHandle }, delay));
 				var processor = new PlacementProcessor(this._configuration, windows,
 					this.Authorize, this.IsCurrent, Now, this._cancellation.Token, automatic: true);
 				var handles = new[] { this._stop, this._monitor.Changed, this._requestReady };
-				var occupancy = this._closeDesktops == null ? null : new PlacementDesktopOccupancyReader();
-				var usedDesktops = occupancy == null ? null : new HashSet<Guid>();
-				var observedVersion = -1L;
-				var observedTopology = -1L;
-				var nextCloseCheck = long.MaxValue;
+				var closure = this._closeDesktops == null ? null : new DesktopClosureCheck(this);
 				while (!this._cancellation.IsCancellationRequested)
 				{
-					for (var n = 0; n < 32 && this._monitor.Events.BufferedCount != 0; n++) this._monitor.Events.ProcessBatch();
+					this.DrainEvents();
 					if (this._monitor.Events.State != PlacementMonitorState.Running) break;
 					this.ProcessRequest();
-					PlacementCandidate candidate;
-					// Destroyed, already handed-out candidates may still be awaiting their next retry.
-					// Cap the worker list separately from the tracker's live admission count.
-					while (pending.Count < CandidateLimit && (candidate = this._monitor.Events.TakeCandidate()) != null) pending.Add(new PlacementWorkItem(candidate));
-					var capacityReached = pending.Count == CandidateLimit;
-					var delay = Timeout.Infinite;
-					for (var i = pending.Count - 1; i >= 0 && !this._cancellation.IsCancellationRequested; i--)
-					{
-						var work = pending[i];
-						if (work.NextAt <= Now() || !this._monitor.Events.IsCurrent(work.Candidate))
-						{
-							processor.Step(work);
-						}
-						if (work.Result != null)
-						{
-							if (work.Target.HasValue && (work.Result.Outcome == PlacementOutcome.Moved || work.Result.Outcome == PlacementOutcome.AlreadyPlaced))
-							{
-								usedDesktops?.Add(work.Target.Value);
-							}
-							if (work.Result.Outcome != PlacementOutcome.NoRule)
-							{
-								this._history.Add(work.Result);
-							}
-							this._monitor.Events.Complete(work.Candidate);
-							pending.RemoveAt(i);
-						}
-						else
-						{
-							var next = (int)Math.Max(0, work.NextAt - Now());
-							delay = delay < 0 ? next : Math.Min(delay, next);
-						}
-					}
+					var capacityReached = this.TakeCandidates(pending);
+					var delay = this.StepPending(pending, processor, closure);
 					if (this._monitor.Events.State != PlacementMonitorState.Running) break;
 					if (this._monitor.Events.BufferedCount != 0 || (capacityReached && pending.Count < CandidateLimit))
 					{
 						delay = 0;
 					}
-					if (occupancy != null)
+					if (closure != null)
 					{
-						var version = this._monitor.Events.Version;
-						var topology = Interlocked.Read(ref this._closureTopologyVersion);
-						if (version != observedVersion || topology != observedTopology)
-						{
-							observedVersion = version;
-							observedTopology = topology;
-							nextCloseCheck = Now() + 100; // Coalesce a burst of native events before inspecting occupancy.
-						}
-						if (pending.Count == 0 && nextCloseCheck <= Now())
-						{
-							bool Current() => !this._cancellation.IsCancellationRequested
-								&& this._monitor.Events.State == PlacementMonitorState.Running && this._monitor.Events.Version == version
-								&& Interlocked.Read(ref this._closureTopologyVersion) == topology;
-							var observed = occupancy.Read(this._cancellation.Token, Current);
-							var observation = new PlacementOccupancyObservation(observed.Complete, observed.Occupied, Current, usedDesktops);
-							var retry = this._closeDesktops(observation, this._cancellation.Token).GetAwaiter().GetResult();
-							nextCloseCheck = retry ? Now() + PlacementDesktopClosure.GraceMilliseconds : long.MaxValue;
-						}
-						if (nextCloseCheck != long.MaxValue)
-						{
-							var next = (int)Math.Max(50, nextCloseCheck - Now());
-							delay = delay < 0 ? next : Math.Min(delay, next);
-						}
+						delay = MergeDelay(delay, closure.Check(pending.Count == 0));
 					}
 					WaitHandle.WaitAny(handles, delay);
 				}
@@ -379,25 +332,11 @@ namespace SylphyHorn.Services.AppPlacement
 			{
 				foreach (var work in pending)
 				{
-					work.Finish(work.Requested ? PlacementOutcome.Unconfirmed : PlacementOutcome.Cancelled);
+					work.FinishIncomplete(PlacementOutcome.Cancelled);
 					this._history.Add(work.Result);
 				}
-				if (this._monitor != null)
-				{
-					if (this._monitor.Events.State == PlacementMonitorState.Paused)
-					{
-						this._history.Add(new PlacementResult(IntPtr.Zero, null, PlacementOutcome.MonitorPaused, this._monitor.Events.PauseReason));
-					}
-					try
-					{
-						this._monitor.StopAsync().GetAwaiter().GetResult();
-					}
-					catch (Exception ex)
-					{
-						failure = failure ?? ex;
-					}
-					this._monitor.Dispose();
-				}
+				var stopFailure = this.StopMonitor();
+				failure = failure ?? stopFailure;
 				lock (this._gate)
 				{
 					this._ended = true;
@@ -418,6 +357,94 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
+		// False when the session stopped first or the monitor could not capture its baseline.
+		private bool StartMonitor()
+		{
+			lock (this._gate)
+			{
+				if (this._cancellation.IsCancellationRequested) return false;
+				this._monitor = PlacementWindowMonitor.Start(candidateLimit: CandidateLimit);
+			}
+			return this._monitor.Ready.GetAwaiter().GetResult();
+		}
+
+		// Returns whether the worker list was full, so freed slots can be refilled without waiting.
+		private bool TakeCandidates(List<PlacementWorkItem> pending)
+		{
+			PlacementCandidate candidate;
+			// Destroyed, already handed-out candidates may still be awaiting their next retry.
+			// Cap the worker list separately from the tracker's live admission count.
+			while (pending.Count < CandidateLimit && (candidate = this._monitor.Events.TakeCandidate()) != null)
+			{
+				pending.Add(new PlacementWorkItem(candidate));
+			}
+			return pending.Count == CandidateLimit;
+		}
+
+		// Steps every due or invalidated item and returns the delay until the earliest remaining retry.
+		private int StepPending(List<PlacementWorkItem> pending, PlacementProcessor processor, DesktopClosureCheck closure)
+		{
+			var delay = Timeout.Infinite;
+			for (var i = pending.Count - 1; i >= 0 && !this._cancellation.IsCancellationRequested; i--)
+			{
+				var work = pending[i];
+				if (work.NextAt <= Now() || !this._monitor.Events.IsCurrent(work.Candidate))
+				{
+					processor.Step(work);
+				}
+				if (work.Result != null)
+				{
+					this.Complete(work, closure);
+					pending.RemoveAt(i);
+				}
+				else
+				{
+					delay = MergeDelay(delay, (int)Math.Max(0, work.NextAt - Now()));
+				}
+			}
+			return delay;
+		}
+
+		private void Complete(PlacementWorkItem work, DesktopClosureCheck closure)
+		{
+			if (work.Target.HasValue && (work.Result.Outcome == PlacementOutcome.Moved || work.Result.Outcome == PlacementOutcome.AlreadyPlaced))
+			{
+				closure?.MarkUsed(work.Target.Value);
+			}
+			if (work.Result.Outcome != PlacementOutcome.NoRule)
+			{
+				this._history.Add(work.Result);
+			}
+			this._monitor.Events.Complete(work.Candidate);
+		}
+
+		// Timeout.Infinite (-1) means no wake-up is scheduled. Otherwise keep the earliest wake-up.
+		private static int MergeDelay(int delay, int next)
+		{
+			if (next < 0) return delay;
+			return delay < 0 ? next : Math.Min(delay, next);
+		}
+
+		private Exception StopMonitor()
+		{
+			if (this._monitor == null) return null;
+			if (this._monitor.Events.State == PlacementMonitorState.Paused)
+			{
+				this._history.Add(new PlacementResult(IntPtr.Zero, null, PlacementOutcome.MonitorPaused, this._monitor.Events.PauseReason));
+			}
+			Exception failure = null;
+			try
+			{
+				this._monitor.StopAsync().GetAwaiter().GetResult();
+			}
+			catch (Exception ex)
+			{
+				failure = ex;
+			}
+			this._monitor.Dispose();
+			return failure;
+		}
+
 		private static long Now() => checked((long)GetTickCount64());
 
 		private PlacementAuthorization Authorize(PlacementDestination destination, long deadline)
@@ -432,17 +459,53 @@ namespace SylphyHorn.Services.AppPlacement
 			}
 		}
 
-		[DllImport("kernel32.dll")]
-		private static extern ulong GetTickCount64();
-
-		private static string Title(IntPtr window)
+		/// <summary>Worker-thread state for offering desktops that stayed empty to the closure callback.</summary>
+		private sealed class DesktopClosureCheck
 		{
-			var title = new StringBuilder(1024);
-			GetWindowText(window, title, title.Capacity);
-			return title.ToString();
-		}
+			// Coalesce a burst of native events before inspecting occupancy.
+			private const long SettleMilliseconds = 100;
+			private const long MinimumRecheckMilliseconds = 50;
 
-		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
-		private static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+			private readonly PlacementSession _session;
+			private readonly PlacementDesktopOccupancyReader _occupancy = new PlacementDesktopOccupancyReader();
+			// Targets that received, or already held, an automatically placed window.
+			private readonly HashSet<Guid> _usedDesktops = new HashSet<Guid>();
+			private long _observedVersion = -1;
+			private long _observedTopology = -1;
+			private long _nextCheck = long.MaxValue;
+
+			internal DesktopClosureCheck(PlacementSession session)
+			{
+				this._session = session;
+			}
+
+			internal void MarkUsed(Guid desktop) => this._usedDesktops.Add(desktop);
+
+			// Offers occupancy to the callback when due and the worker is idle; returns the delay until the next check.
+			internal int Check(bool idle)
+			{
+				var session = this._session;
+				var version = session._monitor.Events.Version;
+				var topology = Interlocked.Read(ref session._closureTopologyVersion);
+				if (version != this._observedVersion || topology != this._observedTopology)
+				{
+					this._observedVersion = version;
+					this._observedTopology = topology;
+					this._nextCheck = Now() + SettleMilliseconds;
+				}
+				if (idle && this._nextCheck <= Now())
+				{
+					bool Current() => !session._cancellation.IsCancellationRequested
+						&& session._monitor.Events.State == PlacementMonitorState.Running && session._monitor.Events.Version == version
+						&& Interlocked.Read(ref session._closureTopologyVersion) == topology;
+					var observed = this._occupancy.Read(session._cancellation.Token, Current);
+					var observation = new PlacementOccupancyObservation(observed.Complete, observed.Occupied, Current, this._usedDesktops);
+					var retry = session._closeDesktops(observation, session._cancellation.Token).GetAwaiter().GetResult();
+					this._nextCheck = retry ? Now() + PlacementDesktopClosure.GraceMilliseconds : long.MaxValue;
+				}
+				if (this._nextCheck == long.MaxValue) return Timeout.Infinite;
+				return (int)Math.Max(MinimumRecheckMilliseconds, this._nextCheck - Now());
+			}
+		}
 	}
 }

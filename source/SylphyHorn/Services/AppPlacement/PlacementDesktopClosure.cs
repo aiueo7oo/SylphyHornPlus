@@ -104,7 +104,9 @@ namespace SylphyHorn.Services.AppPlacement
 				}
 			}
 			foreach (var id in this._emptySince.Keys.Where(id => !stillEmpty.Contains(id)).ToArray())
+			{
 				this._emptySince.Remove(id);
+			}
 
 			// Do not skip a blocked last desktop: removing an interior desktop would renumber successors.
 			var last = desktops[desktops.Count - 1].Desktop.Id;
