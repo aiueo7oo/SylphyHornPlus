@@ -46,7 +46,8 @@
 	</ItemGroup>
 
 	<Target Name="WritePlacementTestHostPath"
-	        AfterTargets="Build">
+	        AfterTargets="Build"
+	        Condition="'$(TargetFramework)' != ''">
 		<MSBuild Projects="..\SylphyHorn.PlacementTestHost\SylphyHorn.PlacementTestHost.csproj"
 		         Targets="GetAppHostPath"
 		         Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework)">
