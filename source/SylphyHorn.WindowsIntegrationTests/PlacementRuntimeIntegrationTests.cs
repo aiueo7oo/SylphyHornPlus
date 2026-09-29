@@ -127,15 +127,22 @@ namespace SylphyHorn.WindowsIntegrationTests
 							sessions.Sessions.Count,
 							sessions.Sessions.Last().Completion.Status,
 							afterImport);
-						foreach (var result in runtime.PlacementResults) this._output.WriteLine("Window={0}; outcome={1}; reason={2}", result.Window, result.Outcome, result.Reason);
-						foreach (var fault in faults) this._output.WriteLine(fault);
+						foreach (var result in runtime.PlacementResults)
+						{
+							this._output.WriteLine("Window={0}; outcome={1}; reason={2}", result.Window, result.Outcome, result.Reason);
+						}
+						foreach (var fault in faults)
+						{
+							this._output.WriteLine(fault);
+						}
 						throw;
 					}
 					var importedResult = runtime.PlacementResults.Last(item => item.Window == afterImport);
 					Assert.Equal(PlacementOutcome.Moved, importedResult.Outcome);
 					Assert.Equal(imported.Rules.Single().Id, importedResult.Rule);
 					Assert.Equal(environment.Target, environment.Location(afterImport));
-					this._output.WriteLine("Import: old workers joined before disk commit; XML and reload publish new rule; paused windows stay; old preview rejected; new windows move under imported rule.");
+					this._output.WriteLine("Import: old workers joined before disk commit; XML and reload publish new rule; "
+						+ "paused windows stay; old preview rejected; new windows move under imported rule.");
 
 					var preview = await runtime.PreviewExistingPlacementAsync(CancellationToken.None);
 					var shutdownItem = preview.Items.Single(value => value.Candidate.Window == duringImport);
@@ -231,7 +238,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 					actions = this._held.ToArray();
 					this._held.Clear();
 				}
-				foreach (var action in actions) action();
+				foreach (var action in actions)
+				{
+					action();
+				}
 			}
 		}
 
@@ -247,13 +257,26 @@ namespace SylphyHorn.WindowsIntegrationTests
 				this._beforeDispose = beforeDispose;
 			}
 
-			public event EventHandler<VirtualDesktopStableBatch> StableBatchPublished { add => this._inner.StableBatchPublished += value; remove => this._inner.StableBatchPublished -= value; }
+			public event EventHandler<VirtualDesktopStableBatch> StableBatchPublished
+			{
+				add => this._inner.StableBatchPublished += value;
+				remove => this._inner.StableBatchPublished -= value;
+			}
 
-			public event EventHandler<VirtualDesktopCurrentTransition> CurrentTransitioned { add => this._inner.CurrentTransitioned += value; remove => this._inner.CurrentTransitioned -= value; }
+			public event EventHandler<VirtualDesktopCurrentTransition> CurrentTransitioned
+			{
+				add => this._inner.CurrentTransitioned += value;
+				remove => this._inner.CurrentTransitioned -= value;
+			}
 
-			public event EventHandler<VirtualDesktopProviderFault> Faulted { add => this._inner.Faulted += value; remove => this._inner.Faulted -= value; }
+			public event EventHandler<VirtualDesktopProviderFault> Faulted
+			{
+				add => this._inner.Faulted += value;
+				remove => this._inner.Faulted -= value;
+			}
 
-			public Task<VirtualDesktopReconciliationResult> RequestReconciliationAsync(VirtualDesktopStableReason reason, CancellationToken cancellationToken) => this._inner.RequestReconciliationAsync(reason, cancellationToken);
+			public Task<VirtualDesktopReconciliationResult> RequestReconciliationAsync(VirtualDesktopStableReason reason, CancellationToken cancellationToken)
+				=> this._inner.RequestReconciliationAsync(reason, cancellationToken);
 
 			public void Dispose()
 			{
@@ -284,7 +307,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 			{
 				var values = new Dictionary<string, object>();
 				SettingsService.ApplyDesktopProjection(values, projection);
-				foreach (var pair in values) this.Provider.SetValue(pair.Key, pair.Value);
+				foreach (var pair in values)
+				{
+					this.Provider.SetValue(pair.Key, pair.Value);
+				}
 			}
 
 			public long SettingsRevision => this.Provider.SettingsRevision;

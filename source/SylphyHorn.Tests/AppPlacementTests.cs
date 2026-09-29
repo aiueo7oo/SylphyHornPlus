@@ -225,7 +225,10 @@ namespace SylphyHorn.Tests
 				new AppPlacementConfiguration(true, new[] { new AppPlacementRule(RuleId, true, rule.App, rule.Destination, "Renamed", rule.DisplayExecutablePath) }),
 				new AppPlacementConfiguration(true, new[] { new AppPlacementRule(RuleId, true, rule.App, rule.Destination, rule.DisplayName, @"D:\Display.exe") }),
 			};
-			foreach (var variant in variants) Assert.NotEqual(expected, await Fingerprint(variant));
+			foreach (var variant in variants)
+			{
+				Assert.NotEqual(expected, await Fingerprint(variant));
+			}
 		}
 
 		[Fact]

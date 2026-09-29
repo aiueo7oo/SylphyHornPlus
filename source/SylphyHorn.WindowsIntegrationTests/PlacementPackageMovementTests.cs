@@ -195,7 +195,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 				}
 				finally
 				{
-					foreach (var process in existing) process.Dispose();
+					foreach (var process in existing)
+					{
+						process.Dispose();
+					}
 				}
 			}
 

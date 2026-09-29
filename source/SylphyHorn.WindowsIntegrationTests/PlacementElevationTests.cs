@@ -112,7 +112,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 						Assert.False(string.IsNullOrWhiteSpace(work.Result.Reason), "A denied or unconfirmed result must have diagnostic evidence.");
 					}
 					var moves = windows.Moves;
-					for (var n = 0; n < 10; n++) processor.Step(work);
+					for (var n = 0; n < 10; n++)
+					{
+						processor.Step(work);
+					}
 					Assert.InRange(moves, 0, 1);
 					Assert.Equal(moves, windows.Moves);
 					Assert.Equal(environment.Source, environment.Location(ordinary));

@@ -249,7 +249,9 @@ namespace SylphyHorn.Tests
 			Assert.True(second.Success, second.Error?.Message);
 			Assert.False(second.Data.Changed);
 			var spec = await CliSpecService.ExecuteAsync(new[] { "spec", "desktop", "creation", "wallpaper", "set", "--resolve" },
-				query => query[1] == "list" ? Task.FromResult(CliResponse.Ok("desktop list", new CliData())) : service.ExecuteAsync(CliCommand.Parse(query), TestContext.Current.CancellationToken));
+				query => query[1] == "list"
+					? Task.FromResult(CliResponse.Ok("desktop list", new CliData()))
+					: service.ExecuteAsync(CliCommand.Parse(query), TestContext.Current.CancellationToken));
 			Assert.Equal("complete", spec.Data.Resolution.Status);
 			var removed = await service.ExecuteAsync(CliCommand.Parse(new[] { "desktop", "creation", "wallpaper", "remove", "--name", "Work" }), TestContext.Current.CancellationToken);
 			Assert.True(removed.Success);

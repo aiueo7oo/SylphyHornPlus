@@ -137,7 +137,10 @@ namespace SylphyHorn.WindowsIntegrationTests
 					}
 					finally
 					{
-						foreach (var window in windows) Assert.True(DestroyWindow(window));
+						foreach (var window in windows)
+						{
+							Assert.True(DestroyWindow(window));
+						}
 					}
 					await Task.Delay(40);
 				}

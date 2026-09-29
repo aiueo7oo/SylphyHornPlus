@@ -52,7 +52,10 @@ namespace SylphyHorn.Tests
 						Assert.Equal(1, calls);
 					}
 				}
-				finally { await server.StopAsync().WaitAsync(deadline.Token); }
+				finally
+				{
+					await server.StopAsync().WaitAsync(deadline.Token);
+				}
 			}
 		}
 
@@ -118,7 +121,7 @@ namespace SylphyHorn.Tests
 			foreach (var argument in CliSpecCatalog.Find("notification configure").Arguments)
 			{
 				args.Add(argument.Name);
-				args.Add(argument.Values?[0] ?? (argument.Type == "integer" ? "10" : argument.Name == "--monitor" ? "current" : "Segoe UI"));
+				args.Add(SampleValue(argument));
 			}
 			Assert.Equal(48, args.Count);
 			Assert.True(args.Count <= CliSpecCatalog.MaximumArgumentCount);
@@ -149,8 +152,19 @@ namespace SylphyHorn.Tests
 						Assert.Null(received);
 					}
 				}
-				finally { await server.StopAsync().WaitAsync(deadline.Token); }
+				finally
+				{
+					await server.StopAsync().WaitAsync(deadline.Token);
+				}
 			}
+		}
+
+		// The first listed choice, or a valid number, monitor or font family for an option without choices.
+		private static string SampleValue(CliSpecArgument argument)
+		{
+			if (argument.Values != null) return argument.Values[0];
+			if (argument.Type == "integer") return "10";
+			return argument.Name == "--monitor" ? "current" : "Segoe UI";
 		}
 
 		private static NamedPipeClientStream Client(string name)

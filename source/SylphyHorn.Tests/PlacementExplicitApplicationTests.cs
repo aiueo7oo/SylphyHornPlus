@@ -269,7 +269,8 @@ namespace SylphyHorn.Tests
 
 			internal PlacementPreview Preview() => this.Engine.Preview(this.Map, CancellationToken.None);
 
-			internal PlacementAuthorization Authorize(PlacementDestination destination, long deadline) => new PlacementAuthorization(this.Map.Resolve(destination), new PlacementMovePermit());
+			internal PlacementAuthorization Authorize(PlacementDestination destination, long deadline)
+				=> new PlacementAuthorization(this.Map.Resolve(destination), new PlacementMovePermit());
 
 			internal PlacementResult[] Apply(PlacementPreview preview, CancellationToken cancellation = default)
 				=> this.Engine.Apply(preview, preview.Items.Select(item => item.Id).ToArray(), this.Authorize, cancellation);

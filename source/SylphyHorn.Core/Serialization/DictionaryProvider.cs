@@ -52,7 +52,10 @@ namespace SylphyHorn.Serialization
 		private static void ValidateDictionary(IEnumerable<KeyValuePair<string, object>> values)
 		{
 			if (values == null) return;
-			foreach (var pair in values) ValidateEntry(pair.Key, pair.Value);
+			foreach (var pair in values)
+			{
+				ValidateEntry(pair.Key, pair.Value);
+			}
 		}
 
 		public void SetValue<T>(string key, T value)

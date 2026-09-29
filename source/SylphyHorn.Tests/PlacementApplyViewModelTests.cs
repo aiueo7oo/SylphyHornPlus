@@ -188,7 +188,8 @@ namespace SylphyHorn.Tests
 			var fixture = new PlacementApplyFixture();
 			fixture.Harness = Harness.Create(Batch(1, 1, A, Entry(A, 0, "Web", ""), Entry(B, 1, "Development", "")), new Factory(fixture.Session));
 			await fixture.Harness.Runtime.InitializeAsync(cancellationToken: CancellationToken.None);
-			await fixture.Harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, fixture.Session.Preview.Items.Select(item => item.Rule).GroupBy(rule => rule.Id).Select(group => group.First())));
+			var rules = fixture.Session.Preview.Items.Select(item => item.Rule).GroupBy(rule => rule.Id).Select(group => group.First());
+			await fixture.Harness.Runtime.ConfigurePlacementAsync(new AppPlacementConfiguration(true, rules));
 			fixture.Model = new PlacementApplyViewModel(fixture.Harness.Runtime);
 			return fixture;
 		}
@@ -278,9 +279,13 @@ namespace SylphyHorn.Tests
 			this.ApplyCalls++;
 			this.Selection = selection;
 			this.Token = cancellation;
-			return this.ApplyPending ?? Task.FromResult(preview.Items.Where(item => selection.Contains(item.Id)).Select(item => new PlacementResult(item.Candidate.Window, item.Rule.Id, PlacementOutcome.Moved, null)).ToArray());
+			return this.ApplyPending ?? Task.FromResult(preview.Items
+				.Where(item => selection.Contains(item.Id))
+				.Select(item => new PlacementResult(item.Candidate.Window, item.Rule.Id, PlacementOutcome.Moved, null))
+				.ToArray());
 		}
 
-		internal PlacementResult Result(int index, PlacementOutcome outcome) => new PlacementResult(this.Preview.Items[index].Candidate.Window, this.Preview.Items[index].Rule.Id, outcome, null);
+		internal PlacementResult Result(int index, PlacementOutcome outcome)
+			=> new PlacementResult(this.Preview.Items[index].Candidate.Window, this.Preview.Items[index].Rule.Id, outcome, null);
 	}
 }
