@@ -27,11 +27,10 @@ namespace SylphyHorn.Services
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// The current screen is captured when a switch is requested and slides out; the snapshot of the next desktop,
-	/// taken the last time it was shown, slides in attached to it. The capture is also kept as the snapshot of the desktop being left.
-	/// The snapshot of the current desktop is also refreshed in the background every few seconds and shortly after arriving
-	/// at a desktop, because a desktop can be left by other means (Alt+Tab, the taskbar, Task View, ...).
-	/// The overlay windows are excluded from screen captures.
+	/// Nothing is captured when a switch is requested, so the animation starts immediately: the snapshot of the current desktop
+	/// slides out and the snapshot of the next desktop, taken the last time it was shown, slides in attached to it.
+	/// Only the desktop on the screen can be captured, so the snapshot of the current desktop is refreshed in the background
+	/// every few seconds and shortly after arriving at a desktop. The overlay windows are excluded from screen captures.
 	/// </para>
 	/// <para>
 	/// The desktop is switched after the animation, so neither the switch itself nor the handlers of the desktop change
@@ -205,11 +204,11 @@ namespace SylphyHorn.Services
 		{
 			StopSettleTimer();
 
-			// The outgoing image: the screen as it is now. Right after a switch, the screen beneath may still show
-			// the wallpaper of the previous desktop, so the snapshot covering the screen is used instead in that case.
+			// The outgoing image: the snapshot of the current desktop, refreshed in the background every few seconds.
+			// Nothing is captured here so that the animation starts immediately, unless there is no snapshot yet.
 			foreach (var screen in _screens)
 			{
-				if (!settling || !screen.HasSnapshot(current.Id))
+				if (!screen.HasSnapshot(current.Id))
 				{
 					screen.Buffer.Capture();
 					screen.StoreSnapshot(current.Id);
