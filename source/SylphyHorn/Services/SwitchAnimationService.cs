@@ -126,7 +126,8 @@ namespace SylphyHorn.Services
 			var current = VirtualDesktop.Current;
 			if (target == current) return;
 
-			if (direction == 0 || IsFullScreenAppRunning())
+			// While the overlay covers the screen after the previous switch, the shell reports it as a fullscreen app.
+			if (direction == 0 || (!settling && IsFullScreenAppRunning()))
 			{
 				HideAll();
 				target.Switch(false);
