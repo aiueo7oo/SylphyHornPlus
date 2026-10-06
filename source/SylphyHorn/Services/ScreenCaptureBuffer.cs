@@ -78,6 +78,18 @@ namespace SylphyHorn.Services
 		}
 
 		/// <summary>
+		/// Captures the screen and creates a frozen bitmap from it, without another capture in between. Thread-safe.
+		/// </summary>
+		public BitmapSource CaptureSnapshot()
+		{
+			lock (this._sync)
+			{
+				this.Capture();
+				return this.CreateSnapshot();
+			}
+		}
+
+		/// <summary>
 		/// Creates a frozen bitmap from the captured pixels.
 		/// </summary>
 		public BitmapSource CreateSnapshot()

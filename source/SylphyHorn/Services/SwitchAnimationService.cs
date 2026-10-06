@@ -30,7 +30,8 @@ namespace SylphyHorn.Services
 	/// Nothing is captured when a switch is requested, so the animation starts immediately: the snapshot of the current desktop
 	/// slides out and the snapshot of the next desktop, taken the last time it was shown, slides in attached to it.
 	/// Only the desktop on the screen can be captured, so the snapshot of the current desktop is refreshed in the background
-	/// every few seconds and shortly after arriving at a desktop. The overlay windows are excluded from screen captures.
+	/// every second and shortly after arriving at a desktop, and once more beneath the overlay when the desktop is left with the animation.
+	/// The overlay windows are excluded from screen captures.
 	/// </para>
 	/// <para>
 	/// The desktop is switched after the animation, so neither the switch itself nor the handlers of the desktop change
@@ -64,13 +65,18 @@ namespace SylphyHorn.Services
 		private static bool _settling;
 
 		/// <summary>
+		/// The desktop being left, captured at the end of the animation before the real switch.
+		/// </summary>
+		private static Guid? _departureDesktopId;
+
+		/// <summary>
 		/// How often the snapshot of the current desktop is refreshed in the background.
 		/// </summary>
 		/// <remarks>
 		/// The snapshot taken when leaving a desktop with a shortcut is not enough: a desktop can also be left by other means
 		/// (Alt+Tab, the taskbar, Task View, ...), which would leave an old snapshot.
 		/// </remarks>
-		private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+		private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
 
 		/// <summary>
 		/// The delay before refreshing the snapshot after arriving at a desktop, until the shell has updated the screen.
@@ -187,6 +193,11 @@ namespace SylphyHorn.Services
 				_animation = null;
 			}
 
+			// The desktop being left is still on the screen beneath the overlay (which is excluded from captures):
+			// capture it, so that the next switch to it shows it as it was when left
+			// (for example, without a window just moved away from it). Hidden by the overlay, this does not delay what is seen.
+			CaptureDeparture();
+
 			_settling = true;
 			try
 			{
@@ -205,7 +216,7 @@ namespace SylphyHorn.Services
 		{
 			StopSettleTimer();
 
-			// The outgoing image: the snapshot of the current desktop, refreshed in the background every few seconds.
+			// The outgoing image: the snapshot of the current desktop, refreshed in the background every second.
 			// Nothing is captured here so that the animation starts immediately, unless there is no snapshot yet.
 			foreach (var screen in _screens)
 			{
@@ -241,6 +252,8 @@ namespace SylphyHorn.Services
 				}
 			}
 
+			// Not while settling, when the shell may still be updating the screen after the previous switch.
+			_departureDesktopId = settling ? (Guid?)null : current.Id;
 			_pendingTarget = target;
 			if (moving.Count == 0)
 			{
@@ -251,6 +264,25 @@ namespace SylphyHorn.Services
 			_animation = new Animation(moving, direction, GetDuration());
 			_animation.Completed += OnAnimationCompleted;
 			_animation.Start();
+		}
+
+		private static void CaptureDeparture()
+		{
+			var desktopId = _departureDesktopId;
+			if (desktopId == null) return;
+
+			_departureDesktopId = null;
+			try
+			{
+				foreach (var screen in _screens)
+				{
+					screen.SetSnapshot(desktopId.Value, screen.Buffer.CaptureSnapshot());
+				}
+			}
+			catch (Exception ex)
+			{
+				LoggingService.Instance.Register(ex);
+			}
 		}
 
 		/// <summary>
@@ -585,6 +617,11 @@ namespace SylphyHorn.Services
 			public void StoreSnapshot(Guid desktopId)
 			{
 				var snapshot = this.Buffer.CreateSnapshot();
+				this.SetSnapshot(desktopId, snapshot);
+			}
+
+			public void SetSnapshot(Guid desktopId, BitmapSource snapshot)
+			{
 				if (snapshot != null)
 				{
 					this._snapshots[desktopId] = snapshot;
