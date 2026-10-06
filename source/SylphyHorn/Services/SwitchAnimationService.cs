@@ -149,8 +149,8 @@ namespace SylphyHorn.Services
 					{
 						foreach (var screen in _screens)
 						{
-							screen.SwitchBuffer.Capture();
-							screen.SwitchBuffer.CopyTo(screen.GetSnapshot(current.Id));
+							screen.Buffer.Capture();
+							screen.StoreSnapshot(current.Id);
 						}
 					}
 					target.Switch(false);
@@ -223,7 +223,7 @@ namespace SylphyHorn.Services
 				{
 					foreach (var screen in screens)
 					{
-						screen.SwitchBuffer.Capture();
+						screen.Buffer.Capture();
 					}
 				});
 			}
@@ -304,7 +304,7 @@ namespace SylphyHorn.Services
 				capture.Wait();
 				foreach (var screen in screens.Where(x => _screens.Contains(x)))
 				{
-					screen.SwitchBuffer.CopyTo(screen.GetSnapshot(desktopId));
+					screen.StoreSnapshot(desktopId);
 				}
 			}
 			catch (Exception ex)
@@ -371,7 +371,7 @@ namespace SylphyHorn.Services
 				{
 					foreach (var screen in screens)
 					{
-						screen.RefreshBuffer.Capture();
+						screen.Buffer.Capture();
 					}
 				}).ContinueWith(task => dispatcher.BeginInvoke(new Action(() =>
 				{
@@ -389,7 +389,7 @@ namespace SylphyHorn.Services
 
 					foreach (var screen in screens)
 					{
-						screen.RefreshBuffer.CopyTo(screen.GetSnapshot(desktopId));
+						screen.StoreSnapshot(desktopId);
 					}
 				})));
 			}
@@ -580,26 +580,20 @@ namespace SylphyHorn.Services
 		private sealed class ScreenOverlay : IDisposable
 		{
 			private readonly SwitchAnimationWindow[] _windows;
-			private readonly Dictionary<Guid, WriteableBitmap> _snapshots = new Dictionary<Guid, WriteableBitmap>();
+			private readonly Dictionary<Guid, BitmapSource> _snapshots = new Dictionary<Guid, BitmapSource>();
 			private int _latest = -1;
 
 			public System.Drawing.Rectangle Bounds { get; }
 
 			/// <summary>
-			/// Captures the desktop being left during a switch.
+			/// Captures the screen, both for switches and for the background refresh (captures are serialized).
 			/// </summary>
-			public ScreenCaptureBuffer SwitchBuffer { get; }
-
-			/// <summary>
-			/// Captures the current desktop for the background refresh.
-			/// </summary>
-			public ScreenCaptureBuffer RefreshBuffer { get; }
+			public ScreenCaptureBuffer Buffer { get; }
 
 			public ScreenOverlay(System.Drawing.Rectangle bounds)
 			{
 				this.Bounds = bounds;
-				this.SwitchBuffer = new ScreenCaptureBuffer(bounds);
-				this.RefreshBuffer = new ScreenCaptureBuffer(bounds);
+				this.Buffer = new ScreenCaptureBuffer(bounds);
 				this._windows = new[] { new SwitchAnimationWindow(bounds), new SwitchAnimationWindow(bounds), };
 				foreach (var window in this._windows)
 				{
@@ -612,15 +606,16 @@ namespace SylphyHorn.Services
 				return this._snapshots.ContainsKey(desktopId);
 			}
 
-			public WriteableBitmap GetSnapshot(Guid desktopId)
+			/// <summary>
+			/// Makes the last capture the snapshot of the desktop. The previous snapshot is released.
+			/// </summary>
+			public void StoreSnapshot(Guid desktopId)
 			{
-				if (!this._snapshots.TryGetValue(desktopId, out var snapshot))
+				var snapshot = this.Buffer.CreateSnapshot();
+				if (snapshot != null)
 				{
-					snapshot = this.SwitchBuffer.CreateBitmap();
 					this._snapshots[desktopId] = snapshot;
 				}
-
-				return snapshot;
 			}
 
 			/// <summary>
@@ -669,8 +664,7 @@ namespace SylphyHorn.Services
 				}
 
 				this._snapshots.Clear();
-				this.SwitchBuffer.Dispose();
-				this.RefreshBuffer.Dispose();
+				this.Buffer.Dispose();
 			}
 		}
 

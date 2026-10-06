@@ -6,13 +6,13 @@ using System.Windows.Media.Imaging;
 namespace SylphyHorn.Services
 {
 	/// <summary>
-	/// A GDI buffer that captures a screen, and copies the captured pixels into a WPF bitmap.
+	/// A GDI buffer that captures a screen, and creates WPF bitmaps from the captured pixels.
 	/// </summary>
 	/// <remarks>
 	/// <see cref="Capture"/> can run on any thread, so capturing a 4K screen in the background does not block the UI thread.
-	/// <see cref="CopyTo"/> must be called on the UI thread.
-	/// A <see cref="WriteableBitmap"/> is used for display because WPF does not pick up changes of an InteropBitmap
-	/// over a memory section reliably: once rendered, it kept showing the first captured image.
+	/// Each capture becomes a new frozen bitmap (<see cref="CreateSnapshot"/>):
+	/// WPF did not pick up changes of an InteropBitmap over a memory section once it had been rendered,
+	/// and a WriteableBitmap keeps two copies of the pixels (back and front buffers).
 	/// </remarks>
 	internal sealed class ScreenCaptureBuffer : IDisposable
 	{
@@ -55,11 +55,6 @@ namespace SylphyHorn.Services
 			this._oldBitmap = SelectObject(this._memoryDc, this._bitmap);
 		}
 
-		public WriteableBitmap CreateBitmap()
-		{
-			return new WriteableBitmap(this._bounds.Width, this._bounds.Height, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null);
-		}
-
 		/// <summary>
 		/// Copies the current content of the screen into the buffer. Thread-safe.
 		/// </summary>
@@ -83,16 +78,20 @@ namespace SylphyHorn.Services
 		}
 
 		/// <summary>
-		/// Copies the captured pixels into the bitmap. Call on the UI thread.
+		/// Creates a frozen bitmap from the captured pixels.
 		/// </summary>
-		public void CopyTo(WriteableBitmap target)
+		public BitmapSource CreateSnapshot()
 		{
 			lock (this._sync)
 			{
-				if (this._bits == IntPtr.Zero) return;
+				if (this._bits == IntPtr.Zero) return null;
 
 				var stride = this._bounds.Width * 4;
-				target.WritePixels(new Int32Rect(0, 0, this._bounds.Width, this._bounds.Height), this._bits, stride * this._bounds.Height, stride);
+				var snapshot = BitmapSource.Create(
+					this._bounds.Width, this._bounds.Height, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null,
+					this._bits, stride * this._bounds.Height, stride);
+				snapshot.Freeze();
+				return snapshot;
 			}
 		}
 
