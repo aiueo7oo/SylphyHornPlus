@@ -59,6 +59,41 @@ namespace SylphyHorn.Services
 
 		#endregion
 
+		#region Switch
+
+		/// <summary>
+		/// Switches to the desktop with the animation selected in the settings.
+		/// </summary>
+		/// <param name="direction">1 when moving right, -1 when moving left, 0 to decide from the desktop order.</param>
+		public static void SwitchTo(this VirtualDesktop desktop, int direction = 0)
+		{
+			switch ((SwitchAnimationMode)Settings.General.SwitchAnimationMode.Value)
+			{
+				case SwitchAnimationMode.Windows:
+					desktop.Switch(true);
+					break;
+
+				case SwitchAnimationMode.Slide:
+					var current = VirtualDesktop.Current;
+					if (desktop == current) return;
+
+					if (direction == 0)
+					{
+						var desktops = VirtualDesktop.AllDesktops;
+						direction = Array.IndexOf(desktops, desktop) > Array.IndexOf(desktops, current) ? 1 : -1;
+					}
+
+					SwitchAnimationService.Switch(desktop, direction);
+					break;
+
+				default:
+					desktop.Switch(false);
+					break;
+			}
+		}
+
+		#endregion
+
 		#region Move Window
 
 		public static VirtualDesktop MoveToLeft(this IntPtr hWnd)
@@ -312,7 +347,7 @@ namespace SylphyHorn.Services
 
 		public static void CreateAndSwitch()
 		{
-			VirtualDesktop.Create()?.Switch();
+			VirtualDesktop.Create()?.SwitchTo();
 		}
 
 		#endregion
@@ -325,7 +360,7 @@ namespace SylphyHorn.Services
 			
 			if (Count > 1)
 			{
-				GetLeft()?.Switch();
+				GetLeft()?.SwitchTo(-1);
 				current.Remove();
 			}
 		}
@@ -336,7 +371,7 @@ namespace SylphyHorn.Services
 
 			if (Count > 1)
 			{
-				GetRight()?.Switch();
+				GetRight()?.SwitchTo(1);
 				current.Remove();
 			}
 		}

@@ -249,7 +249,12 @@ namespace SylphyHorn.Services
 			if (target != null && target.CanExecute())
 			{
 				this._dispatcher.BeginInvoke(
-					new Action(() => target.Action(InteropHelper.GetForegroundWindowEx())),
+					new Action(() =>
+					{
+						// The current desktop does not change until the end of a switch animation.
+						SwitchAnimationService.CompletePendingSwitch();
+						target.Action(InteropHelper.GetForegroundWindowEx());
+					}),
 					DispatcherPriority.Normal);
 				args.Handled = true;
 			}

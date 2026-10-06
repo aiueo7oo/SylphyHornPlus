@@ -772,6 +772,51 @@ namespace SylphyHorn.Properties {
         }
         
         /// <summary>
+        ///   Switching animation: に類似しているローカライズされた文字列を検索します。
+        /// </summary>
+        public static string Settings_DesktopSwitching_Animation {
+            get {
+                return ResourceManager.GetString("Settings_DesktopSwitching_Animation", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   None に類似しているローカライズされた文字列を検索します。
+        /// </summary>
+        public static string Settings_DesktopSwitching_Animation_None {
+            get {
+                return ResourceManager.GetString("Settings_DesktopSwitching_Animation_None", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Windows default (Windows 11 only) に類似しているローカライズされた文字列を検索します。
+        /// </summary>
+        public static string Settings_DesktopSwitching_Animation_Windows {
+            get {
+                return ResourceManager.GetString("Settings_DesktopSwitching_Animation_Windows", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Fast slide に類似しているローカライズされた文字列を検索します。
+        /// </summary>
+        public static string Settings_DesktopSwitching_Animation_Slide {
+            get {
+                return ResourceManager.GetString("Settings_DesktopSwitching_Animation_Slide", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Slide duration: に類似しているローカライズされた文字列を検索します。
+        /// </summary>
+        public static string Settings_DesktopSwitching_AnimationDuration {
+            get {
+                return ResourceManager.GetString("Settings_DesktopSwitching_AnimationDuration", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Loop virtual desktops に類似しているローカライズされた文字列を検索します。
         /// </summary>
         public static string Settings_DesktopSwitching_Loop {

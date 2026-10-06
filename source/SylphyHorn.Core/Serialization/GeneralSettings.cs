@@ -18,6 +18,10 @@ namespace SylphyHorn.Serialization
 
 		public SerializableProperty<bool> LoopDesktop => this.Cache(key => new SerializableProperty<bool>(key, this._provider));
 
+		public SerializableProperty<uint> SwitchAnimationMode => this.Cache(key => new SerializableProperty<uint>(key, this._provider, SwitchAnimationModeDefaultValue));
+
+		public SerializableProperty<int> SwitchAnimationDuration => this.Cache(key => new SerializableProperty<int>(key, this._provider, SwitchAnimationDurationDefaultValue));
+
 		public SerializableProperty<bool> NotificationWhenSwitchedDesktop => this.Cache(key => new SerializableProperty<bool>(key, this._provider, NotificationWhenSwitchedDesktopDefaultValue));
 
 		public SerializableProperty<bool> AlwaysShowDesktopNotification => this.Cache(key => new SerializableProperty<bool>(key, this._provider, AlwaysShowDesktopNotificationDefaultValue));
@@ -95,6 +99,10 @@ namespace SylphyHorn.Serialization
 		public static bool NotificationWhenSwitchedDesktopDefaultValue { get; } = true;
 
 		public static bool AlwaysShowDesktopNotificationDefaultValue { get; } = false;
+
+		public static uint SwitchAnimationModeDefaultValue { get; } = 0 /* SwitchAnimationMode.None */;
+
+		public static int SwitchAnimationDurationDefaultValue { get; } = 150 /* milliseconds */;
 
 		public static int NotificationDurationDefaultValue { get; } = 2500 /* milliseconds */;
 

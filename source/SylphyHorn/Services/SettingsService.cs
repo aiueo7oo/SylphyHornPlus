@@ -53,6 +53,9 @@ namespace SylphyHorn.Services
 		internal static IDisposable ObserveWallpaperSettings(GeneralSettings settings, Action changed)
 			=> ObserveChange(settings.ChangeBackgroundEachDesktop, changed);
 
+		internal static IDisposable ObserveSwitchAnimation(GeneralSettings settings, Action<uint> changed)
+			=> ObserveChange(settings.SwitchAnimationMode, changed);
+
 		private static IDisposable ObserveChange<T>(SerializableProperty<T> property, Action changed)
 			=> ObserveChange(property, (T _) => changed());
 

@@ -77,6 +77,8 @@ namespace SylphyHorn.UI.Bindings
 
 		public IReadOnlyCollection<DisplayItem<BlurWindowCornerMode>> NotificationCornerStyles { get; }
 
+		public IReadOnlyCollection<DisplayItem<SwitchAnimationMode>> SwitchAnimationModes { get; }
+
 		public IReadOnlyCollection<DisplayItem<HorizontalAlignment>> NotificationTextAlignments { get; }
 
 		public bool IsDisplayEnabled { get; }
@@ -293,6 +295,27 @@ namespace SylphyHorn.UI.Bindings
 				}
 			}
 		}
+
+		#endregion
+
+		#region SwitchAnimationMode notification property
+
+		public SwitchAnimationMode SwitchAnimationMode
+		{
+			get => (SwitchAnimationMode)Settings.General.SwitchAnimationMode.Value;
+			set
+			{
+				if ((SwitchAnimationMode)Settings.General.SwitchAnimationMode.Value != value)
+				{
+					Settings.General.SwitchAnimationMode.Value = (uint)value;
+
+					this.OnPropertyChanged();
+					this.OnPropertyChanged(nameof(this.IsSlideAnimation));
+				}
+			}
+		}
+
+		public bool IsSlideAnimation => this.SwitchAnimationMode == SwitchAnimationMode.Slide;
 
 		#endregion
 
@@ -886,6 +909,13 @@ namespace SylphyHorn.UI.Bindings
 				new DisplayItem<BlurWindowThemeMode> { Display = Resources.Settings_NotificationWindowStyle_Dark, Value = BlurWindowThemeMode.Dark, },
 				new DisplayItem<BlurWindowThemeMode> { Display = Resources.Settings_NotificationWindowStyle_Accent, Value = BlurWindowThemeMode.Accent, },
 				new DisplayItem<BlurWindowThemeMode> { Display = Resources.Settings_NotificationWindowStyle_System, Value = BlurWindowThemeMode.System, },
+			}.ToList();
+
+			this.SwitchAnimationModes = new[]
+			{
+				new DisplayItem<SwitchAnimationMode> { Display = Resources.Settings_DesktopSwitching_Animation_None, Value = SwitchAnimationMode.None, },
+				new DisplayItem<SwitchAnimationMode> { Display = Resources.Settings_DesktopSwitching_Animation_Windows, Value = SwitchAnimationMode.Windows, },
+				new DisplayItem<SwitchAnimationMode> { Display = Resources.Settings_DesktopSwitching_Animation_Slide, Value = SwitchAnimationMode.Slide, },
 			}.ToList();
 
 			this.NotificationCornerStyles = new[]

@@ -77,6 +77,8 @@ namespace SylphyHorn.Tests
 			var expected = new[]
 			{
 				Scalar("LoopDesktop", false),
+				Scalar("SwitchAnimationMode", 0U),
+				Scalar("SwitchAnimationDuration", 150),
 				Scalar("NotificationWhenSwitchedDesktop", true),
 				Scalar("AlwaysShowDesktopNotification", false),
 				Scalar("SimpleNotification", false),

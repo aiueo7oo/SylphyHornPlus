@@ -402,6 +402,8 @@ namespace SylphyHorn
 				}, () => this._taskTrayIcon.Reload()).AddTo(this._disposable);
 				SettingsService.ObserveNotificationAppearance(Settings.General,
 					NotificationService.Instance.RefreshAppearance).AddTo(this._disposable);
+				SettingsService.ObserveSwitchAnimation(Settings.General, PrepareSwitchAnimation).AddTo(this._disposable);
+				PrepareSwitchAnimation(Settings.General.SwitchAnimationMode.Value);
 				Settings.AppPlacement.Configuration.Subscribe(configuration =>
 				{
 					_ = runtime.ConfigurePlacementAsync(configuration);
@@ -462,30 +464,42 @@ namespace SylphyHorn
 			public string Header { get; }
 			public string Content { get; }
 		}
+		private static void PrepareSwitchAnimation(uint mode)
+		{
+			if ((SwitchAnimationMode)mode == SwitchAnimationMode.Slide)
+			{
+				SwitchAnimationService.Prepare();
+			}
+			else
+			{
+				SwitchAnimationService.Release();
+			}
+		}
+
 		private void RegisterActions(ShortcutKeySettings settings, ActionRegister register)
 		{
 			register(() => settings.MoveLeft.ToShortcutKey(), hWnd => hWnd.MoveToLeft())
 				.AddTo(this._disposable);
 
-			register(() => settings.MoveLeftAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToLeft()?.Switch())
+			register(() => settings.MoveLeftAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToLeft()?.SwitchTo(-1))
 				.AddTo(this._disposable);
 
 			register(() => settings.MoveRight.ToShortcutKey(), hWnd => hWnd.MoveToRight())
 				.AddTo(this._disposable);
 
-			register(() => settings.MoveRightAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToRight()?.Switch())
+			register(() => settings.MoveRightAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToRight()?.SwitchTo(1))
 				.AddTo(this._disposable);
 
 			register(() => settings.MoveNew.ToShortcutKey(), hWnd => hWnd.MoveToNew())
 				.AddTo(this._disposable);
 
-			register(() => settings.MoveNewAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToNew()?.Switch())
+			register(() => settings.MoveNewAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToNew()?.SwitchTo())
 				.AddTo(this._disposable);
 
 			register(() => settings.MoveToPrevious.ToShortcutKey(), hWnd => hWnd.MoveToPrevious())
 				.AddTo(this._disposable);
 
-			register(() => settings.MoveToPreviousAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToPrevious()?.Switch())
+			register(() => settings.MoveToPreviousAndSwitch.ToShortcutKey(), hWnd => hWnd.MoveToPrevious()?.SwitchTo())
 				.AddTo(this._disposable);
 
 			var isKeyboardSettings = settings as MouseShortcutSettings == null;
@@ -503,33 +517,33 @@ namespace SylphyHorn
 				{
 					register(
 						() => settings.SwitchToLeftWithDefault.ToShortcutKey(),
-						_ => VirtualDesktopService.GetLeft()?.Switch())
+						_ => VirtualDesktopService.GetLeft()?.SwitchTo(-1))
 						.AddTo(this._disposable);
 
 					register(
 						() => settings.SwitchToRightWithDefault.ToShortcutKey(),
-						_ => VirtualDesktopService.GetRight()?.Switch())
+						_ => VirtualDesktopService.GetRight()?.SwitchTo(1))
 						.AddTo(this._disposable);
 				}
 
-				register(() => settings.SwitchToLeft.ToShortcutKey(), _ => VirtualDesktopService.GetLeft()?.Switch())
+				register(() => settings.SwitchToLeft.ToShortcutKey(), _ => VirtualDesktopService.GetLeft()?.SwitchTo(-1))
 					.AddTo(this._disposable);
 
-				register(() => settings.SwitchToRight.ToShortcutKey(), _ => VirtualDesktopService.GetRight()?.Switch())
+				register(() => settings.SwitchToRight.ToShortcutKey(), _ => VirtualDesktopService.GetRight()?.SwitchTo(1))
 					.AddTo(this._disposable);
 
-				register(() => settings.SwitchToPrevious.ToShortcutKey(), _ => VirtualDesktopService.GetPrevious()?.Switch())
+				register(() => settings.SwitchToPrevious.ToShortcutKey(), _ => VirtualDesktopService.GetPrevious()?.SwitchTo())
 					.AddTo(this._disposable);
 			}
 			else
 			{
-				register(() => settings.SwitchToLeft.ToShortcutKey(), _ => VirtualDesktopService.GetLeft()?.Switch())
+				register(() => settings.SwitchToLeft.ToShortcutKey(), _ => VirtualDesktopService.GetLeft()?.SwitchTo(-1))
 					.AddTo(this._disposable);
 
-				register(() => settings.SwitchToRight.ToShortcutKey(), _ => VirtualDesktopService.GetRight()?.Switch())
+				register(() => settings.SwitchToRight.ToShortcutKey(), _ => VirtualDesktopService.GetRight()?.SwitchTo(1))
 					.AddTo(this._disposable);
 
-				register(() => settings.SwitchToPrevious.ToShortcutKey(), _ => VirtualDesktopService.GetPrevious()?.Switch())
+				register(() => settings.SwitchToPrevious.ToShortcutKey(), _ => VirtualDesktopService.GetPrevious()?.SwitchTo())
 					.AddTo(this._disposable);
 			}
 
@@ -628,7 +642,7 @@ namespace SylphyHorn
 
 			void RegisterSpecifiedDesktopSwitching(int i, ShortcutKey shortcut)
 			{
-				register(() => shortcut, _ => VirtualDesktopService.GetByIndex(i)?.Switch())
+				register(() => shortcut, _ => VirtualDesktopService.GetByIndex(i)?.SwitchTo())
 					.AddTo(this._disposable);
 			}
 			;
@@ -649,7 +663,7 @@ namespace SylphyHorn
 
 			void RegisterMovingToSpecifiedDesktopAndSwitch(int i, ShortcutKey shortcut)
 			{
-				register(() => shortcut, hWnd => hWnd.MoveToIndex(i)?.Switch())
+				register(() => shortcut, hWnd => hWnd.MoveToIndex(i)?.SwitchTo())
 					.AddTo(this._disposable);
 			}
 			;

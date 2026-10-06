@@ -167,6 +167,31 @@
 							<CheckBox IsChecked="{Binding Source={x:Static serialization:Settings.General}, Path=OverrideWindowsDefaultKeyCombination.Value, Mode=TwoWay}">
 								<TextBlock Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_DesktopSwitching_OverrideOS}" />
 							</CheckBox>
+							<StackPanel Orientation="Horizontal"
+										Margin="0,6,0,0">
+								<TextBlock Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_DesktopSwitching_Animation}"
+										   VerticalAlignment="Center"
+										   Margin="0,0,8,0" />
+								<metro:PromptComboBox ItemsSource="{Binding SwitchAnimationModes}"
+													  DisplayMemberPath="Display"
+													  SelectedValuePath="Value"
+													  SelectedValue="{Binding SwitchAnimationMode, Mode=TwoWay}"
+													  Prompt=""
+													  IsReadOnly="True"
+													  MinWidth="200"
+													  VerticalAlignment="Center" />
+							</StackPanel>
+							<TextBlock Margin="21,6,0,0">
+								<Run Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_DesktopSwitching_AnimationDuration, Mode=OneWay}" />
+								<InlineUIContainer>
+									<metro:PromptTextBox Text="{Binding Source={x:Static serialization:Settings.General}, Path=SwitchAnimationDuration.Value, Mode=TwoWay}"
+														 Prompt=""
+														 Width="60"
+														 Margin="2,2,2,-7"
+														 IsEnabled="{Binding IsSlideAnimation}" />
+								</InlineUIContainer>
+								<Run Text="{Binding Source={x:Static services:ResourceService.Current}, Path=Resources.Settings_Notification_Display_Duration_Milliseconds, Mode=OneWay}" />
+							</TextBlock>
 						</StackPanel>
 						<Border Height="8" />
 
