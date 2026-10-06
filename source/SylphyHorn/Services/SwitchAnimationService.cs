@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -28,6 +29,8 @@ namespace SylphyHorn.Services
 	/// Nothing is captured when a switch is requested, so the animation starts right away regardless of the screen resolution.
 	/// The snapshot of a desktop is captured in the background while the animation for leaving it is playing
 	/// (the overlay is excluded from screen captures), and is used as the incoming image the next time.
+	/// The snapshot of the current desktop is also refreshed in the background every few seconds and shortly after arriving
+	/// at a desktop, because a desktop can be left by other means (Alt+Tab, the taskbar, Task View, ...).
 	/// </para>
 	/// <para>
 	/// The desktop is switched after the animation, so neither the switch itself nor the handlers of the desktop change
@@ -63,13 +66,33 @@ namespace SylphyHorn.Services
 		private static bool _settling;
 
 		/// <summary>
-		/// Creates the overlay windows in advance so that the first switch is not delayed.
+		/// How often the snapshot of the current desktop is refreshed in the background.
+		/// </summary>
+		/// <remarks>
+		/// The snapshot taken when leaving a desktop with a shortcut is not enough: a desktop can also be left by other means
+		/// (Alt+Tab, the taskbar, Task View, ...), which would leave an old snapshot.
+		/// </remarks>
+		private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+		/// <summary>
+		/// The delay before refreshing the snapshot after arriving at a desktop, until the shell has updated the screen.
+		/// </summary>
+		private static readonly TimeSpan ArrivalRefreshDelay = TimeSpan.FromMilliseconds(500);
+
+		private static DispatcherTimer _refreshTimer;
+		private static bool _refreshing;
+		private static int _desktopChangeCount;
+
+		/// <summary>
+		/// Creates the overlay windows in advance so that the first switch is not delayed,
+		/// and starts keeping the snapshot of the current desktop up to date.
 		/// </summary>
 		public static void Prepare()
 		{
 			try
 			{
 				EnsureScreens();
+				StartRefresh();
 			}
 			catch (Exception ex)
 			{
@@ -83,6 +106,7 @@ namespace SylphyHorn.Services
 		/// </summary>
 		public static void Release()
 		{
+			StopRefresh();
 			CompletePendingSwitch();
 			HideAll();
 			foreach (var screen in _screens)
@@ -94,6 +118,9 @@ namespace SylphyHorn.Services
 
 		public static void Switch(VirtualDesktop target, int direction)
 		{
+			// A background refresh in progress must not store the screen of another desktop.
+			Interlocked.Increment(ref _desktopChangeCount);
+
 			// A switch requested during the previous animation: finish the previous one first.
 			CompletePendingSwitch();
 			var settling = _settling;
@@ -272,6 +299,116 @@ namespace SylphyHorn.Services
 			}
 		}
 
+		private static void StartRefresh()
+		{
+			if (_refreshTimer != null)
+			{
+				_refreshTimer.Start();
+				return;
+			}
+
+			_refreshTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshInterval, };
+			_refreshTimer.Tick += (sender, args) =>
+			{
+				_refreshTimer.Interval = RefreshInterval;
+				RefreshCurrentSnapshot();
+			};
+			_refreshTimer.Start();
+
+			var dispatcher = Dispatcher.CurrentDispatcher;
+			VirtualDesktop.CurrentChanged += (sender, args) =>
+			{
+				Interlocked.Increment(ref _desktopChangeCount);
+
+				// Refresh soon after arriving at a desktop by any means, after the shell has updated the screen.
+				dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (_refreshTimer == null || !_refreshTimer.IsEnabled) return;
+					_refreshTimer.Stop();
+					_refreshTimer.Interval = ArrivalRefreshDelay;
+					_refreshTimer.Start();
+				}));
+			};
+		}
+
+		private static void StopRefresh()
+		{
+			_refreshTimer?.Stop();
+		}
+
+		/// <summary>
+		/// Captures the current desktop into a spare snapshot in the background,
+		/// and replaces its snapshot only if no desktop switch happened meanwhile.
+		/// </summary>
+		private static void RefreshCurrentSnapshot()
+		{
+			if (_screens.Count == 0 || _refreshing) return;
+			if (_animation != null || _pendingTarget != null || _settling) return;
+			if (IsFullScreenAppRunning() || !IsInputDesktopDefault()) return;
+
+			try
+			{
+				var desktopId = VirtualDesktop.Current.Id;
+				var changeCount = Volatile.Read(ref _desktopChangeCount);
+				var screens = _screens.ToArray();
+				var spares = screens.Select(x => x.Spare).ToArray();
+				var dispatcher = Dispatcher.CurrentDispatcher;
+
+				_refreshing = true;
+				Task.Run(() =>
+				{
+					foreach (var spare in spares)
+					{
+						spare.Capture();
+					}
+				}).ContinueWith(task => dispatcher.BeginInvoke(new Action(() =>
+				{
+					_refreshing = false;
+					if (task.IsFaulted)
+					{
+						LoggingService.Instance.Register(task.Exception);
+						return;
+					}
+
+					if (changeCount != Volatile.Read(ref _desktopChangeCount)) return;
+					if (_animation != null || _pendingTarget != null || _settling) return;
+					if (!screens.All(x => _screens.Contains(x))) return;
+					if (VirtualDesktop.Current.Id != desktopId) return;
+
+					foreach (var screen in screens)
+					{
+						screen.CommitSpare(desktopId);
+					}
+				})));
+			}
+			catch (Exception ex)
+			{
+				_refreshing = false;
+				LoggingService.Instance.Register(ex);
+			}
+		}
+
+		/// <summary>
+		/// Whether the normal desktop receives input; false while the secure desktop (Ctrl+Alt+Del, UAC, the lock screen) is shown,
+		/// when a capture would not show the user's desktop.
+		/// </summary>
+		private static bool IsInputDesktopDefault()
+		{
+			var desktop = OpenInputDesktop(0, false, DESKTOP_READOBJECTS);
+			if (desktop == IntPtr.Zero) return false;
+
+			try
+			{
+				var name = new System.Text.StringBuilder(256);
+				return GetUserObjectInformation(desktop, UOI_NAME, name, name.Capacity * 2, out _)
+					&& string.Equals(name.ToString(), "Default", StringComparison.OrdinalIgnoreCase);
+			}
+			finally
+			{
+				CloseDesktop(desktop);
+			}
+		}
+
 		private static void StartSettleTimer()
 		{
 			if (_settleTimer == null)
@@ -432,7 +569,25 @@ namespace SylphyHorn.Services
 		{
 			private readonly SwitchAnimationWindow[] _windows;
 			private readonly Dictionary<Guid, ScreenSnapshot> _snapshots = new Dictionary<Guid, ScreenSnapshot>();
+			private ScreenSnapshot _spare;
 			private int _latest = -1;
+
+			/// <summary>
+			/// The snapshot used for background refresh; it replaces the snapshot of the desktop when the capture completes.
+			/// </summary>
+			public ScreenSnapshot Spare => this._spare ?? (this._spare = new ScreenSnapshot(this.Bounds));
+
+			/// <summary>
+			/// Makes the spare snapshot the snapshot of the desktop, and the replaced one the next spare.
+			/// </summary>
+			public void CommitSpare(Guid desktopId)
+			{
+				var fresh = this.Spare;
+				fresh.Invalidate();
+				this._snapshots.TryGetValue(desktopId, out var replaced);
+				this._snapshots[desktopId] = fresh;
+				this._spare = replaced;
+			}
 
 			public System.Drawing.Rectangle Bounds { get; }
 
@@ -513,6 +668,8 @@ namespace SylphyHorn.Services
 					snapshot.Dispose();
 				}
 				this._snapshots.Clear();
+				this._spare?.Dispose();
+				this._spare = null;
 			}
 		}
 
@@ -525,5 +682,19 @@ namespace SylphyHorn.Services
 
 		[DllImport("dwmapi.dll")]
 		private static extern int DwmFlush();
+
+		private const uint DESKTOP_READOBJECTS = 0x0001;
+		private const int UOI_NAME = 2;
+
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern IntPtr OpenInputDesktop(uint dwFlags, [MarshalAs(UnmanagedType.Bool)] bool fInherit, uint dwDesiredAccess);
+
+		[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool GetUserObjectInformation(IntPtr hObj, int nIndex, System.Text.StringBuilder pvInfo, int nLength, out int lpnLengthNeeded);
+
+		[DllImport("user32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool CloseDesktop(IntPtr hDesktop);
 	}
 }
