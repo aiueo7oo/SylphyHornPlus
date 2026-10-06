@@ -1,38 +1,31 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Interop;
-using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace SylphyHorn.Services
 {
 	/// <summary>
-	/// A snapshot of a screen whose pixels are shared between a GDI DIB section and a WPF bitmap.
+	/// A GDI buffer that captures a screen, and copies the captured pixels into a WPF bitmap.
 	/// </summary>
 	/// <remarks>
-	/// <see cref="Capture"/> can run on any thread and copies the screen directly into the memory shown by WPF,
-	/// so capturing a 4K screen in the background does not block the UI thread and needs no extra copy.
-	/// Create the instance and call <see cref="Invalidate"/> on the UI thread.
+	/// <see cref="Capture"/> can run on any thread, so capturing a 4K screen in the background does not block the UI thread.
+	/// <see cref="CopyTo"/> must be called on the UI thread.
+	/// A <see cref="WriteableBitmap"/> is used for display because WPF does not pick up changes of an InteropBitmap
+	/// over a memory section reliably: once rendered, it kept showing the first captured image.
 	/// </remarks>
-	internal sealed class ScreenSnapshot : IDisposable
+	internal sealed class ScreenCaptureBuffer : IDisposable
 	{
 		private readonly System.Drawing.Rectangle _bounds;
 		private readonly object _sync = new object();
-		private IntPtr _section;
 		private IntPtr _bitmap;
+		private IntPtr _bits;
 		private IntPtr _memoryDc;
 		private IntPtr _oldBitmap;
 
-		public InteropBitmap Source { get; }
-
-		public ScreenSnapshot(System.Drawing.Rectangle bounds)
+		public ScreenCaptureBuffer(System.Drawing.Rectangle bounds)
 		{
 			this._bounds = bounds;
-
-			var stride = bounds.Width * 4;
-			var size = (uint)(stride * bounds.Height);
-			this._section = CreateFileMapping(INVALID_HANDLE_VALUE, IntPtr.Zero, PAGE_READWRITE, 0, size, null);
-			if (this._section == IntPtr.Zero) throw new System.ComponentModel.Win32Exception();
 
 			var screenDc = GetDC(IntPtr.Zero);
 			try
@@ -45,7 +38,7 @@ namespace SylphyHorn.Services
 					biPlanes = 1,
 					biBitCount = 32,
 				};
-				this._bitmap = CreateDIBSection(screenDc, ref info, DIB_RGB_COLORS, out _, this._section, 0);
+				this._bitmap = CreateDIBSection(screenDc, ref info, DIB_RGB_COLORS, out this._bits, IntPtr.Zero, 0);
 				this._memoryDc = CreateCompatibleDC(screenDc);
 			}
 			finally
@@ -56,15 +49,19 @@ namespace SylphyHorn.Services
 			if (this._bitmap == IntPtr.Zero || this._memoryDc == IntPtr.Zero)
 			{
 				this.Dispose();
-				throw new InvalidOperationException("Failed to create a screen snapshot.");
+				throw new InvalidOperationException("Failed to create a screen capture buffer.");
 			}
 
 			this._oldBitmap = SelectObject(this._memoryDc, this._bitmap);
-			this.Source = (InteropBitmap)Imaging.CreateBitmapSourceFromMemorySection(this._section, bounds.Width, bounds.Height, PixelFormats.Bgr32, stride, 0);
+		}
+
+		public WriteableBitmap CreateBitmap()
+		{
+			return new WriteableBitmap(this._bounds.Width, this._bounds.Height, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null);
 		}
 
 		/// <summary>
-		/// Copies the current content of the screen into the snapshot. Thread-safe.
+		/// Copies the current content of the screen into the buffer. Thread-safe.
 		/// </summary>
 		public void Capture()
 		{
@@ -86,11 +83,17 @@ namespace SylphyHorn.Services
 		}
 
 		/// <summary>
-		/// Lets WPF pick up the captured pixels. Call on the UI thread after <see cref="Capture"/>.
+		/// Copies the captured pixels into the bitmap. Call on the UI thread.
 		/// </summary>
-		public void Invalidate()
+		public void CopyTo(WriteableBitmap target)
 		{
-			this.Source.Invalidate();
+			lock (this._sync)
+			{
+				if (this._bits == IntPtr.Zero) return;
+
+				var stride = this._bounds.Width * 4;
+				target.WritePixels(new Int32Rect(0, 0, this._bounds.Width, this._bounds.Height), this._bits, stride * this._bounds.Height, stride);
+			}
 		}
 
 		public void Dispose()
@@ -108,12 +111,7 @@ namespace SylphyHorn.Services
 				{
 					DeleteObject(this._bitmap);
 					this._bitmap = IntPtr.Zero;
-				}
-
-				if (this._section != IntPtr.Zero)
-				{
-					CloseHandle(this._section);
-					this._section = IntPtr.Zero;
+					this._bits = IntPtr.Zero;
 				}
 			}
 		}
@@ -136,15 +134,6 @@ namespace SylphyHorn.Services
 
 		private const int SRCCOPY = 0x00CC0020;
 		private const uint DIB_RGB_COLORS = 0;
-		private const uint PAGE_READWRITE = 0x04;
-		private static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
-
-		[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-		private static extern IntPtr CreateFileMapping(IntPtr hFile, IntPtr lpAttributes, uint flProtect, uint dwMaximumSizeHigh, uint dwMaximumSizeLow, string lpName);
-
-		[DllImport("kernel32.dll")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool CloseHandle(IntPtr hObject);
 
 		[DllImport("user32.dll")]
 		private static extern IntPtr GetDC(IntPtr hWnd);

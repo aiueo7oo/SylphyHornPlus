@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using SylphyHorn.Serialization;
 using SylphyHorn.UI;
@@ -56,7 +57,8 @@ namespace SylphyHorn.Services
 
 		private static VirtualDesktop _pendingTarget;
 		private static Task _pendingCapture;
-		private static List<ScreenSnapshot> _pendingSnapshots;
+		private static ScreenOverlay[] _pendingCaptureScreens;
+		private static Guid _pendingCaptureDesktopId;
 		private static Animation _animation;
 		private static DispatcherTimer _settleTimer;
 
@@ -145,10 +147,10 @@ namespace SylphyHorn.Services
 					HideAll();
 					if (!settling)
 					{
-						foreach (var snapshot in _screens.Select(x => x.GetSnapshot(current.Id)))
+						foreach (var screen in _screens)
 						{
-							snapshot.Capture();
-							snapshot.Invalidate();
+							screen.SwitchBuffer.Capture();
+							screen.SwitchBuffer.CopyTo(screen.GetSnapshot(current.Id));
 						}
 					}
 					target.Switch(false);
@@ -213,9 +215,17 @@ namespace SylphyHorn.Services
 			// of the previous desktop, so keep the snapshot shown at the arrival in that case.
 			if (!settling)
 			{
-				var snapshots = _screens.Select(x => x.GetSnapshot(current.Id)).ToList();
-				_pendingSnapshots = snapshots;
-				_pendingCapture = Task.Run(() => snapshots.ForEach(x => x.Capture()));
+				var desktopId = current.Id;
+				var screens = _screens.ToArray();
+				_pendingCaptureDesktopId = desktopId;
+				_pendingCaptureScreens = screens;
+				_pendingCapture = Task.Run(() =>
+				{
+					foreach (var screen in screens)
+					{
+						screen.SwitchBuffer.Capture();
+					}
+				});
 			}
 
 			var windows = _screens.Select(x => x.ShowNext(target.Id)).ToList();
@@ -283,15 +293,19 @@ namespace SylphyHorn.Services
 		private static void FinishCapture()
 		{
 			var capture = _pendingCapture;
-			var snapshots = _pendingSnapshots;
+			var screens = _pendingCaptureScreens;
+			var desktopId = _pendingCaptureDesktopId;
 			_pendingCapture = null;
-			_pendingSnapshots = null;
+			_pendingCaptureScreens = null;
 			if (capture == null) return;
 
 			try
 			{
 				capture.Wait();
-				snapshots.ForEach(x => x.Invalidate());
+				foreach (var screen in screens.Where(x => _screens.Contains(x)))
+				{
+					screen.SwitchBuffer.CopyTo(screen.GetSnapshot(desktopId));
+				}
 			}
 			catch (Exception ex)
 			{
@@ -337,8 +351,7 @@ namespace SylphyHorn.Services
 		}
 
 		/// <summary>
-		/// Captures the current desktop into a spare snapshot in the background,
-		/// and replaces its snapshot only if no desktop switch happened meanwhile.
+		/// Captures the current desktop in the background, and updates its snapshot only if no desktop switch happened meanwhile.
 		/// </summary>
 		private static void RefreshCurrentSnapshot()
 		{
@@ -351,15 +364,14 @@ namespace SylphyHorn.Services
 				var desktopId = VirtualDesktop.Current.Id;
 				var changeCount = Volatile.Read(ref _desktopChangeCount);
 				var screens = _screens.ToArray();
-				var spares = screens.Select(x => x.Spare).ToArray();
 				var dispatcher = Dispatcher.CurrentDispatcher;
 
 				_refreshing = true;
 				Task.Run(() =>
 				{
-					foreach (var spare in spares)
+					foreach (var screen in screens)
 					{
-						spare.Capture();
+						screen.RefreshBuffer.Capture();
 					}
 				}).ContinueWith(task => dispatcher.BeginInvoke(new Action(() =>
 				{
@@ -377,7 +389,7 @@ namespace SylphyHorn.Services
 
 					foreach (var screen in screens)
 					{
-						screen.CommitSpare(desktopId);
+						screen.RefreshBuffer.CopyTo(screen.GetSnapshot(desktopId));
 					}
 				})));
 			}
@@ -568,32 +580,26 @@ namespace SylphyHorn.Services
 		private sealed class ScreenOverlay : IDisposable
 		{
 			private readonly SwitchAnimationWindow[] _windows;
-			private readonly Dictionary<Guid, ScreenSnapshot> _snapshots = new Dictionary<Guid, ScreenSnapshot>();
-			private ScreenSnapshot _spare;
+			private readonly Dictionary<Guid, WriteableBitmap> _snapshots = new Dictionary<Guid, WriteableBitmap>();
 			private int _latest = -1;
 
-			/// <summary>
-			/// The snapshot used for background refresh; it replaces the snapshot of the desktop when the capture completes.
-			/// </summary>
-			public ScreenSnapshot Spare => this._spare ?? (this._spare = new ScreenSnapshot(this.Bounds));
-
-			/// <summary>
-			/// Makes the spare snapshot the snapshot of the desktop, and the replaced one the next spare.
-			/// </summary>
-			public void CommitSpare(Guid desktopId)
-			{
-				var fresh = this.Spare;
-				fresh.Invalidate();
-				this._snapshots.TryGetValue(desktopId, out var replaced);
-				this._snapshots[desktopId] = fresh;
-				this._spare = replaced;
-			}
-
 			public System.Drawing.Rectangle Bounds { get; }
+
+			/// <summary>
+			/// Captures the desktop being left during a switch.
+			/// </summary>
+			public ScreenCaptureBuffer SwitchBuffer { get; }
+
+			/// <summary>
+			/// Captures the current desktop for the background refresh.
+			/// </summary>
+			public ScreenCaptureBuffer RefreshBuffer { get; }
 
 			public ScreenOverlay(System.Drawing.Rectangle bounds)
 			{
 				this.Bounds = bounds;
+				this.SwitchBuffer = new ScreenCaptureBuffer(bounds);
+				this.RefreshBuffer = new ScreenCaptureBuffer(bounds);
 				this._windows = new[] { new SwitchAnimationWindow(bounds), new SwitchAnimationWindow(bounds), };
 				foreach (var window in this._windows)
 				{
@@ -606,11 +612,11 @@ namespace SylphyHorn.Services
 				return this._snapshots.ContainsKey(desktopId);
 			}
 
-			public ScreenSnapshot GetSnapshot(Guid desktopId)
+			public WriteableBitmap GetSnapshot(Guid desktopId)
 			{
 				if (!this._snapshots.TryGetValue(desktopId, out var snapshot))
 				{
-					snapshot = new ScreenSnapshot(this.Bounds);
+					snapshot = this.SwitchBuffer.CreateBitmap();
 					this._snapshots[desktopId] = snapshot;
 				}
 
@@ -627,7 +633,7 @@ namespace SylphyHorn.Services
 
 				this._latest = this._latest == 0 ? 1 : 0;
 				var window = this._windows[this._latest];
-				window.ShowSnapshot(this._snapshots[desktopId].Source);
+				window.ShowSnapshot(this._snapshots[desktopId]);
 				return window;
 			}
 
@@ -651,7 +657,6 @@ namespace SylphyHorn.Services
 			{
 				foreach (var id in this._snapshots.Keys.Where(x => !desktopIds.Contains(x)).ToArray())
 				{
-					this._snapshots[id].Dispose();
 					this._snapshots.Remove(id);
 				}
 			}
@@ -663,13 +668,9 @@ namespace SylphyHorn.Services
 					window.Close();
 				}
 
-				foreach (var snapshot in this._snapshots.Values)
-				{
-					snapshot.Dispose();
-				}
 				this._snapshots.Clear();
-				this._spare?.Dispose();
-				this._spare = null;
+				this.SwitchBuffer.Dispose();
+				this.RefreshBuffer.Dispose();
 			}
 		}
 
