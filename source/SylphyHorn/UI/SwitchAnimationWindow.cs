@@ -102,23 +102,27 @@ namespace SylphyHorn.UI
 		}
 
 		/// <summary>
-		/// Places the window so that it covers the given portion of the screen.
+		/// Places the window for the given progress of a slide in which the outgoing and incoming desktops move together.
 		/// </summary>
-		/// <param name="coverage">0.0 (just outside of the screen) to 1.0 (covers the whole screen).</param>
-		/// <param name="direction">1 when sliding in from the right edge, -1 from the left edge.</param>
+		/// <param name="progress">0.0 (the outgoing desktop covers the screen) to 1.0 (the incoming desktop covers the screen).</param>
+		/// <param name="direction">
+		/// 1 when moving to the right desktop (the desktops move to the left), -1 when moving to the left desktop (they move to the right).
+		/// </param>
+		/// <param name="incoming">true for the incoming desktop, which follows the outgoing one.</param>
 		/// <remarks>
 		/// A window region cannot be used to clip the part outside of the screen (WPF stops rendering a window with a region),
-		/// so do not slide in from an edge adjacent to another screen.
+		/// so do not slide on a screen with an adjacent screen.
 		/// </remarks>
-		public void Place(double coverage, int direction)
+		public void Slide(double progress, int direction, bool incoming)
 		{
 			var width = this.ScreenBounds.Width;
-			var visible = (int)Math.Round(width * Math.Max(0.0, Math.Min(1.0, coverage)));
-			var x = direction > 0
-				? this.ScreenBounds.Right - visible
-				: this.ScreenBounds.Left - (width - visible);
+			var offset = (int)Math.Round(-direction * width * Math.Max(0.0, Math.Min(1.0, progress)));
+			if (incoming)
+			{
+				offset += direction * width;
+			}
 
-			this.MoveTo(x, this.ScreenBounds.Top);
+			this.MoveTo(this.ScreenBounds.Left + offset, this.ScreenBounds.Top);
 			this.Cloak(false);
 		}
 

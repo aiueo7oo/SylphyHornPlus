@@ -23,15 +23,15 @@ namespace SylphyHorn.Services
 	}
 
 	/// <summary>
-	/// Slides a snapshot of the next desktop in over the screen, then switches the desktop beneath it.
+	/// Slides the current and the next desktop side by side (like Windows does), then switches the desktop beneath the overlay.
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// Nothing is captured when a switch is requested, so the animation starts right away regardless of the screen resolution.
-	/// The snapshot of a desktop is captured in the background while the animation for leaving it is playing
-	/// (the overlay is excluded from screen captures), and is used as the incoming image the next time.
+	/// The current screen is captured when a switch is requested and slides out; the snapshot of the next desktop,
+	/// taken the last time it was shown, slides in attached to it. The capture is also kept as the snapshot of the desktop being left.
 	/// The snapshot of the current desktop is also refreshed in the background every few seconds and shortly after arriving
 	/// at a desktop, because a desktop can be left by other means (Alt+Tab, the taskbar, Task View, ...).
+	/// The overlay windows are excluded from screen captures.
 	/// </para>
 	/// <para>
 	/// The desktop is switched after the animation, so neither the switch itself nor the handlers of the desktop change
@@ -56,9 +56,6 @@ namespace SylphyHorn.Services
 		private static readonly Stopwatch _stopwatch = new Stopwatch();
 
 		private static VirtualDesktop _pendingTarget;
-		private static Task _pendingCapture;
-		private static ScreenOverlay[] _pendingCaptureScreens;
-		private static Guid _pendingCaptureDesktopId;
 		private static Animation _animation;
 		private static DispatcherTimer _settleTimer;
 
@@ -190,9 +187,6 @@ namespace SylphyHorn.Services
 				_animation = null;
 			}
 
-			// The snapshot of the desktop being left must be taken before it is switched away.
-			FinishCapture();
-
 			_settling = true;
 			try
 			{
@@ -211,63 +205,63 @@ namespace SylphyHorn.Services
 		{
 			StopSettleTimer();
 
-			// Capture the desktop being left in the background. Right after a switch, the screen may still show the wallpaper
-			// of the previous desktop, so keep the snapshot shown at the arrival in that case.
-			if (!settling)
+			// The outgoing image: the screen as it is now. Right after a switch, the screen beneath may still show
+			// the wallpaper of the previous desktop, so the snapshot covering the screen is used instead in that case.
+			foreach (var screen in _screens)
 			{
-				var desktopId = current.Id;
-				var screens = _screens.ToArray();
-				_pendingCaptureDesktopId = desktopId;
-				_pendingCaptureScreens = screens;
-				_pendingCapture = Task.Run(() =>
+				if (!settling || !screen.HasSnapshot(current.Id))
 				{
-					foreach (var screen in screens)
-					{
-						screen.Buffer.Capture();
-					}
-				});
+					screen.Buffer.Capture();
+					screen.StoreSnapshot(current.Id);
+				}
 			}
 
-			var windows = _screens.Select(x => x.ShowNext(target.Id)).ToList();
+			var pairs = _screens.Select(x => x.PrepareWindows(current.Id, target.Id, reuseCovering: settling)).ToList();
 
-			// Make sure the snapshots are rendered before they appear; the windows are still far outside of the screens.
+			// Make sure the snapshots are rendered before they appear; the windows are still cloaked.
 			WaitForPresent();
 
-			// A window sliding in from an edge adjacent to another screen would appear on that screen,
+			// A window sliding over an edge adjacent to another screen would appear on that screen,
 			// so such a screen is covered at once instead.
-			var sliding = new List<SwitchAnimationWindow>();
+			var moving = new List<(SwitchAnimationWindow Window, bool Incoming)>();
 			for (var i = 0; i < _screens.Count; i++)
 			{
-				if (CanSlideIn(_screens[i].Bounds, direction))
+				var (outgoing, incoming) = pairs[i];
+				if (CanSlide(_screens[i].Bounds))
 				{
-					windows[i].Place(0.0, direction);
-					sliding.Add(windows[i]);
+					outgoing.Slide(0.0, direction, incoming: false);
+					incoming.Slide(0.0, direction, incoming: true);
+					moving.Add((outgoing, false));
+					moving.Add((incoming, true));
 				}
 				else
 				{
-					windows[i].Place(1.0, direction);
+					incoming.Slide(1.0, direction, incoming: true);
+					outgoing.Release();
 				}
 			}
 
 			_pendingTarget = target;
-			if (sliding.Count == 0)
+			if (moving.Count == 0)
 			{
 				OnAnimationCompleted(null, EventArgs.Empty);
 				return;
 			}
 
-			_animation = new Animation(sliding, direction, GetDuration());
+			_animation = new Animation(moving, direction, GetDuration());
 			_animation.Completed += OnAnimationCompleted;
 			_animation.Start();
 		}
 
-		private static bool CanSlideIn(System.Drawing.Rectangle screen, int direction)
+		/// <summary>
+		/// Whether both images can slide on the screen without appearing on an adjacent screen.
+		/// </summary>
+		private static bool CanSlide(System.Drawing.Rectangle screen)
 		{
-			var entry = direction > 0
-				? new System.Drawing.Rectangle(screen.Right, screen.Top, screen.Width, screen.Height)
-				: new System.Drawing.Rectangle(screen.Left - screen.Width, screen.Top, screen.Width, screen.Height);
+			var left = new System.Drawing.Rectangle(screen.Left - screen.Width, screen.Top, screen.Width, screen.Height);
+			var right = new System.Drawing.Rectangle(screen.Right, screen.Top, screen.Width, screen.Height);
 
-			return _screens.All(x => !x.Bounds.IntersectsWith(entry));
+			return _screens.All(x => !x.Bounds.IntersectsWith(left) && !x.Bounds.IntersectsWith(right));
 		}
 
 		private static void OnAnimationCompleted(object sender, EventArgs e)
@@ -287,29 +281,6 @@ namespace SylphyHorn.Services
 			else
 			{
 				HideAll();
-			}
-		}
-
-		private static void FinishCapture()
-		{
-			var capture = _pendingCapture;
-			var screens = _pendingCaptureScreens;
-			var desktopId = _pendingCaptureDesktopId;
-			_pendingCapture = null;
-			_pendingCaptureScreens = null;
-			if (capture == null) return;
-
-			try
-			{
-				capture.Wait();
-				foreach (var screen in screens.Where(x => _screens.Contains(x)))
-				{
-					screen.StoreSnapshot(desktopId);
-				}
-			}
-			catch (Exception ex)
-			{
-				LoggingService.Instance.Register(ex);
 			}
 		}
 
@@ -506,7 +477,7 @@ namespace SylphyHorn.Services
 		/// </summary>
 		private sealed class Animation
 		{
-			private readonly IReadOnlyList<SwitchAnimationWindow> _windows;
+			private readonly IReadOnlyList<(SwitchAnimationWindow Window, bool Incoming)> _windows;
 			private readonly int _direction;
 			private readonly TimeSpan _duration;
 			private TimeSpan _startTime;
@@ -514,7 +485,8 @@ namespace SylphyHorn.Services
 
 			public event EventHandler Completed;
 
-			public Animation(IReadOnlyList<SwitchAnimationWindow> windows, int direction, TimeSpan duration)
+			/// <param name="windows">The outgoing and incoming windows, which move together.</param>
+			public Animation(IReadOnlyList<(SwitchAnimationWindow Window, bool Incoming)> windows, int direction, TimeSpan duration)
 			{
 				this._windows = windows;
 				this._direction = direction;
@@ -530,7 +502,7 @@ namespace SylphyHorn.Services
 			}
 
 			/// <summary>
-			/// Jumps to the end: the windows cover the whole screen.
+			/// Jumps to the end: the incoming windows cover the whole screen.
 			/// </summary>
 			public void Finish()
 			{
@@ -562,11 +534,11 @@ namespace SylphyHorn.Services
 				this.Place(1.0 - remaining * remaining * remaining * remaining);
 			}
 
-			private void Place(double coverage)
+			private void Place(double progress)
 			{
-				foreach (var window in this._windows)
+				foreach (var (window, incoming) in this._windows)
 				{
-					window.Place(coverage, this._direction);
+					window.Slide(progress, this._direction, incoming);
 				}
 			}
 		}
@@ -575,7 +547,8 @@ namespace SylphyHorn.Services
 		/// The overlay windows for one screen and the snapshots of each desktop on that screen.
 		/// </summary>
 		/// <remarks>
-		/// Two windows are used in turn, so that a new animation can slide in over the window still covering the screen.
+		/// Two windows are used: one shows the outgoing desktop and the other the incoming desktop.
+		/// The window covering the screen at the end of an animation becomes the outgoing window of a switch requested right after it.
 		/// </remarks>
 		private sealed class ScreenOverlay : IDisposable
 		{
@@ -619,17 +592,29 @@ namespace SylphyHorn.Services
 			}
 
 			/// <summary>
-			/// Shows the snapshot of the desktop, outside of the screen, in the window not covering the screen.
+			/// Shows the snapshots of the outgoing and incoming desktops, cloaked.
 			/// </summary>
-			public SwitchAnimationWindow ShowNext(Guid desktopId)
+			/// <param name="reuseCovering">true to use the window still covering the screen as the outgoing window.</param>
+			public (SwitchAnimationWindow Outgoing, SwitchAnimationWindow Incoming) PrepareWindows(Guid fromId, Guid toId, bool reuseCovering)
 			{
-				// Keep only the latest window (it may be covering the screen) and slide in the other one over it.
-				this.HideAllButLatest();
+				int outgoingIndex;
+				if (reuseCovering && this._latest >= 0 && this._windows[this._latest].IsVisible)
+				{
+					outgoingIndex = this._latest;
+				}
+				else
+				{
+					this.HideAll();
+					outgoingIndex = 0;
+					this._windows[outgoingIndex].ShowSnapshot(this._snapshots[fromId]);
+				}
 
-				this._latest = this._latest == 0 ? 1 : 0;
-				var window = this._windows[this._latest];
-				window.ShowSnapshot(this._snapshots[desktopId]);
-				return window;
+				var incomingIndex = 1 - outgoingIndex;
+				this._windows[incomingIndex].Release();
+				this._windows[incomingIndex].ShowSnapshot(this._snapshots[toId]);
+				this._latest = incomingIndex;
+
+				return (this._windows[outgoingIndex], this._windows[incomingIndex]);
 			}
 
 			public void HideAllButLatest()
