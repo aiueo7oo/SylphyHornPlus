@@ -132,8 +132,7 @@ namespace SylphyHorn.Services
 			var current = VirtualDesktop.Current;
 			if (target == current) return;
 
-			// While the overlay covers the screen after the previous switch, the shell reports it as a fullscreen app.
-			if (direction == 0 || (!settling && IsFullScreenAppRunning()))
+			if (direction == 0 || IsExclusiveFullScreenAppRunning())
 			{
 				HideAll();
 				target.Switch(false);
@@ -360,7 +359,7 @@ namespace SylphyHorn.Services
 		{
 			if (_screens.Count == 0 || _refreshing) return;
 			if (_animation != null || _pendingTarget != null || _settling) return;
-			if (IsFullScreenAppRunning() || !IsInputDesktopDefault()) return;
+			if (IsExclusiveFullScreenAppRunning() || !IsInputDesktopDefault()) return;
 
 			try
 			{
@@ -497,11 +496,18 @@ namespace SylphyHorn.Services
 			DwmFlush();
 		}
 
-		private static bool IsFullScreenAppRunning()
+		/// <summary>
+		/// Whether a Direct3D app runs in exclusive fullscreen (its screen cannot be captured or covered) or presentation mode is on.
+		/// </summary>
+		/// <remarks>
+		/// A fullscreen window (a video, a browser with F11, a borderless game, ...) is captured and animated like any other window.
+		/// The shell reports it as "busy", as it does the overlay covering the screen.
+		/// </remarks>
+		private static bool IsExclusiveFullScreenAppRunning()
 		{
 			if (SHQueryUserNotificationState(out var state) != 0) return false;
 
-			return state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE;
+			return state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE;
 		}
 
 		/// <summary>
@@ -690,7 +696,6 @@ namespace SylphyHorn.Services
 			}
 		}
 
-		private const int QUNS_BUSY = 2;
 		private const int QUNS_RUNNING_D3D_FULL_SCREEN = 3;
 		private const int QUNS_PRESENTATION_MODE = 4;
 

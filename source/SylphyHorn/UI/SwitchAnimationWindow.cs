@@ -67,6 +67,9 @@ namespace SylphyHorn.UI
 			// Keep the overlay out of screen captures so that the screen beneath it can be captured during the animation.
 			SetWindowDisplayAffinity(this._handle, WDA_EXCLUDEFROMCAPTURE);
 
+			// Window commands such as Win+Down (minimize) pressed during the animation must not change the overlay.
+			HwndSource.FromHwnd(this._handle)?.AddHook(WndProc);
+
 			this.Cloak(true);
 			this.MoveTo(this.ScreenBounds.Left, this.ScreenBounds.Top);
 		}
@@ -96,6 +99,16 @@ namespace SylphyHorn.UI
 
 		private void ShowCloaked()
 		{
+			// A minimized window would no longer appear: restore it in case it was minimized anyway.
+			if (this._handle != IntPtr.Zero && IsIconic(this._handle))
+			{
+				ShowWindow(this._handle, SW_SHOWNOACTIVATE);
+			}
+			if (this.WindowState != WindowState.Normal)
+			{
+				this.WindowState = WindowState.Normal;
+			}
+
 			this.Cloak(true);
 			this.MoveTo(this.ScreenBounds.Left, this.ScreenBounds.Top);
 			this.Show();
@@ -151,6 +164,26 @@ namespace SylphyHorn.UI
 			this._image.Source = null;
 		}
 
+		private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+		{
+			switch (msg)
+			{
+				case WM_SYSCOMMAND:
+					var command = wParam.ToInt64() & 0xFFF0;
+					if (command == SC_MINIMIZE || command == SC_MAXIMIZE || command == SC_RESTORE || command == SC_MOVE || command == SC_SIZE)
+					{
+						handled = true;
+					}
+					break;
+
+				case WM_MOUSEACTIVATE:
+					handled = true;
+					return new IntPtr(MA_NOACTIVATE);
+			}
+
+			return IntPtr.Zero;
+		}
+
 		private static double GetSystemDpiScale()
 		{
 			using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
@@ -163,6 +196,15 @@ namespace SylphyHorn.UI
 		private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 		private const uint SWP_NOACTIVATE = 0x0010;
 		private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+		private const int SW_SHOWNOACTIVATE = 4;
+		private const int WM_SYSCOMMAND = 0x0112;
+		private const int WM_MOUSEACTIVATE = 0x0021;
+		private const int MA_NOACTIVATE = 3;
+		private const long SC_SIZE = 0xF000;
+		private const long SC_MOVE = 0xF010;
+		private const long SC_MINIMIZE = 0xF020;
+		private const long SC_MAXIMIZE = 0xF030;
+		private const long SC_RESTORE = 0xF120;
 
 		[DllImport("user32.dll")]
 		[return: MarshalAs(UnmanagedType.Bool)]
@@ -174,6 +216,14 @@ namespace SylphyHorn.UI
 		[DllImport("user32.dll")]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+		[DllImport("user32.dll")]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool IsIconic(IntPtr hWnd);
+
+		[DllImport("user32.dll")]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
 	}
 }
